@@ -8,6 +8,15 @@ from pathlib import Path
 
 from src.core.command_runner import run_command
 from src.core import diagnostics, exporter, registry, runbooks
+from src.core.db import (
+    count_artifacts_for_session,
+    count_findings_for_session,
+    db_stats,
+    get_run,
+    get_session,
+    initialize_db,
+    rebuild_from_sessions_folder,
+)
 from src.core.evidence_collector import (
     collect_crash_bundle,
     collect_event_logs,
@@ -19,6 +28,7 @@ from src.core.exporter import validate_export_folder
 from src.core.masking import MaskingOptions
 from src.core.run_events import RunEventType, get_run_event_bus
 from src.core.script_tasks import run_script_task
+from src.core.sessions import save_session
 
 
 def _assert(condition: bool, message: str) -> None:
@@ -66,6 +76,9 @@ def _ui_module_smoke() -> None:
             any(kind in event_types for kind in {RunEventType.PROGRESS, RunEventType.STDOUT, RunEventType.STDERR, RunEventType.WARNING, RunEventType.ERROR}),
             f"{context}: missing live run events",
         )
+        run_row = get_run(run_id)
+        _assert(run_row is not None, f"{context}: run row missing in sqlite index")
+        _assert(str(run_row.get("status", "")).strip() != "", f"{context}: run status missing in sqlite index")
 
     try:
         for idx, page in enumerate(window.NAV_ITEMS):
@@ -104,6 +117,9 @@ def _ui_module_smoke() -> None:
         _assert(window.tool_runner is not None, "ToolRunner window missing after safe tool run")
         assert_run_events(window.tool_runner.run_id, "safe_tool")
         _assert(bool(window.run_status_detail.text().strip()), "run status detail did not update")
+        sid = str(window.current_session.get("session_id", "")) if isinstance(window.current_session, dict) else ""
+        _assert(bool(sid), "safe_tool: active session id missing")
+        _assert(get_session(sid) is not None, "safe_tool: session row missing in sqlite index")
 
         window._run_script_task("task_wifi_report_fix_wizard", dry_run=True)
         wait_for_worker()
@@ -123,6 +139,8 @@ def _ui_module_smoke() -> None:
 
 
 def main() -> int:
+    db_file = initialize_db()
+    _assert(db_file.exists(), "sqlite db file was not initialized")
     _assert(len(registry.CAPABILITIES) >= 20, "capability registry too small")
     _ui_module_smoke()
     bus = get_run_event_bus()
@@ -142,6 +160,9 @@ def main() -> int:
     session["actions"] = []
     session["network"] = {"ssid": "HomeWifi"}
     session["evidence"] = {"files": []}
+    save_session(session)
+    _assert(get_session("S_SMOKE") is not None, "session row not indexed in sqlite")
+    _assert(count_findings_for_session("S_SMOKE") > 0, "session findings were not indexed in sqlite")
     mask = MaskingOptions(enabled=True, mask_ip=True, extra_tokens=("DESKTOP-SMOKE", "HomeWifi", "John"))
 
     # Required runbook dry-run path
@@ -197,6 +218,7 @@ def main() -> int:
         allow_validator_override=False,
     )
     _assert(ticket.validation_passed, f"ticket export validation failed: {ticket.validation_warnings}")
+    _assert(count_artifacts_for_session("S_SMOKE") > 0, "artifacts were not indexed in sqlite after export")
 
     listing = _read_zip_listing(ticket.zip_path)
     required_files = {
@@ -231,6 +253,11 @@ def main() -> int:
     _assert("C:\\Users\\John" not in summary_md, "summary markdown contains unmasked user path")
     _assert("DESKTOP-SMOKE" not in summary_md, "summary markdown contains unmasked host token")
     _assert("HomeWifi" not in data_session, "session.json contains unmasked SSID token")
+
+    rebuilt = rebuild_from_sessions_folder()
+    _assert(int(rebuilt.get("sessions", 0)) >= 1, "db rebuild indexed zero sessions")
+    stats = db_stats()
+    _assert(stats.sessions >= 1, "db stats sessions count invalid after rebuild")
 
     print("Smoke test passed.")
     return 0

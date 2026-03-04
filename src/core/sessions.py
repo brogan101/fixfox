@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .db import upsert_artifacts, upsert_findings, upsert_session_from_payload, upsert_session_row
 from .paths import ensure_dirs
 
 
@@ -75,6 +76,17 @@ def save_session(session: dict[str, Any]) -> Path:
         raise ValueError("session_id is required")
     path = _session_file(sid)
     path.write_text(json.dumps(session, indent=2), encoding="utf-8")
+    try:
+        upsert_session_from_payload(session)
+        findings = session.get("findings", [])
+        if isinstance(findings, list):
+            upsert_findings(sid, findings)
+        evidence = session.get("evidence", {})
+        files = evidence.get("files", []) if isinstance(evidence, dict) else []
+        if isinstance(files, list):
+            upsert_artifacts(sid, files)
+    except Exception:
+        pass
     return path
 
 
@@ -82,7 +94,13 @@ def load_session(session_id: str) -> dict[str, Any]:
     path = _session_file(session_id)
     if not path.exists():
         raise FileNotFoundError(path)
-    return json.loads(path.read_text(encoding="utf-8"))
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    try:
+        if isinstance(payload, dict):
+            upsert_session_from_payload(payload)
+    except Exception:
+        pass
+    return payload
 
 
 def add_or_update_meta(meta: SessionMeta) -> None:
@@ -95,6 +113,18 @@ def add_or_update_meta(meta: SessionMeta) -> None:
         reverse=True,
     )
     save_index(merged)
+    try:
+        upsert_session_row(
+            meta.session_id,
+            created_at=meta.created_utc,
+            updated_at=meta.created_utc,
+            goal=meta.symptom,
+            status="open",
+            summary_plain=meta.summary,
+            last_export_path=meta.last_export_path,
+        )
+    except Exception:
+        pass
 
 
 def persist_new_session(session: dict[str, Any], summary: str = "") -> SessionMeta:
@@ -113,6 +143,17 @@ def persist_new_session(session: dict[str, Any], summary: str = "") -> SessionMe
         tags=[],
     )
     add_or_update_meta(meta)
+    try:
+        upsert_session_row(
+            sid,
+            created_at=created,
+            updated_at=created,
+            goal=symptom,
+            status="open",
+            summary_plain=summary,
+        )
+    except Exception:
+        pass
     return meta
 
 
@@ -123,3 +164,12 @@ def update_meta_export_path(session_id: str, export_path: str) -> None:
             item.last_export_path = export_path
             break
     save_index(items)
+    try:
+        upsert_session_row(
+            session_id,
+            updated_at=datetime.now(timezone.utc).isoformat(),
+            status="exported",
+            last_export_path=export_path,
+        )
+    except Exception:
+        pass

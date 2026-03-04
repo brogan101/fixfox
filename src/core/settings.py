@@ -30,6 +30,7 @@ class AppSettings:
     favorites_fixes: list[str] | None = None
     favorites_tools: list[str] | None = None
     favorites_runbooks: list[str] | None = None
+    file_index_roots: list[str] | None = None
 
     def normalized(self) -> "AppSettings":
         self.ui_mode = "pro" if str(self.ui_mode).strip().lower() == "pro" else "basic"
@@ -41,6 +42,8 @@ class AppSettings:
             self.favorites_tools = []
         if self.favorites_runbooks is None:
             self.favorites_runbooks = []
+        if self.file_index_roots is None:
+            self.file_index_roots = []
         return self
 
 
@@ -65,5 +68,17 @@ def load_settings() -> AppSettings:
 
 def save_settings(settings: AppSettings) -> Path:
     path = settings_path()
-    path.write_text(json.dumps(asdict(settings.normalized()), indent=2), encoding="utf-8")
+    normalized = settings.normalized()
+    path.write_text(json.dumps(asdict(normalized), indent=2), encoding="utf-8")
+    try:
+        from .db import replace_all_favorites, set_file_index_roots
+
+        replace_all_favorites(
+            fixes=normalized.favorites_fixes or [],
+            tools=normalized.favorites_tools or [],
+            runbooks=normalized.favorites_runbooks or [],
+        )
+        set_file_index_roots(normalized.file_index_roots or [])
+    except Exception:
+        pass
     return path

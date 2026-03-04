@@ -2436,61 +2436,49 @@ def _run_fast_file_search(task: ScriptTask, context: ScriptTaskContext, dry_run:
     if dry_run:
         return {"task_id": task.id, "title": task.title, "dry_run": True, "command": ["build/update file index and export sample search results"], "timeout_s": task.timeout_s, "category": task.category}
     output_dir = _ensure_output_dir(context.output_dir)
-    state_index = ensure_dirs()["state"] / "file_index.json"
-    roots = [Path.home() / "Desktop", Path.home() / "Documents", Path.home() / "Downloads"]
+    from .file_index import export_results_csv, index_roots, resolve_roots, search_files
+    from .settings import load_settings
+
+    settings = load_settings()
+    configured_roots = settings.file_index_roots or []
+    roots = resolve_roots(configured_roots)
     start = time.monotonic()
     budget_s = min(max(task.timeout_s, 15), 120)
-    old_index: dict[str, Any] = {}
-    if state_index.exists():
-        try:
-            old_index = json.loads(state_index.read_text(encoding="utf-8"))
-        except Exception:
-            old_index = {}
-    rows: list[dict[str, Any]] = []
-    scanned = 0
-    for root in roots:
-        if not root.exists():
-            continue
-        for dirpath, _dirs, files in os.walk(root):
-            if context.cancel_event is not None and context.cancel_event.is_set():
-                break
-            for name in files:
-                scanned += 1
-                p = Path(dirpath) / name
-                try:
-                    st = p.stat()
-                except OSError:
-                    continue
-                rows.append({"path": str(p), "mtime": int(st.st_mtime), "size": int(st.st_size)})
-                if time.monotonic() - start > budget_s:
-                    break
-            if time.monotonic() - start > budget_s:
-                break
-        if time.monotonic() - start > budget_s:
-            break
-    merged = {row["path"]: row for row in old_index.get("rows", []) if isinstance(row, dict)}
-    for row in rows:
-        merged[row["path"]] = row
-    final_rows = list(merged.values())
-    payload = {"generated_utc": time.time(), "roots": [str(r) for r in roots], "rows": final_rows}
-    state_index.write_text(_effective_mask(json.dumps(payload, indent=2), context.mask_options), encoding="utf-8")
-    index_copy = output_dir / "file_index.json"
-    shutil.copy2(state_index, index_copy)
+    payload = index_roots(
+        roots,
+        budget_seconds=budget_s,
+        cancel_event=context.cancel_event,
+        log_cb=context.log_cb,
+    )
     query = "log"
-    matches = [row for row in final_rows if query in str(row.get("path", "")).lower()][:250]
+    matches = search_files(query, limit=250)
     results_csv = output_dir / "search_results.csv"
-    _write_csv(results_csv, matches, ["path", "mtime", "size"])
+    export_results_csv(matches, results_csv)
+    index_meta = output_dir / "file_index_meta.json"
+    index_meta.write_text(_effective_mask(json.dumps(payload, indent=2), context.mask_options), encoding="utf-8")
     summary = _sectioned_summary(
         title="Fast File Search (Everything-lite) Summary",
-        checked=["Indexed selected roots with a bounded time budget.", "Merged with existing persisted index for incremental updates."],
-        found=[f"files_scanned={scanned}", f"index_rows={len(final_rows)}", f"sample_query={query} matches={len(matches)}"],
+        checked=["Indexed selected roots with a bounded time budget.", "Used SQLite-backed incremental index for fast subsequent queries."],
+        found=[f"files_scanned={payload.get('scanned', 0)}", f"index_rows_changed={payload.get('changed', 0)}", f"sample_query={query} matches={len(matches)}"],
         changed=["No files were modified; index metadata only."],
         next_steps=["Run the tool again to refresh index incrementally.", "Use exported results csv to shortlist large/problem files."],
-        technical_lines=[f"state_index={state_index}", f"budget_s={budget_s}"],
+        technical_lines=[f"roots={';'.join([str(r) for r in roots])}", f"budget_s={budget_s}", f"index_meta={index_meta}"],
     )
     summary_file = _build_output_path(task, output_dir)
     _write_summary_file(summary_file, summary, context.mask_options)
-    return {"task_id": task.id, "title": task.title, "dry_run": False, "code": 0, "stdout": _effective_mask(summary[:3000], context.mask_options), "stderr": "", "duration_s": round(time.monotonic() - start, 2), "timed_out": False, "category": task.category, "output_files": [str(summary_file), str(index_copy), str(results_csv)], "summary_text": summary}
+    return {
+        "task_id": task.id,
+        "title": task.title,
+        "dry_run": False,
+        "code": 130 if payload.get("cancelled") else 0,
+        "stdout": _effective_mask(summary[:3000], context.mask_options),
+        "stderr": "" if not payload.get("cancelled") else "Cancelled by user.",
+        "duration_s": round(time.monotonic() - start, 2),
+        "timed_out": False,
+        "category": task.category,
+        "output_files": [str(summary_file), str(index_meta), str(results_csv)],
+        "summary_text": summary,
+    }
 
 
 def _run_appdata_bloat_scanner(task: ScriptTask, context: ScriptTaskContext, dry_run: bool) -> dict[str, Any]:

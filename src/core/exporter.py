@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from .brand import APP_TAGLINE, EXPORT_PREFIX, ICON_PNG, REPORT_TITLE
+from .db import record_export_artifacts
 from .masking import MaskingOptions, mask_text
 from .paths import ensure_dirs
 from .report import render_html
@@ -468,6 +469,10 @@ def export_session(
         for file in folder.rglob("*"):
             if file.is_file():
                 zf.write(file, arcname=str(file.relative_to(folder)))
+    try:
+        record_export_artifacts(sid, folder, zip_path, preset)
+    except Exception:
+        pass
 
     return ExportResult(
         zip_path=zip_path,

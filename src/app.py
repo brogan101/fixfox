@@ -59,6 +59,7 @@ def _load_runtime_imports():
     try:
         from .core.brand import APP_NAME, ICON_PNG
         from .core.brand_assets import ensure_logo_on_desktop
+        from .core.db import initialize_db
         from .core.logging_setup import configure_logging, install_global_exception_handler
         from .core.settings import load_settings
         from .core.utils import resource_path
@@ -69,6 +70,7 @@ def _load_runtime_imports():
         _ensure_repo_on_sys_path()
         from src.core.brand import APP_NAME, ICON_PNG
         from src.core.brand_assets import ensure_logo_on_desktop
+        from src.core.db import initialize_db
         from src.core.logging_setup import configure_logging, install_global_exception_handler
         from src.core.settings import load_settings
         from src.core.utils import resource_path
@@ -81,6 +83,7 @@ def _load_runtime_imports():
         APP_NAME,
         ICON_PNG,
         ensure_logo_on_desktop,
+        initialize_db,
         configure_logging,
         install_global_exception_handler,
         load_settings,
@@ -99,6 +102,7 @@ def main():
             APP_NAME,
             ICON_PNG,
             ensure_logo_on_desktop,
+            initialize_db,
             configure_logging,
             install_global_exception_handler,
             load_settings,
@@ -116,6 +120,10 @@ def main():
     logger = configure_logging()
     install_global_exception_handler(logger)
     logger.info("Starting %s", APP_NAME)
+    try:
+        initialize_db()
+    except Exception as exc:
+        logger.warning("DB initialization warning: %s", exc)
 
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)

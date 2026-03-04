@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
     QMenu,
     QMessageBox,
     QScrollArea,
+    QSpinBox,
     QSplitter,
     QStackedWidget,
     QTabWidget,
@@ -47,6 +48,15 @@ from ..core import diagnostics
 from ..core.brand import APP_DISPLAY_NAME, APP_TAGLINE, ICON_PNG
 from ..core.brand_assets import ensure_logo_on_desktop
 from ..core.command_runner import run_command
+from ..core.db import (
+    db_stats,
+    get_run,
+    list_recent_runs,
+    list_sessions as list_sessions_db,
+    rebuild_from_sessions_folder,
+    vacuum_database,
+    clear_file_index as clear_file_index_db,
+)
 from ..core.evidence_collector import (
     collect_crash_bundle,
     collect_event_logs,
@@ -58,6 +68,7 @@ from ..core.errors import classify_exit, ensure_next_steps
 from ..core.exporter import PRESETS, export_session
 from ..core.feedback import save_feedback
 from ..core.fixes import FIX_CATALOG, FixAction, list_fixes, run_fix
+from ..core.file_index import export_results_csv, index_roots, search_files
 from ..core.kb import KB_CARDS
 from ..core.logging_setup import log_path, logs_dir
 from ..core.masking import MaskingOptions, mask_text, redaction_preview
@@ -180,9 +191,13 @@ class CommandPaletteDialog(QDialog):
             "runbook": 2,
             "task": 3,
             "session": 4,
-            "kb": 5,
-            "capability": 6,
-            "export": 7,
+            "run": 5,
+            "finding": 6,
+            "artifact": 7,
+            "file": 8,
+            "kb": 9,
+            "capability": 10,
+            "export": 11,
         }
         self.feed.set_items(adapters, sort_key=lambda item: (order.get(item.category.lower(), 99), item.title.lower()))
         if adapters:
@@ -408,6 +423,7 @@ class MainWindow(QMainWindow):
         self.safety_policy = policy_from_settings(self.settings_state)
         self.current_session: dict[str, Any] = {}
         self.last_export: dict[str, Any] = {}
+        self._fast_file_results: list[dict[str, Any]] = []
         self.active_worker: TaskWorker | None = None
         self.tool_runner: ToolRunnerWindow | None = None
         self.run_event_bus: RunEventBus = get_run_event_bus()
@@ -495,6 +511,7 @@ class MainWindow(QMainWindow):
 
         self._refresh_home_history(); self._refresh_history(); self._refresh_run_center(); self._refresh_fixes(); self._refresh_toolbox(); self._refresh_runbooks(); self._refresh_home_favorites()
         self._update_status_strip(); self._update_weekly_status(); self._update_context_labels(); self._update_redaction_preview(); self._refresh_evidence_items(); self._update_diagnose_context({}); self._update_concierge()
+        self._refresh_db_info_label()
         self._sync_ui_mode_controls()
         self._apply_mode_visibility()
         self._status_tick_timer = QTimer(self)
@@ -767,6 +784,8 @@ class MainWindow(QMainWindow):
             self.pb_pro_console.setVisible(policy.show_playbooks_pro_console)
         if hasattr(self, "task_card") and not policy.show_script_tasks:
             self.task_card.setVisible(False)
+        if hasattr(self, "file_index_card"):
+            self.file_index_card.setVisible(policy.show_playbooks_pro_console)
         if hasattr(self, "rb_audience"):
             self.rb_audience.blockSignals(True)
             self.rb_audience.clear()
@@ -832,7 +851,16 @@ class MainWindow(QMainWindow):
         spinner = self._status_spinner_frames[self._status_spinner_index]
         elapsed = self._status_elapsed_text()
         title = f"Running: {self.active_run_name or 'Task'}"
-        line = self._last_run_log_line[:120].strip() or self._last_run_line[:120].strip() or "Running..."
+        line = self._last_run_log_line[:120].strip() or self._last_run_line[:120].strip()
+        if not line and self.active_run_id:
+            try:
+                run_row = get_run(self.active_run_id)
+                if isinstance(run_row, dict):
+                    line = str(run_row.get("last_log_line", "")).strip()[:120]
+            except Exception:
+                line = ""
+        if not line:
+            line = "Running..."
         detail = f"{spinner} {line} | {elapsed}"
         self._set_run_status(title, detail)
 
@@ -1472,6 +1500,55 @@ class MainWindow(QMainWindow):
         self.task_card.setVisible(False)
         rl.addWidget(self.task_card, 1)
 
+        self.file_index_card = Card("Fast File Search", "Build a local index for instant file lookups (Pro).")
+        self.file_index_roots = QLineEdit()
+        self.file_index_roots.setObjectName("SearchInput")
+        self.file_index_roots.setPlaceholderText("Roots (semicolon-separated), e.g. C:\\Users\\You\\Downloads;C:\\Users\\You\\Desktop")
+        if self.settings_state.file_index_roots:
+            self.file_index_roots.setText(";".join(self.settings_state.file_index_roots))
+        self.file_index_budget = QSpinBox()
+        self.file_index_budget.setRange(10, 600)
+        self.file_index_budget.setValue(90)
+        self.file_index_budget.setSuffix(" s")
+        file_idx_top = QHBoxLayout()
+        file_idx_top.setContentsMargins(0, 0, 0, 0)
+        file_idx_top.setSpacing(6)
+        self.btn_file_index_add_root = SoftButton("Add Root")
+        self.btn_file_index_build = SoftButton("Build Index")
+        self.btn_file_index_add_root.clicked.connect(self._pick_file_index_root)
+        self.btn_file_index_build.clicked.connect(self._build_file_index)
+        file_idx_top.addWidget(self.btn_file_index_add_root)
+        file_idx_top.addWidget(QLabel("Budget"))
+        file_idx_top.addWidget(self.file_index_budget)
+        file_idx_top.addStretch(1)
+        file_idx_top.addWidget(self.btn_file_index_build)
+
+        self.file_index_query = QLineEdit()
+        self.file_index_query.setObjectName("SearchInput")
+        self.file_index_query.setPlaceholderText("Search indexed files")
+        self.btn_file_index_search = SoftButton("Search")
+        self.btn_file_index_export = SoftButton("Export CSV")
+        self.btn_file_index_search.clicked.connect(self._search_file_index)
+        self.btn_file_index_export.clicked.connect(self._export_file_index_results)
+        self.file_index_query.returnPressed.connect(self._search_file_index)
+        file_idx_search = QHBoxLayout()
+        file_idx_search.setContentsMargins(0, 0, 0, 0)
+        file_idx_search.setSpacing(6)
+        file_idx_search.addWidget(self.file_index_query, 1)
+        file_idx_search.addWidget(self.btn_file_index_search)
+        file_idx_search.addWidget(self.btn_file_index_export)
+
+        self.file_index_status = QLabel("Index not built yet.")
+        self.file_index_results = QTextEdit()
+        self.file_index_results.setReadOnly(True)
+        self.file_index_results.setMinimumHeight(150)
+        self.file_index_card.body_layout().addWidget(self.file_index_roots)
+        self.file_index_card.body_layout().addLayout(file_idx_top)
+        self.file_index_card.body_layout().addLayout(file_idx_search)
+        self.file_index_card.body_layout().addWidget(self.file_index_status)
+        self.file_index_card.body_layout().addWidget(self.file_index_results)
+        rl.addWidget(self.file_index_card, 1)
+
         tvl.addWidget(left, 3)
         tvl.addWidget(right, 2)
 
@@ -1548,6 +1625,99 @@ class MainWindow(QMainWindow):
         self.task_card.setVisible(visible)
         if hasattr(self, "pb_advanced_toggle"):
             self.pb_advanced_toggle.setText("Hide advanced script tasks" if visible else "Show advanced script tasks")
+
+    def _current_file_index_roots(self) -> list[str]:
+        raw = self.file_index_roots.text().strip() if hasattr(self, "file_index_roots") else ""
+        if not raw:
+            return []
+        rows = [part.strip() for part in raw.replace("\n", ";").split(";")]
+        return [row for row in rows if row]
+
+    def _pick_file_index_root(self) -> None:
+        start = str(Path.home())
+        path = QFileDialog.getExistingDirectory(self, "Select File Index Root", start)
+        if not path:
+            return
+        roots = self._current_file_index_roots()
+        if path not in roots:
+            roots.append(path)
+        self.file_index_roots.setText(";".join(roots))
+
+    def _build_file_index(self) -> None:
+        roots = self._current_file_index_roots()
+        if not roots:
+            self.toasts.show_toast("Add at least one root path to index.")
+            return
+        budget_s = int(self.file_index_budget.value()) if hasattr(self, "file_index_budget") else 90
+
+        def task(progress_cb: Any, partial_cb: Any, log_cb: Any, cancel_event: Any, timeout_s: int) -> dict[str, Any]:
+            del partial_cb, timeout_s
+            log_cb(f"[file-index] roots={';'.join(roots)}")
+            result = index_roots(
+                roots,
+                budget_seconds=budget_s,
+                cancel_event=cancel_event,
+                progress_cb=progress_cb,
+                log_cb=log_cb,
+            )
+            return result
+
+        self._start_task(
+            "Build File Index",
+            task,
+            self._on_file_index_built,
+            timeout_s=max(30, budget_s + 30),
+            risk="Safe",
+            plain_summary="Builds an SQLite-backed file index for fast local file search.",
+            details_text=f"roots={';'.join(roots)}\nbudget_s={budget_s}",
+            next_steps="Search the index and export CSV results if needed.",
+            rerun_cb=self._build_file_index,
+            run_metadata={"kind": "index", "capability_id": "fast_file_index_build"},
+        )
+
+    def _on_file_index_built(self, payload: dict[str, Any]) -> None:
+        roots = payload.get("roots", [])
+        scanned = int(payload.get("scanned", 0))
+        changed = int(payload.get("changed", 0))
+        deleted = int(payload.get("deleted", 0))
+        cancelled = bool(payload.get("cancelled"))
+        status = (
+            f"Cancelled. Scanned={scanned}, changed={changed}, removed={deleted}."
+            if cancelled
+            else f"Index ready. Scanned={scanned}, changed={changed}, removed={deleted}."
+        )
+        self.file_index_status.setText(status)
+        if isinstance(roots, list) and roots:
+            self.file_index_roots.setText(";".join([str(row) for row in roots]))
+            self.settings_state.file_index_roots = [str(row) for row in roots]
+            save_settings(self.settings_state)
+        self.toasts.show_toast("File index build complete." if not cancelled else "File index build cancelled.")
+
+    def _search_file_index(self) -> None:
+        query = self.file_index_query.text().strip() if hasattr(self, "file_index_query") else ""
+        if not query:
+            self.file_index_results.setPlainText("Enter a query to search indexed files.")
+            return
+        rows = search_files(query, limit=300)
+        self._fast_file_results = rows
+        lines: list[str] = []
+        for row in rows[:200]:
+            size_mb = float(row.get("size_bytes", 0) or 0) / (1024 * 1024)
+            lines.append(f"{row.get('name', '')} | {size_mb:.2f} MB | {row.get('path', '')}")
+        self.file_index_results.setPlainText("\n".join(lines) if lines else "No indexed files matched this query.")
+        self.file_index_status.setText(f"Query '{query}' returned {len(rows)} rows.")
+
+    def _export_file_index_results(self) -> None:
+        if not self._fast_file_results:
+            self.toasts.show_toast("No file index results to export.")
+            return
+        path, _ = QFileDialog.getSaveFileName(self, "Export File Index Results", "file_index_results.csv", "CSV (*.csv)")
+        if not path:
+            return
+        target = export_results_csv(self._fast_file_results, Path(path))
+        self._merge_files_into_session_evidence([str(target)], "storage", "file_index_search")
+        self._refresh_evidence_items()
+        self.toasts.show_toast("File index results exported.")
 
     def _refresh_basic_playbooks_cards(self) -> None:
         if not hasattr(self, "pb_basic_goal_grid"):
@@ -1814,12 +1984,27 @@ class MainWindow(QMainWindow):
         b_logo.clicked.connect(lambda: self.create_desktop_logo(force=False))
         b_logo_recreate = SoftButton("Recreate Desktop Logo")
         b_logo_recreate.clicked.connect(lambda: self.create_desktop_logo(force=True))
+        b_rebuild_db = SoftButton("Rebuild Database Index")
+        b_rebuild_db.clicked.connect(self._rebuild_database_index)
+        b_vacuum_db = SoftButton("Vacuum Database")
+        b_vacuum_db.clicked.connect(self._vacuum_database_now)
+        b_clear_file_index = SoftButton("Clear File Index")
+        b_clear_file_index.clicked.connect(self._clear_file_index_now)
+        self.db_info_label = QLabel("Database: loading...")
+        self.db_info_label.setWordWrap(True)
         c_adv.body_layout().addWidget(b_open)
         c_adv.body_layout().addWidget(self._setting_hint("Open application log directory in File Explorer."))
         c_adv.body_layout().addWidget(b_copy)
         c_adv.body_layout().addWidget(self._setting_hint("Copy absolute path to the active log file."))
         c_adv.body_layout().addWidget(b_data)
         c_adv.body_layout().addWidget(self._setting_hint("Open app data root for sessions, state, and exports."))
+        c_adv.body_layout().addWidget(self.db_info_label)
+        c_adv.body_layout().addWidget(b_rebuild_db)
+        c_adv.body_layout().addWidget(self._setting_hint("Rebuilds SQLite index from session JSON files (safe/idempotent)."))
+        c_adv.body_layout().addWidget(b_vacuum_db)
+        c_adv.body_layout().addWidget(self._setting_hint("Compacts SQLite database and can improve read/write performance."))
+        c_adv.body_layout().addWidget(b_clear_file_index)
+        c_adv.body_layout().addWidget(self._setting_hint("Clears Everything-lite file index rows without deleting session data."))
         c_adv.body_layout().addWidget(b_diag)
         c_adv.body_layout().addWidget(self._setting_hint("Runs core evidence collection and attaches output for export."))
         c_adv.body_layout().addWidget(b_logo)
@@ -1896,6 +2081,73 @@ class MainWindow(QMainWindow):
         l.addLayout(shell, 1)
         self.settings_nav.setCurrentRow(0)
         return _scroll(p)
+
+    def _refresh_db_info_label(self) -> None:
+        if not hasattr(self, "db_info_label"):
+            return
+        try:
+            stats = db_stats()
+            size_mb = float(stats.size_bytes) / (1024 * 1024)
+            self.db_info_label.setText(
+                f"DB: {stats.path}\nSize: {size_mb:.2f} MB | sessions={stats.sessions} runs={stats.runs} findings={stats.findings} artifacts={stats.artifacts} file_index={stats.file_index_rows}"
+            )
+        except Exception as exc:
+            self.db_info_label.setText(f"Database info unavailable: {exc}")
+
+    def _rebuild_database_index(self) -> None:
+        def task(progress_cb: Any, partial_cb: Any, log_cb: Any, cancel_event: Any, timeout_s: int) -> dict[str, Any]:
+            del partial_cb, cancel_event, timeout_s
+            progress_cb(10, "Rebuilding SQLite index")
+            log_cb("Rebuilding from session JSON files...")
+            result = rebuild_from_sessions_folder()
+            progress_cb(100, "Done")
+            log_cb(
+                f"Rebuild done: sessions={result.get('sessions', 0)} runs={result.get('runs', 0)} findings={result.get('findings', 0)} artifacts={result.get('artifacts', 0)}"
+            )
+            return result
+
+        self._start_task(
+            "Rebuild Database Index",
+            task,
+            self._on_rebuild_database_index,
+            timeout_s=300,
+            risk="Safe",
+            plain_summary="Rebuilds SQLite query/index tables from persisted session JSON.",
+            details_text="Reads sessions/*.json and sessions/index.json, then repopulates sessions/runs/findings/artifacts tables.",
+            next_steps="Refresh History and Run Center to validate rebuilt results.",
+            rerun_cb=self._rebuild_database_index,
+            run_metadata={"kind": "maintenance", "capability_id": "db_rebuild"},
+        )
+
+    def _on_rebuild_database_index(self, payload: dict[str, Any]) -> None:
+        self._refresh_db_info_label()
+        self._refresh_home_history()
+        self._refresh_history()
+        self._refresh_run_center()
+        self.toasts.show_toast(
+            f"DB rebuild complete: sessions={payload.get('sessions', 0)} runs={payload.get('runs', 0)} findings={payload.get('findings', 0)}."
+        )
+
+    def _vacuum_database_now(self) -> None:
+        try:
+            vacuum_database()
+            self._refresh_db_info_label()
+            self.toasts.show_toast("Database vacuum complete.")
+        except Exception as exc:
+            self.toasts.show_toast(f"Database vacuum failed: {exc}")
+
+    def _clear_file_index_now(self) -> None:
+        try:
+            removed = clear_file_index_db()
+            self._fast_file_results = []
+            if hasattr(self, "file_index_results"):
+                self.file_index_results.setPlainText("")
+            if hasattr(self, "file_index_status"):
+                self.file_index_status.setText(f"File index cleared ({removed} rows removed).")
+            self._refresh_db_info_label()
+            self.toasts.show_toast(f"Cleared file index rows: {removed}")
+        except Exception as exc:
+            self.toasts.show_toast(f"Clear file index failed: {exc}")
 
     def _apply_theme(self) -> None:
         palette = normalize_palette(self.settings_state.theme_palette)
@@ -2237,6 +2489,7 @@ class MainWindow(QMainWindow):
         rerun_cb: Callable[[], None] | None = None,
         evidence_root: str = "",
         run_id: str = "",
+        run_metadata: dict[str, Any] | None = None,
     ) -> str:
         if self.active_worker is not None:
             self.toasts.show_toast("Another task is running.")
@@ -2247,6 +2500,7 @@ class MainWindow(QMainWindow):
                 name=name,
                 risk=risk,
                 session_id=str(self.current_session.get("session_id", "")) if self.current_session else "",
+                metadata=run_metadata or {},
             )
         self.active_run_id = resolved_run_id
         self.active_run_name = name
@@ -2466,6 +2720,7 @@ class MainWindow(QMainWindow):
             details_text="Includes CPU, memory, disk, update and network heuristics.",
             next_steps="Review findings in Diagnose, then run a safe fix or runbook.",
             rerun_cb=lambda: self.run_quick_check(symptom),
+            run_metadata={"kind": "diagnostic", "capability_id": "quick_check", "diagnostic": "quick_check"},
         )
 
     def _on_quick_check(self, data: dict[str, Any]) -> None:
@@ -2849,6 +3104,7 @@ class MainWindow(QMainWindow):
             details_text="\n".join(fx.commands),
             next_steps=f"Review result then {'reboot if prompted' if fx.admin_required else 'continue with next safe action'}.",
             rerun_cb=lambda: self.run_fix_action(fx.key),
+            run_metadata={"kind": "fix", "capability_id": fx.key, "fix_id": fx.key},
         )
 
     def _on_fix(self, payload: dict[str, Any]) -> None:
@@ -2915,6 +3171,7 @@ class MainWindow(QMainWindow):
             details_text=f"Preset={self.rep_preset.currentText()} ShareSafe={self.rep_safe.isChecked()} MaskIP={self.rep_ip.isChecked()} AllowWarnings={allow_validator_override}",
             next_steps="Copy ticket summary or open report folder when complete. If validation fails, export stays blocked unless you explicitly allow warnings.",
             rerun_cb=(self.export_current_session_allow_warnings if allow_validator_override else self.export_current_session),
+            run_metadata={"kind": "export", "capability_id": f"export_preset.{self.rep_preset.currentText()}", "export_preset": self.rep_preset.currentText()},
         )
 
     def _on_export(self, payload: dict[str, Any]) -> None:
@@ -2923,6 +3180,9 @@ class MainWindow(QMainWindow):
             return
         self.last_export = payload
         if self.current_session:
+            self.current_session["last_export_preset"] = self.rep_preset.currentText()
+            self.current_session["last_export_path"] = payload.get("zip", "")
+            save_session(self.current_session)
             update_meta_export_path(self.current_session.get("session_id", ""), payload.get("zip", ""))
         self.rep_status.sub.setText(f"Validation {'passed' if payload.get('ok') else 'warnings'}: {payload.get('zip', '')}")
         if hasattr(self, "rep_steps"):
@@ -3045,7 +3305,16 @@ class MainWindow(QMainWindow):
         if hasattr(self, "rep_token_map"):
             self.rep_token_map.setText("Token map example: PC_1 / USER_1 / SSID_1")
 
-    def _session_meta_payload(self, row: SessionMeta) -> dict[str, Any]:
+    def _session_meta_payload(self, row: Any) -> dict[str, Any]:
+        if isinstance(row, dict):
+            return {
+                "session_id": str(row.get("session_id", "")),
+                "symptom": str(row.get("goal", row.get("symptom", "Quick Check"))),
+                "summary": str(row.get("summary_plain", row.get("summary", ""))),
+                "created_utc": str(row.get("created_at", row.get("updated_at", ""))),
+                "last_export_path": str(row.get("last_export_path", "")),
+                "pinned": bool(row.get("pinned", False)),
+            }
         return {
             "session_id": row.session_id,
             "symptom": row.symptom,
@@ -3068,15 +3337,21 @@ class MainWindow(QMainWindow):
         )
 
     def _refresh_home_history(self) -> None:
-        rows = load_index()[:8]
+        rows: list[Any] = []
+        try:
+            rows = list_sessions_db(limit=8)
+        except Exception:
+            rows = []
+        if not rows:
+            rows = load_index()[:8]
         adapters = [
             FeedItemAdapter(
-                key=r.session_id,
-                title=r.symptom,
-                subtitle=r.summary,
+                key=str(self._session_meta_payload(r).get("session_id", "")),
+                title=str(self._session_meta_payload(r).get("symptom", "")),
+                subtitle=str(self._session_meta_payload(r).get("summary", "")),
                 payload=self._session_meta_payload(r),
-                timestamp=r.created_utc,
-                export_status="Exported" if r.last_export_path else "New",
+                timestamp=str(self._session_meta_payload(r).get("created_utc", "")),
+                export_status="Exported" if self._session_meta_payload(r).get("last_export_path") else "New",
             )
             for r in rows
         ]
@@ -3085,18 +3360,26 @@ class MainWindow(QMainWindow):
     def _refresh_history(self) -> None:
         q = self.hist_search.text().strip().lower() if hasattr(self, "hist_search") else ""
         adapters: list[FeedItemAdapter] = []
-        for r in load_index():
-            blob = f"{r.session_id} {r.symptom} {r.summary}".lower()
+        rows: list[Any] = []
+        try:
+            rows = list_sessions_db(limit=300, query=q)
+        except Exception:
+            rows = []
+        if not rows:
+            rows = load_index()
+        for r in rows:
+            payload = self._session_meta_payload(r)
+            blob = f"{payload.get('session_id', '')} {payload.get('symptom', '')} {payload.get('summary', '')}".lower()
             if q and q not in blob:
                 continue
             adapters.append(
                 FeedItemAdapter(
-                    key=r.session_id,
-                    title=r.symptom,
-                    subtitle=r.summary,
-                    payload=self._session_meta_payload(r),
-                    timestamp=r.created_utc,
-                    export_status="Exported" if r.last_export_path else "New",
+                    key=str(payload.get("session_id", "")),
+                    title=str(payload.get("symptom", "")),
+                    subtitle=str(payload.get("summary", "")),
+                    payload=payload,
+                    timestamp=str(payload.get("created_utc", "")),
+                    export_status="Exported" if payload.get("last_export_path") else "New",
                 )
             )
         self.hist_list.set_items(adapters)
@@ -3224,57 +3507,93 @@ class MainWindow(QMainWindow):
     def _refresh_run_center(self) -> None:
         if not hasattr(self, "run_center"):
             return
-        actions: list[dict[str, Any]] = []
-        current_actions = self.current_session.get("actions", []) if self.current_session else []
-        if isinstance(current_actions, list):
-            for row in current_actions:
-                if isinstance(row, dict):
-                    actions.append(dict(row))
-        if not actions:
-            for meta in load_index()[:12]:
-                try:
-                    session = load_session(meta.session_id)
-                except Exception:
-                    continue
-                session_actions = session.get("actions", [])
-                if not isinstance(session_actions, list):
-                    continue
-                for row in session_actions[-3:]:
-                    if not isinstance(row, dict):
-                        continue
-                    cloned = dict(row)
-                    cloned.setdefault("_session_id", meta.session_id)
-                    actions.append(cloned)
-                if len(actions) >= 20:
-                    break
         adapters: list[FeedItemAdapter] = []
-        for idx, action in enumerate(reversed(actions[-20:]), start=1):
-            if not isinstance(action, dict):
-                continue
-            key = str(action.get("key", "")).strip()
-            title = str(action.get("title", "")).strip() or key or f"Run {idx}"
-            code = int(action.get("code", 0 if action.get("dry_run") else 1))
-            status = "Completed" if code == 0 else "Failed"
-            sid = str(action.get("_session_id", self.current_session.get("session_id", "") if self.current_session else "")).strip()
-            sid_piece = f" | session={sid}" if sid else ""
-            subtitle = f"{status} | code={code} | risk={action.get('risk', 'Safe')}{sid_piece}"
-            adapters.append(
-                FeedItemAdapter(
-                    key=f"run:{idx}:{key}",
-                    title=title,
-                    subtitle=subtitle,
-                    payload=action,
-                    category=str(action.get("type", "run")).strip() or "run",
-                    status=str(action.get("risk", "Safe")),
+        try:
+            sid = str(self.current_session.get("session_id", "") if self.current_session else "").strip()
+            runs = list_recent_runs(limit=20, session_id=sid if sid else "")
+            for idx, run in enumerate(runs, start=1):
+                capability = str(run.get("capability_id", "")).strip()
+                run_kind = str(run.get("kind", "run")).strip() or "run"
+                run_id = str(run.get("run_id", "")).strip()
+                code = int(run.get("exit_code", 0) or 0)
+                status = str(run.get("status", "unknown")).strip() or "unknown"
+                title = capability or run_id or f"Run {idx}"
+                last_line = str(run.get("last_log_line", "")).strip()
+                sid_piece = f" | session={run.get('session_id', '')}" if run.get("session_id") else ""
+                subtitle = f"{status} | code={code} | {run_kind}{sid_piece}"
+                if last_line:
+                    subtitle += f" | {last_line[:90]}"
+                payload = {
+                    "key": capability,
+                    "title": title,
+                    "code": code,
+                    "result": last_line,
+                    "_kind": run_kind,
+                    "_run_id": run_id,
+                }
+                adapters.append(
+                    FeedItemAdapter(
+                        key=f"run:{idx}:{capability or run_id}",
+                        title=title,
+                        subtitle=subtitle,
+                        payload=payload,
+                        category=run_kind,
+                        status=status,
+                    )
                 )
-            )
+        except Exception:
+            adapters = []
+
+        if not adapters:
+            actions: list[dict[str, Any]] = []
+            current_actions = self.current_session.get("actions", []) if self.current_session else []
+            if isinstance(current_actions, list):
+                for row in current_actions:
+                    if isinstance(row, dict):
+                        actions.append(dict(row))
+            for idx, action in enumerate(reversed(actions[-20:]), start=1):
+                key = str(action.get("key", "")).strip()
+                title = str(action.get("title", "")).strip() or key or f"Run {idx}"
+                code = int(action.get("code", 0 if action.get("dry_run") else 1))
+                status = "Completed" if code == 0 else "Failed"
+                subtitle = f"{status} | code={code} | risk={action.get('risk', 'Safe')}"
+                adapters.append(
+                    FeedItemAdapter(
+                        key=f"run:{idx}:{key}",
+                        title=title,
+                        subtitle=subtitle,
+                        payload=action,
+                        category=str(action.get("type", "run")).strip() or "run",
+                        status=str(action.get("risk", "Safe")),
+                    )
+                )
         self.run_center.set_items(adapters)
 
     def _run_center_activate(self, payload: Any) -> None:
         if not isinstance(payload, dict):
             return
         key = str(payload.get("key", "")).strip()
+        run_kind = str(payload.get("_kind", "")).strip().lower()
+        if run_kind in {"tool", "script", "runbook", "fix"} and not key:
+            key = str(payload.get("title", "")).strip()
         if not key:
+            return
+        if run_kind == "tool":
+            self._launch_tool_payload(key)
+            return
+        if run_kind == "script":
+            self.nav.setCurrentRow(self.NAV_ITEMS.index("Playbooks"))
+            self._select_script_task(key)
+            self._run_script_task(key, dry_run=False)
+            return
+        if run_kind == "runbook":
+            self.nav.setCurrentRow(self.NAV_ITEMS.index("Playbooks"))
+            self._select_runbook(key)
+            self.run_selected_runbook(False)
+            return
+        if run_kind == "fix":
+            self.nav.setCurrentRow(self.NAV_ITEMS.index("Fixes"))
+            self.run_fix_action(key)
             return
         if key in script_task_map():
             self.nav.setCurrentRow(self.NAV_ITEMS.index("Playbooks"))
@@ -3463,7 +3782,7 @@ class MainWindow(QMainWindow):
             name=f"Tool: {t.title}",
             risk="Safe",
             session_id=sid,
-            metadata={"tool_id": t.id},
+            metadata={"kind": "tool", "capability_id": t.id, "tool_id": t.id},
         )
 
         def task(progress_cb: Any, partial_cb: Any, log_cb: Any, cancel_event: Any, timeout_s: int) -> dict[str, Any]:
@@ -3606,7 +3925,7 @@ class MainWindow(QMainWindow):
             name=f"Script Task: {task_meta.title}",
             risk=task_meta.risk,
             session_id=sid,
-            metadata={"task_id": task_meta.id},
+            metadata={"kind": "script", "capability_id": task_meta.id, "task_id": task_meta.id},
         )
 
         def task(progress_cb: Any, partial_cb: Any, log_cb: Any, cancel_event: Any, timeout_s: int) -> dict[str, Any]:
@@ -3739,6 +4058,7 @@ class MainWindow(QMainWindow):
             next_steps="Review evidence in Reports, then export a support pack for sharing.",
             rerun_cb=self._collect_core_evidence,
             evidence_root=str(ensure_dirs()["state"] / "evidence"),
+            run_metadata={"kind": "evidence", "capability_id": "core_evidence_collection"},
         )
 
     def _on_evidence_collection(self, payload: dict[str, Any]) -> None:
@@ -3813,7 +4133,7 @@ class MainWindow(QMainWindow):
             name=selected.title if selected is not None else "Runbook",
             risk="Admin" if selected and selected.audience == "it" else "Safe",
             session_id=str(self.current_session.get("session_id", "")) if self.current_session else "",
-            metadata={"runbook_id": rid, "dry_run": dry_run},
+            metadata={"kind": "runbook", "capability_id": rid, "runbook_id": rid, "dry_run": dry_run},
         )
 
         def task(progress_cb: Any, partial_cb: Any, log_cb: Any, cancel_event: Any, timeout_s: int) -> dict[str, Any]:
@@ -4018,6 +4338,27 @@ class MainWindow(QMainWindow):
             self._copy_text(v + ".zip")
         elif k == "kb":
             self.nav.setCurrentRow(self.NAV_ITEMS.index("Diagnose"))
+        elif k == "run":
+            self.nav.setCurrentRow(self.NAV_ITEMS.index("History"))
+            self.toasts.show_toast(f"Run indexed: {v}")
+        elif k == "finding":
+            self.nav.setCurrentRow(self.NAV_ITEMS.index("Diagnose"))
+            if hasattr(self, "diag_search"):
+                self.diag_search.setText(v)
+        elif k == "artifact":
+            target = Path(v)
+            if target.exists():
+                if os.name == "nt":
+                    os.startfile(str(target))
+            else:
+                self.toasts.show_toast("Artifact path not found.")
+        elif k == "file":
+            target = Path(v)
+            if target.exists():
+                if os.name == "nt":
+                    os.startfile(str(target))
+            else:
+                self.toasts.show_toast("Indexed file path not found.")
         else:
             self.nav.setCurrentRow(0)
 
@@ -4469,6 +4810,7 @@ class MainWindow(QMainWindow):
         self._refresh_home_favorites()
         self._apply_mode_visibility()
         self._apply_theme()
+        self._refresh_db_info_label()
         desired_open = self.s_panel.isChecked() and self.layout_policy_state.right_panel_default_open
         if self.concierge.collapsed == desired_open:
             self._set_concierge_collapsed(not desired_open, persist=False)

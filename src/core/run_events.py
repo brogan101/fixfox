@@ -94,6 +94,19 @@ class RunEventBus:
             event = buffer.append(event_type, message, progress, data, rid)
             callbacks.extend(self._subscribers.get(rid, {}).values())
             callbacks.extend(self._subscribers.get("*", {}).values())
+        try:
+            from .db import record_run_event
+
+            record_run_event(
+                rid,
+                event_type,
+                event.timestamp_utc,
+                message=event.message,
+                data=event.data if isinstance(event.data, dict) else None,
+            )
+        except Exception:
+            # Index failures must never block runtime run-event delivery.
+            pass
         for callback in callbacks:
             self._notify_subscriber(callback, event)
         return event
