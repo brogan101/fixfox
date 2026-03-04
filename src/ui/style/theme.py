@@ -10,31 +10,32 @@ from .tokens import (
     ThemeTokens,
 )
 
-PALETTE_ORDER = ("fixfox_m3",)
+PALETTE_ORDER = ("fixfox", "graphite", "high_contrast")
 _UI_SCALE_PERCENT = 100
 
 PALETTE_LABELS: dict[str, str] = {
-    "fixfox_m3": "Fix Fox M3",
+    "fixfox": "Fix Fox",
+    "graphite": "Graphite",
+    "high_contrast": "High Contrast",
 }
 
 PALETTE_ALIASES: dict[str, str] = {
-    "graphite_blue": "fixfox_m3",
-    "neutral_slate": "fixfox_m3",
-    "indigo": "fixfox_m3",
-    "monochrome": "fixfox_m3",
-    "fixfox_graphite": "fixfox_m3",
-    "fixfox_slate": "fixfox_m3",
-    "fixfox_indigo": "fixfox_m3",
-    "fixfox_mono": "fixfox_m3",
-    "Fix Fox M3": "fixfox_m3",
-    "Fix Fox Graphite": "fixfox_m3",
-    "Fix Fox Slate": "fixfox_m3",
-    "Fix Fox Indigo": "fixfox_m3",
-    "Fix Fox Mono": "fixfox_m3",
+    "fixfox_m3": "fixfox",
+    "graphite_blue": "graphite",
+    "neutral_slate": "graphite",
+    "monochrome": "graphite",
+    "fixfox_graphite": "graphite",
+    "Fix Fox M3": "fixfox",
+    "Fix Fox": "fixfox",
+    "Fix Fox Graphite": "graphite",
+    "Graphite": "graphite",
+    "High Contrast": "high_contrast",
+    "high-contrast": "high_contrast",
+    "high_contrast": "high_contrast",
 }
 
 PALETTE_TOKENS_LIGHT: dict[str, ThemeTokens] = {
-    "fixfox_m3": ThemeTokens(
+    "fixfox": ThemeTokens(
         bg0="#FAFAFA",
         bg1="#F6F7F9",
         panel="#FFFFFF",
@@ -52,10 +53,46 @@ PALETTE_TOKENS_LIGHT: dict[str, ThemeTokens] = {
         shadow1="#CFD6DF",
         shadow2="#EEF1F5",
     ),
+    "graphite": ThemeTokens(
+        bg0="#F2F4F7",
+        bg1="#ECEFF3",
+        panel="#FFFFFF",
+        panel2="#E8ECF1",
+        border="#C3CAD4",
+        text="#1B2430",
+        text_muted="#556272",
+        accent="#2E77D0",
+        accent_hover="#4288DC",
+        accent_pressed="#235EA8",
+        ok="#0F8A4A",
+        warn="#A86412",
+        crit="#BA2B2B",
+        info="#2E77D0",
+        shadow1="#CAD1DB",
+        shadow2="#E3E7EE",
+    ),
+    "high_contrast": ThemeTokens(
+        bg0="#FFFFFF",
+        bg1="#FAFAFA",
+        panel="#FFFFFF",
+        panel2="#F2F2F2",
+        border="#101010",
+        text="#000000",
+        text_muted="#1E1E1E",
+        accent="#0057D8",
+        accent_hover="#0B63EA",
+        accent_pressed="#003EA0",
+        ok="#007A33",
+        warn="#8A4B00",
+        crit="#B00020",
+        info="#0057D8",
+        shadow1="#DCDCDC",
+        shadow2="#F0F0F0",
+    ),
 }
 
 PALETTE_TOKENS_DARK: dict[str, ThemeTokens] = {
-    "fixfox_m3": ThemeTokens(
+    "fixfox": ThemeTokens(
         bg0="#0B0D12",
         bg1="#0E1118",
         panel="#101521",
@@ -72,6 +109,42 @@ PALETTE_TOKENS_DARK: dict[str, ThemeTokens] = {
         info="#2563EB",
         shadow1="#07090E",
         shadow2="#1A2336",
+    ),
+    "graphite": ThemeTokens(
+        bg0="#101317",
+        bg1="#141920",
+        panel="#161C25",
+        panel2="#1D2631",
+        border="#394657",
+        text="#EAF0F7",
+        text_muted="#BAC4D1",
+        accent="#5A9DFF",
+        accent_hover="#74AEFF",
+        accent_pressed="#3D82E8",
+        ok="#2FBE73",
+        warn="#D89B49",
+        crit="#F06A6A",
+        info="#5A9DFF",
+        shadow1="#0A0D12",
+        shadow2="#232D39",
+    ),
+    "high_contrast": ThemeTokens(
+        bg0="#000000",
+        bg1="#050505",
+        panel="#000000",
+        panel2="#0A0A0A",
+        border="#FFFFFF",
+        text="#FFFFFF",
+        text_muted="#F0F0F0",
+        accent="#FFD400",
+        accent_hover="#FFE062",
+        accent_pressed="#E0B900",
+        ok="#36FF8F",
+        warn="#FFC340",
+        crit="#FF6B6B",
+        info="#7DC2FF",
+        shadow1="#000000",
+        shadow2="#121212",
     ),
 }
 
@@ -92,11 +165,11 @@ def normalize_palette(palette: str) -> str:
     mapped = PALETTE_ALIASES.get(palette, "")
     if mapped in PALETTE_TOKENS_LIGHT:
         return mapped
-    return "fixfox_m3"
+    return "fixfox"
 
 
 def palette_label(palette: str) -> str:
-    return PALETTE_LABELS.get(normalize_palette(palette), PALETTE_LABELS["fixfox_m3"])
+    return PALETTE_LABELS.get(normalize_palette(palette), PALETTE_LABELS["fixfox"])
 
 
 def palette_key_from_label(label: str) -> str:

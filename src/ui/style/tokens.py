@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-BASE_FONT_FAMILY = '"Segoe UI", "Segoe UI Variable", Arial, sans-serif'
+BASE_FONT_FAMILY = '"DejaVu Sans", "Segoe UI", "Segoe UI Variable", Arial, sans-serif'
 
 
 @dataclass(frozen=True)

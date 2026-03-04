@@ -113,13 +113,13 @@ from .layout_guardrails import (
 )
 from .ui_state import LayoutPolicy, is_basic, is_pro, layout_policy
 from .pages import (
-    build_diagnose_page,
-    build_fixes_page,
-    build_history_page,
-    build_home_page,
-    build_playbooks_page,
-    build_reports_page,
-    build_settings_page,
+    DiagnosePage,
+    FixesPage,
+    HistoryPage,
+    HomePage,
+    PlaybooksPage,
+    ReportsPage,
+    SettingsPage,
 )
 from .style import spacing
 from .theme import (
@@ -494,7 +494,7 @@ class MainWindow(QMainWindow):
         self.split.setChildrenCollapsible(False)
         root.addWidget(self.split, 1)
 
-        self.nav = QListWidget(); self.nav.setObjectName("Nav")
+        self.nav = QListWidget(); self.nav.setObjectName("MainNav")
         self.nav.setMinimumWidth(MIN_NAV_WIDTH)
         self.nav.setMaximumWidth(260)
         self.nav.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
@@ -525,13 +525,14 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Ctrl+Alt+L"), self, self._toggle_layout_debug_overlay)
         QShortcut(QKeySequence("Ctrl+Alt+T"), self, self._run_ui_self_check)
 
-        self.nav.setCurrentRow(0)
         self._sync_settings_ui()
+        self._restore_layout_state()
         self._apply_theme()
         apply_button_guardrails(self, self.settings_state.density)
         default_open = self.settings_state.right_panel_open and self.layout_policy_state.right_panel_default_open
         self._set_concierge_collapsed(not default_open, persist=False)
         self._apply_responsive_concierge()
+        self._apply_responsive_header()
         self.layout_overlay = LayoutDebugOverlay(self)
 
         self._refresh_home_history(); self._refresh_history(); self._refresh_run_center(); self._refresh_fixes(); self._refresh_toolbox(); self._refresh_runbooks(); self._refresh_home_favorites()
@@ -547,6 +548,7 @@ class MainWindow(QMainWindow):
     def resizeEvent(self, event: Any) -> None:
         super().resizeEvent(event)
         self._apply_responsive_concierge()
+        self._apply_responsive_header()
         if hasattr(self, "run_status_title") and hasattr(self, "run_status_detail"):
             self._set_run_status(self.run_status_title.text(), self._run_status_detail_raw)
         if self.layout_overlay is not None and self.layout_overlay.isVisible():
@@ -592,40 +594,60 @@ class MainWindow(QMainWindow):
 
         self.run_status_panel = RunStatusPanel()
         self.run_status_panel.setObjectName("RunStatusCard")
-        self.run_status_panel.setMinimumWidth(700)
         status_l = QHBoxLayout(self.run_status_panel)
-        status_l.setContentsMargins(spacing("sm"), spacing("sm"), spacing("sm"), spacing("sm"))
+        status_l.setContentsMargins(spacing("sm"), spacing("xs"), spacing("sm"), spacing("xs"))
         status_l.setSpacing(spacing("sm"))
         self.run_status_icon = QLabel()
         icon_pix = QPixmap(resource_path(ICON_PNG))
         if not icon_pix.isNull():
-            self.run_status_icon.setPixmap(icon_pix.scaled(28, 28, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            self.run_status_icon.setPixmap(icon_pix.scaled(22, 22, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         status_text = QVBoxLayout()
         status_text.setContentsMargins(0, 0, 0, 0)
-        status_text.setSpacing(2)
+        status_text.setSpacing(1)
+        self.app_identity = QLabel(APP_DISPLAY_NAME)
+        self.app_identity.setObjectName("RunStatusTitle")
         self.run_status_title = QLabel("Ready")
-        self.run_status_title.setObjectName("RunStatusTitle")
+        self.run_status_title.setObjectName("RunStatusDetail")
         self.run_status_detail = QLabel("No active run.")
         self.run_status_detail.setObjectName("RunStatusDetail")
         self.run_status_detail.setWordWrap(False)
+        status_text.addWidget(self.app_identity)
         status_text.addWidget(self.run_status_title)
-        status_text.addWidget(self.run_status_detail)
-        self.btn_open_runner = SoftButton("Open ToolRunner")
-        self.btn_open_runner.setMinimumHeight(min_btn.height())
-        self.btn_open_runner.clicked.connect(self.open_tool_runner)
-        self.run_status_panel.clicked.connect(self.open_tool_runner)
         status_l.addWidget(self.run_status_icon, 0, Qt.AlignTop)
         status_l.addLayout(status_text, 1)
-        status_l.addWidget(self.btn_open_runner, 0)
+        self.run_status_chip = QLabel("Idle")
+        self.run_status_chip.setObjectName("RunnerStatusChip")
+        self.run_status_chip.setProperty("kind", "info")
+        status_l.addWidget(self.run_status_chip, 0, Qt.AlignVCenter)
+        self.run_status_panel.clicked.connect(self.open_tool_runner)
+        self.run_status_panel.setToolTip("Open ToolRunner (Ctrl+R)")
 
         self.top_search = QLineEdit()
         self.top_search.setObjectName("SearchInput")
         self.top_search.setPlaceholderText("Search goals, tools, runbooks, fixes, and sessions")
+        self.top_search.setToolTip("Global search (Ctrl+K)")
         self.top_search.textChanged.connect(self._schedule_global_search)
         self.top_search.returnPressed.connect(self._activate_global_search_or_palette)
         self.top_search.installEventFilter(self)
+        self.compact_search_btn = IconButton("search", f, "Search (Ctrl+K)")
+        self.compact_search_btn.clicked.connect(self.open_command_palette)
+        self.top_search_stack = QStackedWidget()
+        self.top_search_stack.setObjectName("HeaderSearchStack")
+        self.top_search_stack.addWidget(self.top_search)
+        self.top_search_stack.addWidget(self.compact_search_btn)
+
         self.btn_cancel_task = SoftButton("Cancel Task")
+        self.btn_cancel_task.setToolTip("Cancel active task")
         self.btn_cancel_task.setEnabled(False)
+        self.btn_cancel_task.setMinimumSize(min_btn)
+
+        self.btn_open_runner = IconButton("run", f, "Open ToolRunner (Ctrl+R)")
+        self.btn_open_runner.clicked.connect(self.open_tool_runner)
+        self.btn_export = IconButton("export", f, "Open Reports (Ctrl+E)")
+        self.btn_export.clicked.connect(lambda: self.nav.setCurrentRow(self.NAV_ITEMS.index("Reports")))
+        self.btn_panel_toggle = IconButton("panel_open", f, "Toggle right panel (Ctrl+\\)")
+        self.btn_overflow = IconButton("menu", f, "More actions")
+        self.btn_overflow.clicked.connect(self._open_header_overflow_menu)
 
         mode_shell = QWidget()
         mode_l = QHBoxLayout(mode_shell)
@@ -642,25 +664,21 @@ class MainWindow(QMainWindow):
         mode_l.addWidget(self.mode_basic_btn)
         mode_l.addWidget(self.mode_pro_btn)
 
-        self.btn_export = IconButton("export", f, "Open Reports")
-        self.btn_help = IconButton("help", f, "Help")
-        self.btn_menu = IconButton("menu", f, "Menu")
-        self.btn_panel_toggle = IconButton("panel_open", f, "Toggle concierge panel")
-        self.btn_export.clicked.connect(lambda: self.nav.setCurrentRow(self.NAV_ITEMS.index("Reports")))
-        self.btn_help.clicked.connect(self._open_help_menu)
-        self.btn_menu.clicked.connect(self._open_profile_menu)
-        self.btn_cancel_task.setMinimumSize(min_btn)
-        for btn in (self.btn_export, self.btn_help, self.btn_panel_toggle, self.btn_menu):
+        for btn in (self.btn_open_runner, self.btn_export, self.btn_panel_toggle, self.btn_overflow):
             btn.setMinimumHeight(min_btn.height())
 
+        QShortcut(QKeySequence("Ctrl+E"), self, lambda: self.nav.setCurrentRow(self.NAV_ITEMS.index("Reports")))
+        QShortcut(QKeySequence("Ctrl+R"), self, self.open_tool_runner)
+        QShortcut(QKeySequence("Ctrl+\\"), self, self._toggle_concierge)
+
         l.addWidget(self.run_status_panel, 0)
-        l.addWidget(self.top_search, 1)
+        l.addWidget(self.top_search_stack, 1)
         l.addWidget(mode_shell, 0)
         l.addWidget(self.btn_cancel_task, 0)
+        l.addWidget(self.btn_open_runner, 0)
         l.addWidget(self.btn_export, 0)
-        l.addWidget(self.btn_help, 0)
         l.addWidget(self.btn_panel_toggle, 0)
-        l.addWidget(self.btn_menu, 0)
+        l.addWidget(self.btn_overflow, 0)
         return f
 
     def _build_context_bar(self) -> QWidget:
@@ -970,6 +988,21 @@ class MainWindow(QMainWindow):
             metrics = QFontMetrics(self.run_status_detail.font())
             max_width = max(120, self.run_status_detail.width() - 8)
             self.run_status_detail.setText(metrics.elidedText(clean, Qt.ElideRight, max_width))
+        if hasattr(self, "run_status_chip"):
+            status = str(title or "").strip().lower()
+            kind = "info"
+            if "fail" in status or "error" in status:
+                kind = "crit"
+            elif "warn" in status:
+                kind = "warn"
+            elif "run" in status:
+                kind = "info"
+            elif "success" in status or "ready" in status or "done" in status:
+                kind = "ok"
+            self.run_status_chip.setText(title if len(title) <= 16 else title[:15] + ".")
+            self.run_status_chip.setProperty("kind", kind)
+            self.run_status_chip.style().unpolish(self.run_status_chip)
+            self.run_status_chip.style().polish(self.run_status_chip)
 
     def _update_run_status_indicator(self) -> None:
         if self.active_worker is None:
@@ -1099,6 +1132,7 @@ class MainWindow(QMainWindow):
         desc = {
             "safety": "risk admin advanced rollback",
             "privacy": "sessions evidence logs local-only masking share-safe not collected storage path",
+            "privacy & safety": "local only telemetry sessions logs exports safe admin advanced",
             "appearance": "theme density palette right panel scale ui",
             "advanced": "logs diagnostics data folder evidence",
             "about": "version help start here privacy safety",
@@ -1158,1115 +1192,20 @@ class MainWindow(QMainWindow):
         self.toasts.show_toast("Settings exported.")
 
     def _build_pages(self) -> None:
-        self.pages.addWidget(build_home_page(self))
-        self.pages.addWidget(build_playbooks_page(self))
-        self.pages.addWidget(build_diagnose_page(self))
-        self.pages.addWidget(build_fixes_page(self))
-        self.pages.addWidget(build_reports_page(self))
-        self.pages.addWidget(build_history_page(self))
-        self.pages.addWidget(build_settings_page(self))
-
-    def _build_home(self) -> QWidget:
-        p = QWidget(); l = QVBoxLayout(p); l.setContentsMargins(0, 0, 0, 0); l.setSpacing(10)
-        b = PrimaryButton("Start Quick Check"); b.clicked.connect(lambda: self.run_quick_check("Quick Check"))
-        l.addWidget(self._header("Home", "Status, goals, favorites, and recent sessions.", b, "Start from a goal card or recent session, then export when done."))
-        st = Card("System Status", "Last checked: n/a")
-        self.home_last = st.sub
-        strip = QWidget(); sl = QHBoxLayout(strip); sl.setContentsMargins(0, 0, 0, 0); sl.setSpacing(8)
-        self.p_disk = Pill("Disk: ..."); self.p_cpu = Pill("CPU: ..."); self.p_mem = Pill("Memory: ..."); self.p_update = Pill("Update: review"); self.p_reboot = Pill("Reboot: unknown")
-        for x in (self.p_disk, self.p_cpu, self.p_mem, self.p_update, self.p_reboot):
-            sl.addWidget(x)
-        sl.addStretch(1); st.body_layout().addWidget(strip); l.addWidget(st)
-
-        goals = QWidget(); gl = QGridLayout(goals); gl.setContentsMargins(0, 0, 0, 0); gl.setSpacing(10)
-        goals_meta = [
-            (
-                "speed",
-                "Speed Up PC",
-                "Find the biggest performance bottlenecks with safe checks.",
-                ["Performance sample", "Startup pressure review", "Pending reboot signals"],
-                "Safe",
-            ),
-            (
-                "space",
-                "Free Up Space",
-                "Identify high-impact storage cleanup opportunities safely.",
-                ["Storage radar", "Large file scan", "Downloads cleanup preview"],
-                "Safe",
-            ),
-            (
-                "wifi",
-                "Fix Wi-Fi",
-                "Collect connectivity evidence and stabilize common network issues.",
-                ["Wi-Fi report", "DNS/proxy checks", "Network evidence bundle"],
-                "Safe/Admin Optional",
-            ),
-        ]
-        for i, (k, t, d, runs, badge) in enumerate(goals_meta):
-            actions = QWidget()
-            actions_l = QHBoxLayout(actions); actions_l.setContentsMargins(0, 0, 0, 0); actions_l.setSpacing(6)
-            sb = SoftButton("Start"); sb.clicked.connect(partial(self.run_quick_check, t))
-            lb = SoftButton("Learn More"); lb.clicked.connect(lambda _checked=False, title=t, desc=d: self._show_page_help(title, desc))
-            actions_l.addWidget(sb)
-            actions_l.addWidget(lb)
-            actions_l.addStretch(1)
-            c = Card(t, d, right_widget=actions); c.setProperty("goal", k)
-            c.body_layout().addWidget(QLabel("Runs:"))
-            for row in runs:
-                c.body_layout().addWidget(QLabel(f"- {row}"))
-            c.body_layout().addWidget(QLabel(f"Safety: {badge}"))
-            gl.addWidget(c, i, 0)
-        l.addWidget(goals)
-
-        self.home_changes = Card("What Changed Since Last Run", "Pending reboot: unknown | Recent updates: n/a | Reliability critical events: n/a")
-        l.addWidget(self.home_changes)
-
-        self.weekly_card = Card("Weekly Check Reminder", "Reminder is off.")
-        l.addWidget(self.weekly_card)
-
-        favorites_card = Card("Quick Actions", "Pinned actions (max 6).")
-        self.home_favorites = FeedRenderer(self._make_home_favorite_row, density=self.settings_state.density, empty_icon="*", empty_message="No favorites yet.")
-        self.home_favorites.item_activated.connect(self._launch_home_favorite)
-        self.home_favorites.context_requested.connect(self._home_favorite_menu)
-        fav_manage = SoftButton("Manage Favorites"); fav_manage.clicked.connect(lambda: self.nav.setCurrentRow(self.NAV_ITEMS.index("Settings")))
-        fav_manage.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        favorites_card.body_layout().addWidget(fav_manage)
-        favorites_card.body_layout().addWidget(self.home_favorites)
-        l.addWidget(favorites_card)
-
-        row = QWidget(); rl = QHBoxLayout(row); rl.setContentsMargins(0, 0, 0, 0); rl.setSpacing(10)
-        self.home_recent = FeedRenderer(self._make_session_row, density=self.settings_state.density, empty_icon="clock", empty_message="No sessions yet.")
-        self.home_recent.item_activated.connect(lambda payload: self._load_session(str((payload or {}).get("session_id", ""))) if isinstance(payload, dict) else None)
-        self.home_recent.context_requested.connect(self._session_menu)
-        c_hist = Card("Recent Sessions", "Reopen or export previous sessions."); c_hist.body_layout().addWidget(self.home_recent)
-        ex = SoftButton("Export Last Pack"); ex.clicked.connect(self.export_last_session)
-        c_ex = Card("Quick Action", "Export latest session without rerun.", right_widget=ex)
-        rl.addWidget(c_hist, 1); rl.addWidget(c_ex, 0); l.addWidget(row, 1)
-        return _scroll(p)
-
-    def _build_diagnose(self) -> QWidget:
-        p = QWidget(); l = QHBoxLayout(p); l.setContentsMargins(0, 0, 0, 0); l.setSpacing(10)
-        left = QWidget(); ll = QVBoxLayout(left); ll.setContentsMargins(0, 0, 0, 0); ll.setSpacing(10)
-        ll.addWidget(self._header("Diagnose", "Grouped findings feed with context and next actions.", help_text="Select a finding to see meaning, evidence impact, and next deterministic actions in the right detail pane."))
-        self.diag_summary = Card("No active session", "Run Quick Check from Home.")
-        self.diag_counts = Card("Severity Snapshot", "CRIT 0 | WARN 0 | OK 0 | INFO 0")
-        self.diag_top3 = Card("Top 3 Findings", "No findings yet.")
-        self.diag_next_btn = PrimaryButton("Run Quick Check")
-        self.diag_next_btn.clicked.connect(self._run_next_best_action)
-        self.diag_next = Card("Next Best Action", "Run Quick Check to generate findings.", right_widget=self.diag_next_btn)
-        ll.addWidget(self.diag_summary); ll.addWidget(self.diag_counts); ll.addWidget(self.diag_top3); ll.addWidget(self.diag_next); ll.addStretch(1)
-
-        center = QWidget(); cl = QVBoxLayout(center); cl.setContentsMargins(0, 0, 0, 0); cl.setSpacing(10)
-        toolbar = Card("Findings Toolbar", "Search and filter findings.")
-        trow = QWidget()
-        trow_l = QHBoxLayout(trow); trow_l.setContentsMargins(0, 0, 0, 0); trow_l.setSpacing(8)
-        self.diag_search = QLineEdit()
-        self.diag_search.setObjectName("SearchInput")
-        self.diag_search.setPlaceholderText("Search findings")
-        self.diag_severity = QComboBox()
-        self.diag_severity.addItems(["Any Severity", "CRIT", "WARN", "OK", "INFO"])
-        self.diag_recommended = QCheckBox("Recommended only")
-        self.diag_search.textChanged.connect(self._apply_diagnose_filters)
-        self.diag_severity.currentTextChanged.connect(self._apply_diagnose_filters)
-        self.diag_recommended.stateChanged.connect(self._apply_diagnose_filters)
-        trow_l.addWidget(self.diag_search, 1)
-        trow_l.addWidget(self.diag_severity, 0)
-        trow_l.addWidget(self.diag_recommended, 0)
-        toolbar.body_layout().addWidget(trow)
-        cl.addWidget(toolbar)
-        self.diag_loading = SkeletonLoader(rows=5, density=self.settings_state.density); self.diag_loading.hide(); cl.addWidget(self.diag_loading)
-        self.diag_feed = QWidget(); self.diag_feed_layout = QVBoxLayout(self.diag_feed); self.diag_feed_layout.setContentsMargins(0, 0, 0, 0); self.diag_feed_layout.setSpacing(8)
-        run_cta = PrimaryButton("Run Quick Check")
-        run_cta.clicked.connect(lambda: self.run_quick_check("Quick Check"))
-        self.diag_feed_layout.addWidget(EmptyState("No Findings", "Run a scan to populate findings.", cta=run_cta, icon="!"))
-        cl.addWidget(self.diag_feed, 1)
-
-        l.addWidget(left, 1); l.addWidget(center, 3)
-        return _scroll(p)
-
-    def _build_fixes(self) -> QWidget:
-        p = QWidget(); l = QHBoxLayout(p); l.setContentsMargins(0, 0, 0, 0); l.setSpacing(10)
-        left = QWidget(); ll = QVBoxLayout(left); ll.setContentsMargins(0, 0, 0, 0); ll.setSpacing(10)
-        ll.addWidget(self._header("Fixes", "Recommended fixes first, with rollback notes.", help_text="Select a fix, review risk and rollback, then run through ToolRunner."))
-        self.fix_scope = QComboBox(); self.fix_scope.addItems(["Recommended", "All"])
-        self.fix_scope.currentTextChanged.connect(self._refresh_fixes)
-        self.fix_chip_safe = QCheckBox("Safe")
-        self.fix_chip_admin = QCheckBox("Admin")
-        self.fix_chip_adv = QCheckBox("Advanced")
-        self.fix_chip_safe.setChecked(True)
-        self.fix_chip_admin.setChecked(self.settings_state.show_admin_tools)
-        self.fix_chip_adv.setChecked(self.settings_state.show_advanced_tools)
-        for chip in (self.fix_chip_safe, self.fix_chip_admin, self.fix_chip_adv):
-            chip.stateChanged.connect(self._refresh_fixes)
-        policy_card = Card("Policy Summary", "Safe-only mode and visible risk levels.", right_widget=self.fix_scope)
-        self.fix_policy_text = QLabel("Safe-only mode ON")
-        chip_row = QWidget()
-        chip_l = QHBoxLayout(chip_row); chip_l.setContentsMargins(0, 0, 0, 0); chip_l.setSpacing(8)
-        chip_l.addWidget(self.fix_chip_safe)
-        chip_l.addWidget(self.fix_chip_admin)
-        chip_l.addWidget(self.fix_chip_adv)
-        chip_l.addStretch(1)
-        policy_card.body_layout().addWidget(self.fix_policy_text)
-        policy_card.body_layout().addWidget(chip_row)
-        ll.addWidget(policy_card)
-        self.fix_list = FeedRenderer(self._make_fix_row, density=self.settings_state.density, empty_icon="wrench", empty_message="No fixes match current filters.")
-        self.fix_list.item_selected.connect(lambda key: self._set_fix_selection(str(key)))
-        self.fix_list.item_activated.connect(lambda key: self._set_fix_selection(str(key)))
-        self.fix_list.context_requested.connect(self._fix_menu)
-        list_card = Card("Fix Directory", "Choose a fix to review details and rollback guidance.")
-        list_card.body_layout().addWidget(self.fix_list)
-        ll.addWidget(list_card, 1)
-
-        right = QWidget(); rl = QVBoxLayout(right); rl.setContentsMargins(0, 0, 0, 0); rl.setSpacing(10)
-        self.fix_detail = Card("Fix Detail", "Select a fix.")
-        self.fix_detail_text = QLabel("Select a fix to see plain language, risk, and rollback guidance.")
-        self.fix_detail_text.setWordWrap(True)
-        self.fix_commands = DrawerCard("Commands")
-        self.fix_detail.body_layout().addWidget(self.fix_detail_text)
-        self.fix_detail.body_layout().addWidget(self.fix_commands)
-        detail_buttons = QWidget()
-        db = QHBoxLayout(detail_buttons); db.setContentsMargins(0, 0, 0, 0); db.setSpacing(8)
-        self.fix_preview_btn = SoftButton("Preview")
-        self.fix_run_btn = PrimaryButton("Run")
-        self.fix_preview_btn.clicked.connect(self._preview_selected_fix)
-        self.fix_run_btn.clicked.connect(self._run_selected_fix)
-        db.addWidget(self.fix_preview_btn)
-        db.addWidget(self.fix_run_btn)
-        db.addStretch(1)
-        self.fix_detail.body_layout().addWidget(detail_buttons)
-        rl.addWidget(self.fix_detail)
-
-        rollback_btn = SoftButton("Undo Selected")
-        rollback_btn.clicked.connect(self._run_selected_rollback)
-        self.fix_rollback = Card("Rollback Center", "Reversible actions from this session.", right_widget=rollback_btn)
-        self.rollback_feed = FeedRenderer(self._make_rollback_row, density=self.settings_state.density, empty_icon="undo", empty_message="No reversible actions yet.")
-        self.fix_rollback.body_layout().addWidget(self.rollback_feed)
-        rl.addWidget(self.fix_rollback, 1)
-
-        self.fix_info = Card("Safety and Rollback", "All fixes require confirmation.")
-        rl.addWidget(self.fix_info)
-
-        l.addWidget(left, 2); l.addWidget(right, 2)
-        return _scroll(p)
-
-    def _build_reports(self) -> QWidget:
-        p = QWidget(); l = QVBoxLayout(p); l.setContentsMargins(0, 0, 0, 0); l.setSpacing(10)
-        l.addWidget(self._header("Reports", "Export validated packs with share-safe masking.", help_text="Use the 3-step flow: configure, preview evidence/redaction, then generate and validate."))
-
-        start_btn = PrimaryButton("Run Quick Check")
-        start_btn.clicked.connect(lambda: self.run_quick_check("Quick Check"))
-        self.rep_empty_state = EmptyState(
-            "Run a goal first",
-            "Start from Home to generate a session, then return here to configure and export.",
-            cta=start_btn,
-            icon="!",
-        )
-        l.addWidget(self.rep_empty_state)
-
-        self.rep_steps = QTabWidget()
-        self.rep_steps.setDocumentMode(True)
-
-        step1 = QWidget(); s1 = QVBoxLayout(step1); s1.setContentsMargins(0, 0, 0, 0); s1.setSpacing(10)
-        self.rep_preset = QComboBox(); self.rep_preset.addItems(list(PRESETS)); self.rep_preset.currentTextChanged.connect(self._update_context_labels)
-        self.rep_safe = QCheckBox("Share-safe masking enabled"); self.rep_safe.setChecked(self.settings_state.share_safe_default); self.rep_safe.stateChanged.connect(self._update_context_labels)
-        self.rep_ip = QCheckBox("Mask IP addresses"); self.rep_ip.setChecked(self.settings_state.mask_ip_default); self.rep_ip.stateChanged.connect(self._update_redaction_preview)
-        self.rep_logs = QCheckBox("Include evidence logs"); self.rep_logs.setChecked(False)
-        self.rep_preset_hint = QLabel("Basic mode is locked to Home Share preset.")
-        self.rep_preset_hint.setObjectName("SubTitle")
-        self.rep_preset_hint.setWordWrap(True)
-        s1.addWidget(Card("Step 1: Configure", "Pick export policy and masking defaults.", right_widget=self.rep_preset))
-        s1.addWidget(self.rep_preset_hint)
-        s1.addWidget(self.rep_safe)
-        s1.addWidget(self.rep_ip)
-        s1.addWidget(self.rep_logs)
-        s1.addStretch(1)
-
-        step2 = QWidget(); s2 = QVBoxLayout(step2); s2.setContentsMargins(0, 0, 0, 0); s2.setSpacing(10)
-        self.rep_preview = QTextEdit(); self.rep_preview.setReadOnly(True); self.rep_preview.setMinimumHeight(180)
-        redaction_card = Card("Step 2: Redaction Preview", "Before/after masking preview with token map.")
-        self.rep_token_map = QLabel("Token map: PC_1 / USER_1 / SSID_1")
-        self.rep_token_map.setWordWrap(True)
-        redaction_card.body_layout().addWidget(self.rep_preview)
-        redaction_card.body_layout().addWidget(self.rep_token_map)
-        self.rep_tree = QTreeWidget(); self.rep_tree.setHeaderLabels(["Export Preview", "Value"])
-        tree_card = Card("Export Tree Preview", "Review what will be included.")
-        tree_card.body_layout().addWidget(self.rep_tree)
-        self.rep_evidence_status = QTreeWidget()
-        self.rep_evidence_status.setHeaderLabels(["Evidence", "Status", "Notes"])
-        collect_now = SoftButton("Collect Now")
-        collect_now.clicked.connect(self._collect_core_evidence)
-        self.rep_evidence_card = Card("Evidence Checklist", "Collected/missing/optional evidence by status.", right_widget=collect_now)
-        self.rep_evidence_checklist = QLabel("Included: none")
-        self.rep_evidence_checklist.setWordWrap(True)
-        self.rep_evidence = FeedRenderer(self._make_evidence_row, density=self.settings_state.density, empty_icon="file", empty_message="No evidence collected yet.")
-        self.rep_evidence.context_requested.connect(self._evidence_menu)
-        self.rep_evidence.item_activated.connect(lambda payload: self._open_evidence_path(payload))
-        self.rep_evidence_card.body_layout().addWidget(self.rep_evidence_checklist)
-        self.rep_evidence_card.body_layout().addWidget(self.rep_evidence_status)
-        self.rep_evidence_card.body_layout().addWidget(self.rep_evidence)
-        s2.addWidget(redaction_card)
-        s2.addWidget(tree_card)
-        s2.addWidget(self.rep_evidence_card, 1)
-
-        step3 = QWidget(); s3 = QVBoxLayout(step3); s3.setContentsMargins(0, 0, 0, 0); s3.setSpacing(10)
-        self.rep_generate = PrimaryButton("Generate Export"); self.rep_generate.clicked.connect(self.export_current_session)
-        self.rep_generate_override = SoftButton("Generate (Allow Warnings)")
-        self.rep_generate_override.clicked.connect(self.export_current_session_allow_warnings)
-        self.rep_status = Card("Step 3: Generate and Validate", "No export yet.")
-        self.rep_actions = Card("Post-export Actions", "Available after export.")
-        b1 = SoftButton("Open Report Folder"); b1.clicked.connect(self.open_last_export_folder)
-        b2 = SoftButton("Copy Export Path"); b2.clicked.connect(self.copy_last_export_path)
-        b3 = SoftButton("Copy Ticket Summary (Short)"); b3.clicked.connect(lambda: self.copy_ticket_summary(True))
-        b4 = SoftButton("Copy Ticket Summary (Detailed)"); b4.clicked.connect(lambda: self.copy_ticket_summary(False))
-        for b in (b1, b2, b3, b4):
-            self.rep_actions.body_layout().addWidget(b)
-        s3.addWidget(self.rep_generate)
-        s3.addWidget(self.rep_generate_override)
-        s3.addWidget(self.rep_status)
-        s3.addWidget(self.rep_actions, 1)
-
-        self.rep_steps.addTab(step1, "1. Configure")
-        self.rep_steps.addTab(step2, "2. Preview")
-        self.rep_steps.addTab(step3, "3. Generate")
-        l.addWidget(self.rep_steps, 1)
-        self._sync_reports_empty_state()
-        return _scroll(p)
-
-    def _build_history(self) -> QWidget:
-        p = QWidget(); l = QHBoxLayout(p); l.setContentsMargins(0, 0, 0, 0); l.setSpacing(10)
-        center = QWidget(); cl = QVBoxLayout(center); cl.setContentsMargins(0, 0, 0, 0); cl.setSpacing(10)
-        cl.addWidget(self._header("History", "Timeline of sessions with reopen and re-export.", help_text="Search, reopen prior sessions, compare with active, or re-export without rerunning diagnostics."))
-        self.hist_search = QLineEdit(); self.hist_search.setObjectName("SearchInput"); self.hist_search.setPlaceholderText("Search sessions")
-        self.hist_search.textChanged.connect(self._refresh_history)
-        self.hist_list = FeedRenderer(self._make_session_row, density=self.settings_state.density, empty_icon="clock", empty_message="No sessions found.")
-        self.hist_list.item_activated.connect(lambda payload: self._load_session(str((payload or {}).get("session_id", ""))) if isinstance(payload, dict) else None)
-        self.hist_list.context_requested.connect(self._session_menu)
-        self.hist_list.item_selected.connect(lambda _: self._update_history_detail())
-        cl.addWidget(self.hist_search); cl.addWidget(self.hist_list, 1)
-
-        right = QWidget(); rl = QVBoxLayout(right); rl.setContentsMargins(0, 0, 0, 0); rl.setSpacing(10)
-        self.hist_detail = Card("Case Summary", "Select a session.")
-        br = SoftButton("Reopen Session"); br.clicked.connect(self.reopen_selected_session)
-        bc = SoftButton("Compare with Active"); bc.clicked.connect(self.compare_with_active_session)
-        be = SoftButton("Re-export"); be.clicked.connect(self.reexport_selected_session)
-        for b in (br, bc, be):
-            self.hist_detail.body_layout().addWidget(b)
-        rl.addWidget(self.hist_detail)
-        self.hist_compare = DrawerCard("Compare View")
-        rl.addWidget(self.hist_compare)
-        self.run_center = FeedRenderer(self._make_run_center_row, density=self.settings_state.density, empty_icon="run", empty_message="No recent runs.")
-        self.run_center.item_activated.connect(self._run_center_activate)
-        self.run_center.context_requested.connect(self._run_center_menu)
-        self.run_card_widget = Card("Run Center", "Last 20 tool/fix/runbook runs.")
-        self.run_card_widget.body_layout().addWidget(self.run_center)
-        rl.addWidget(self.run_card_widget, 1)
-        rl.addStretch(1)
-
-        l.addWidget(center, 2); l.addWidget(right, 1)
-        return _scroll(p)
-
-    def _build_toolbox(self) -> QWidget:
-        p = QWidget()
-        l = QVBoxLayout(p)
-        l.setContentsMargins(0, 0, 0, 0)
-        l.setSpacing(10)
-        l.addWidget(
-            self._header(
-                "Playbooks",
-                "Tools and runbooks are separated into clean directories.",
-                help_text="Use Tools for one-off actions and Runbooks for guided sequences.",
-            )
-        )
-
-        self.pb_basic_container = QWidget()
-        basic_l = QVBoxLayout(self.pb_basic_container)
-        basic_l.setContentsMargins(0, 0, 0, 0)
-        basic_l.setSpacing(10)
-        basic_intro = Card(
-            "Guided Goals",
-            "Pick a goal, run the guided path, and review results in ToolRunner.",
-        )
-        basic_l.addWidget(basic_intro)
-        self.pb_basic_goal_grid = QGridLayout()
-        self.pb_basic_goal_grid.setContentsMargins(0, 0, 0, 0)
-        self.pb_basic_goal_grid.setSpacing(10)
-        basic_l.addLayout(self.pb_basic_goal_grid, 1)
-        l.addWidget(self.pb_basic_container, 1)
-
-        self.pb_pro_console = QWidget()
-        pro_l = QVBoxLayout(self.pb_pro_console)
-        pro_l.setContentsMargins(0, 0, 0, 0)
-        pro_l.setSpacing(10)
-
-        controls_shell = QWidget()
-        controls_outer = QVBoxLayout(controls_shell)
-        controls_outer.setContentsMargins(0, 0, 0, 0)
-        controls_outer.setSpacing(6)
-        controls_row1 = QHBoxLayout()
-        controls_row1.setContentsMargins(0, 0, 0, 0)
-        controls_row1.setSpacing(8)
-        controls_row2 = QHBoxLayout()
-        controls_row2.setContentsMargins(0, 0, 0, 0)
-        controls_row2.setSpacing(8)
-        self.tb_search = QLineEdit()
-        self.tb_search.setObjectName("SearchInput")
-        self.tb_search.setPlaceholderText("Search tools, script tasks, and runbooks")
-        self.tb_search.textChanged.connect(self._refresh_toolbox)
-        self.pb_segment = QComboBox()
-        self.pb_segment.addItems(["Tools", "Runbooks"])
-        self.pb_segment.currentTextChanged.connect(lambda _: self._switch_playbooks_segment())
-        self.pb_advanced_toggle = SoftButton("Show advanced script tasks")
-        self.pb_advanced_toggle.clicked.connect(self._toggle_advanced_script_tasks)
-        controls_row1.addWidget(self.tb_search, 1)
-        controls_row1.addWidget(self.pb_segment, 0)
-        controls_row2.addStretch(1)
-        controls_row2.addWidget(self.pb_advanced_toggle, 0)
-        controls_outer.addLayout(controls_row1)
-        controls_outer.addLayout(controls_row2)
-        pro_l.addWidget(controls_shell)
-
-        self.pb_stack = QStackedWidget()
-
-        tools_view = QWidget()
-        tvl = QHBoxLayout(tools_view)
-        tvl.setContentsMargins(0, 0, 0, 0)
-        tvl.setSpacing(10)
-
-        left = QWidget()
-        ll = QVBoxLayout(left)
-        ll.setContentsMargins(0, 0, 0, 0)
-        ll.setSpacing(10)
-        self.tb_filter = QComboBox()
-        self.tb_filter.addItems(
-            [
-                "All Categories",
-                "Windows Links",
-                "Evidence",
-                "Network",
-                "Updates",
-                "Printer",
-                "Integrity",
-                "Browser",
-                "Audio",
-                "Privacy",
-                "Cloud",
-                "Devices",
-                "Office",
-                "Services",
-                "Security",
-                "WMI",
-            ]
-        )
-        self.tb_filter.currentTextChanged.connect(self._refresh_toolbox)
-        self.tb_top = FeedRenderer(self._make_tool_row, density=self.settings_state.density, empty_icon="tool", empty_message="No top tools.")
-        self.tb_top.item_activated.connect(lambda tid: self._launch_tool_payload(str(tid)))
-        self.tb_top.item_selected.connect(lambda tid: self._set_selected_tool(str(tid)))
-        self.tb_top.context_requested.connect(self._tool_menu)
-        pinned = Card("Pinned", "Top tools and favorites.")
-        pinned.body_layout().addWidget(self.tb_filter)
-        pinned.body_layout().addWidget(QLabel("Top tools"))
-        pinned.body_layout().addWidget(self.tb_top, 1)
-
-        self.tb_favorites = FeedRenderer(self._make_tool_row, density=self.settings_state.density, empty_icon="star", empty_message="No favorite tools.")
-        self.tb_favorites.item_activated.connect(lambda tid: self._launch_tool_payload(str(tid)))
-        self.tb_favorites.item_selected.connect(lambda tid: self._set_selected_tool(str(tid)))
-        self.tb_favorites.context_requested.connect(self._tool_menu)
-        pinned.body_layout().addWidget(QLabel("Favorites"))
-        pinned.body_layout().addWidget(self.tb_favorites, 1)
-        ll.addWidget(pinned, 1)
-
-        self.tb_all = FeedRenderer(self._make_tool_row, density=self.settings_state.density, empty_icon="tool", empty_message="No tools match search.")
-        self.tb_all.item_activated.connect(lambda tid: self._launch_tool_payload(str(tid)))
-        self.tb_all.item_selected.connect(lambda tid: self._set_selected_tool(str(tid)))
-        self.tb_all.context_requested.connect(self._tool_menu)
-        call = Card("Tool Directory", "Browse with search and category filters.")
-        call.body_layout().addWidget(self.tb_all)
-        ll.addWidget(call, 2)
-
-        right = QWidget()
-        rl = QVBoxLayout(right)
-        rl.setContentsMargins(0, 0, 0, 0)
-        rl.setSpacing(10)
-        self.pb_tool_detail = Card("Tool Detail", "Select a tool to see details and run it.")
-        self.pb_tool_detail_text = QLabel("Select a tool to see details and run it.")
-        self.pb_tool_detail_text.setWordWrap(True)
-        self.pb_tool_detail.body_layout().addWidget(self.pb_tool_detail_text)
-        self.pb_detail_steps = DrawerCard("What it runs")
-        self.pb_tool_detail.body_layout().addWidget(self.pb_detail_steps)
-        detail_btn_row = QWidget()
-        detail_btn_l = QHBoxLayout(detail_btn_row)
-        detail_btn_l.setContentsMargins(0, 0, 0, 0)
-        detail_btn_l.setSpacing(6)
-        self.pb_detail_run = PrimaryButton("Run")
-        self.pb_detail_dry = SoftButton("Dry Run")
-        self.pb_detail_export = SoftButton("Export Pack")
-        self.pb_detail_run.clicked.connect(self._run_selected_tool)
-        self.pb_detail_dry.clicked.connect(self._dry_run_selected_tool)
-        self.pb_detail_export.clicked.connect(lambda: self.nav.setCurrentRow(self.NAV_ITEMS.index("Reports")))
-        detail_btn_l.addWidget(self.pb_detail_run)
-        detail_btn_l.addWidget(self.pb_detail_dry)
-        detail_btn_l.addWidget(self.pb_detail_export)
-        detail_btn_l.addStretch(1)
-        self.pb_tool_detail.body_layout().addWidget(detail_btn_row)
-        rl.addWidget(self.pb_tool_detail)
-
-        self.task_filter = QComboBox()
-        self.task_filter.addItems([
-            "All Task Categories",
-            "system",
-            "eventlogs",
-            "network",
-            "updates",
-            "printer",
-            "integrity",
-            "performance",
-            "crash",
-            "evidence",
-            "storage",
-            "repair",
-            "hardware",
-            "browser",
-            "audio",
-            "privacy",
-            "cloud",
-            "devices",
-            "office",
-            "services",
-            "security",
-            "wmi",
-        ])
-        self.task_filter.currentTextChanged.connect(self._refresh_script_tasks)
-        self.task_feed = FeedRenderer(self._make_task_row, density=self.settings_state.density, empty_icon="task", empty_message="No script tasks match search.")
-        self.task_feed.item_activated.connect(lambda tid: self._run_script_task(str(tid), dry_run=False))
-        self.task_feed.item_selected.connect(lambda tid: self._set_selected_script_task(str(tid)))
-        self.task_feed.context_requested.connect(self._task_menu)
-        self.task_card = Card("Advanced Script Tasks", "Hidden by default to reduce clutter for home users.")
-        self.task_card.body_layout().addWidget(self.task_filter)
-        self.task_card.body_layout().addWidget(self.task_feed)
-        btn_row = QHBoxLayout()
-        b_task_run = SoftButton("Run Selected")
-        b_task_run.clicked.connect(self._run_selected_script_task)
-        b_collect = SoftButton("Collect Core Evidence")
-        b_collect.clicked.connect(self._collect_core_evidence)
-        btn_row.addWidget(b_task_run)
-        btn_row.addWidget(b_collect)
-        btn_row.addStretch(1)
-        self.task_card.body_layout().addLayout(btn_row)
-        self.task_card.setVisible(False)
-        rl.addWidget(self.task_card, 1)
-
-        self.file_index_card = Card("Fast File Search", "Build a local index for instant file lookups (Pro).")
-        self.file_index_roots = QLineEdit()
-        self.file_index_roots.setObjectName("SearchInput")
-        self.file_index_roots.setPlaceholderText("Roots (semicolon-separated), e.g. C:\\Users\\You\\Downloads;C:\\Users\\You\\Desktop")
-        if self.settings_state.file_index_roots:
-            self.file_index_roots.setText(";".join(self.settings_state.file_index_roots))
-        self.file_index_budget = QSpinBox()
-        self.file_index_budget.setRange(10, 600)
-        self.file_index_budget.setValue(90)
-        self.file_index_budget.setSuffix(" s")
-        file_idx_top = QHBoxLayout()
-        file_idx_top.setContentsMargins(0, 0, 0, 0)
-        file_idx_top.setSpacing(6)
-        self.btn_file_index_add_root = SoftButton("Add Root")
-        self.btn_file_index_build = SoftButton("Build Index")
-        self.btn_file_index_add_root.clicked.connect(self._pick_file_index_root)
-        self.btn_file_index_build.clicked.connect(self._build_file_index)
-        file_idx_top.addWidget(self.btn_file_index_add_root)
-        file_idx_top.addWidget(QLabel("Budget"))
-        file_idx_top.addWidget(self.file_index_budget)
-        file_idx_top.addStretch(1)
-        file_idx_top.addWidget(self.btn_file_index_build)
-
-        self.file_index_query = QLineEdit()
-        self.file_index_query.setObjectName("SearchInput")
-        self.file_index_query.setPlaceholderText("Search indexed files")
-        self.btn_file_index_search = SoftButton("Search")
-        self.btn_file_index_export = SoftButton("Export CSV")
-        self.btn_file_index_search.clicked.connect(self._search_file_index)
-        self.btn_file_index_export.clicked.connect(self._export_file_index_results)
-        self.file_index_query.returnPressed.connect(self._search_file_index)
-        file_idx_search = QHBoxLayout()
-        file_idx_search.setContentsMargins(0, 0, 0, 0)
-        file_idx_search.setSpacing(6)
-        file_idx_search.addWidget(self.file_index_query, 1)
-        file_idx_search.addWidget(self.btn_file_index_search)
-        file_idx_search.addWidget(self.btn_file_index_export)
-
-        self.file_index_status = QLabel("Index not built yet.")
-        self.file_index_results = QTextEdit()
-        self.file_index_results.setReadOnly(True)
-        self.file_index_results.setMinimumHeight(150)
-        self.file_index_card.body_layout().addWidget(self.file_index_roots)
-        self.file_index_card.body_layout().addLayout(file_idx_top)
-        self.file_index_card.body_layout().addLayout(file_idx_search)
-        self.file_index_card.body_layout().addWidget(self.file_index_status)
-        self.file_index_card.body_layout().addWidget(self.file_index_results)
-        rl.addWidget(self.file_index_card, 1)
-
-        tvl.addWidget(left, 3)
-        tvl.addWidget(right, 2)
-
-        runbooks_view = QWidget()
-        rvl = QVBoxLayout(runbooks_view)
-        rvl.setContentsMargins(0, 0, 0, 0)
-        rvl.setSpacing(10)
-        rb_controls = QHBoxLayout()
-        self.rb_audience = QComboBox()
-        self.rb_audience.addItems(["All Audiences", "home", "it"])
-        self.rb_audience.currentTextChanged.connect(self._refresh_runbooks)
-        rb_controls.addWidget(QLabel("Audience"))
-        rb_controls.addWidget(self.rb_audience, 0)
-        rb_controls.addStretch(1)
-        rvl.addLayout(rb_controls)
-
-        self.rb_curated = FeedRenderer(self._make_runbook_row, density=self.settings_state.density, empty_icon="book", empty_message="No curated runbooks.")
-        self.rb_curated.item_selected.connect(lambda rid: self._set_runbook_selection(str(rid) if rid else ""))
-        self.rb_curated.item_activated.connect(lambda rid: self._set_runbook_selection(str(rid) if rid else ""))
-        self.rb_curated.context_requested.connect(self._runbook_menu)
-        curated_card = Card("Curated Runbooks", "3 home playbooks + key IT runbooks (max 6 visible).")
-        curated_card.body_layout().addWidget(self.rb_curated)
-        rvl.addWidget(curated_card)
-
-        self.rb_card = Card("Runbook Directory", "Dry-run first, then execute with checkpoints.")
-        self.rb_feed = FeedRenderer(self._make_runbook_row, density=self.settings_state.density, empty_icon="book", empty_message="No runbooks match search.")
-        self.rb_feed.item_selected.connect(lambda rid: self._set_runbook_selection(str(rid) if rid else ""))
-        self.rb_feed.item_activated.connect(lambda rid: self._set_runbook_selection(str(rid) if rid else ""))
-        self.rb_feed.context_requested.connect(self._runbook_menu)
-        rb_btns = QHBoxLayout()
-        bd = SoftButton("Run Dry-Run")
-        br = SoftButton("Run")
-        bd.clicked.connect(lambda: self.run_selected_runbook(True))
-        br.clicked.connect(lambda: self.run_selected_runbook(False))
-        rb_btns.addWidget(bd)
-        rb_btns.addWidget(br)
-        rb_btns.addStretch(1)
-        self.rb_detail = Card("Runbook Detail", "Select a runbook to view sequence and safety context.")
-        self.rb_steps = DrawerCard("Steps Preview")
-        self.rb_detail.body_layout().addWidget(self.rb_steps)
-        self.rb_card.body_layout().addWidget(self.rb_feed, 1)
-        self.rb_card.body_layout().addLayout(rb_btns)
-        self.rb_card.body_layout().addWidget(self.rb_detail)
-        rvl.addWidget(self.rb_card, 1)
-
-        self.pb_stack.addWidget(tools_view)
-        self.pb_stack.addWidget(runbooks_view)
-        pro_l.addWidget(self.pb_stack, 1)
-        l.addWidget(self.pb_pro_console, 1)
-        self._refresh_basic_playbooks_cards()
-        self._switch_playbooks_segment()
-        return _scroll(p)
-
-    def _switch_playbooks_segment(self) -> None:
-        segment = self.pb_segment.currentText().strip().lower() if hasattr(self, "pb_segment") else "tools"
-        if self.layout_policy_state.show_playbooks_pro_console:
-            self.pb_stack.setCurrentIndex(1 if segment == "runbooks" else 0)
-        else:
-            self.pb_stack.setCurrentIndex(1)
-        if hasattr(self, "pb_advanced_toggle"):
-            tools_mode = self.pb_stack.currentIndex() == 0
-            self.pb_advanced_toggle.setVisible(self.layout_policy_state.show_script_tasks and tools_mode)
-        self._apply_playbooks_mode_visibility()
-        self._refresh_toolbox()
-        self._update_concierge()
-
-    def _toggle_advanced_script_tasks(self) -> None:
-        if not self.layout_policy_state.show_script_tasks:
-            self.toasts.show_toast("Switch to Pro mode to view advanced script tasks.")
-            return
-        if not hasattr(self, "task_card"):
-            return
-        visible = not self.task_card.isVisible()
-        self.task_card.setVisible(visible)
-        if hasattr(self, "pb_advanced_toggle"):
-            self.pb_advanced_toggle.setText("Hide advanced script tasks" if visible else "Show advanced script tasks")
-
-    def _current_file_index_roots(self) -> list[str]:
-        raw = self.file_index_roots.text().strip() if hasattr(self, "file_index_roots") else ""
-        if not raw:
-            return []
-        rows = [part.strip() for part in raw.replace("\n", ";").split(";")]
-        return [row for row in rows if row]
-
-    def _pick_file_index_root(self) -> None:
-        start = str(Path.home())
-        path = QFileDialog.getExistingDirectory(self, "Select File Index Root", start)
-        if not path:
-            return
-        roots = self._current_file_index_roots()
-        if path not in roots:
-            roots.append(path)
-        self.file_index_roots.setText(";".join(roots))
-
-    def _build_file_index(self) -> None:
-        roots = self._current_file_index_roots()
-        if not roots:
-            self.toasts.show_toast("Add at least one root path to index.")
-            return
-        budget_s = int(self.file_index_budget.value()) if hasattr(self, "file_index_budget") else 90
-
-        def task(progress_cb: Any, partial_cb: Any, log_cb: Any, cancel_event: Any, timeout_s: int) -> dict[str, Any]:
-            del partial_cb, timeout_s
-            log_cb(f"[file-index] roots={';'.join(roots)}")
-            result = index_roots(
-                roots,
-                budget_seconds=budget_s,
-                cancel_event=cancel_event,
-                progress_cb=progress_cb,
-                log_cb=log_cb,
-            )
-            return result
-
-        self._start_task(
-            "Build File Index",
-            task,
-            self._on_file_index_built,
-            timeout_s=max(30, budget_s + 30),
-            risk="Safe",
-            plain_summary="Builds an SQLite-backed file index for fast local file search.",
-            details_text=f"roots={';'.join(roots)}\nbudget_s={budget_s}",
-            next_steps="Search the index and export CSV results if needed.",
-            rerun_cb=self._build_file_index,
-            run_metadata={"kind": "index", "capability_id": "fast_file_index_build"},
-        )
-
-    def _on_file_index_built(self, payload: dict[str, Any]) -> None:
-        roots = payload.get("roots", [])
-        scanned = int(payload.get("scanned", 0))
-        changed = int(payload.get("changed", 0))
-        deleted = int(payload.get("deleted", 0))
-        cancelled = bool(payload.get("cancelled"))
-        status = (
-            f"Cancelled. Scanned={scanned}, changed={changed}, removed={deleted}."
-            if cancelled
-            else f"Index ready. Scanned={scanned}, changed={changed}, removed={deleted}."
-        )
-        self.file_index_status.setText(status)
-        if isinstance(roots, list) and roots:
-            self.file_index_roots.setText(";".join([str(row) for row in roots]))
-            self.settings_state.file_index_roots = [str(row) for row in roots]
-            save_settings(self.settings_state)
-        self.toasts.show_toast("File index build complete." if not cancelled else "File index build cancelled.")
-
-    def _search_file_index(self) -> None:
-        query = self.file_index_query.text().strip() if hasattr(self, "file_index_query") else ""
-        if not query:
-            self.file_index_results.setPlainText("Enter a query to search indexed files.")
-            return
-        rows = search_files(query, limit=300)
-        self._fast_file_results = rows
-        lines: list[str] = []
-        for row in rows[:200]:
-            size_mb = float(row.get("size_bytes", 0) or 0) / (1024 * 1024)
-            lines.append(f"{row.get('name', '')} | {size_mb:.2f} MB | {row.get('path', '')}")
-        self.file_index_results.setPlainText("\n".join(lines) if lines else "No indexed files matched this query.")
-        self.file_index_status.setText(f"Query '{query}' returned {len(rows)} rows.")
-
-    def _export_file_index_results(self) -> None:
-        if not self._fast_file_results:
-            self.toasts.show_toast("No file index results to export.")
-            return
-        path, _ = QFileDialog.getSaveFileName(self, "Export File Index Results", "file_index_results.csv", "CSV (*.csv)")
-        if not path:
-            return
-        target = export_results_csv(self._fast_file_results, Path(path))
-        self._merge_files_into_session_evidence([str(target)], "storage", "file_index_search")
-        self._refresh_evidence_items()
-        self.toasts.show_toast("File index results exported.")
-
-    def _refresh_basic_playbooks_cards(self) -> None:
-        if not hasattr(self, "pb_basic_goal_grid"):
-            return
-        while self.pb_basic_goal_grid.count():
-            item = self.pb_basic_goal_grid.takeAt(0)
-            widget = item.widget()
-            if widget is not None:
-                widget.deleteLater()
-        goals: list[tuple[str, str, str, list[str]]] = [
-            ("wifi", "Fix Wi-Fi", "Collect network evidence and run guided recovery checks.", ["Wi-Fi report + DNS/proxy checks", "Network evidence pack", "Ping verification"]),
-            ("space", "Free Up Space", "Find the largest storage offenders before cleanup.", ["Storage radar", "Large file radar", "Downloads cleanup preview"]),
-            ("speed", "Speed Up PC", "Check pressure, startup load, and reboot signals.", ["Performance sample window", "Startup/autostart pack", "Pending reboot sources"]),
-            ("printer", "Printer Issues", "Capture printer health and spooler status.", ["Printer status snapshot", "Queue + service checks", "PrintService evidence"]),
-            ("browser", "Browser Problems", "Run browser + network checks together.", ["Browser rescue helper", "DNS timing test", "Hosts/proxy checks"]),
-            ("crashes", "App Crashes", "Collect crash-focused evidence for triage.", ["Crash helper", "Reliability snapshot", "Application/System event context"]),
-        ]
-        for idx, (goal_id, title, desc, runs) in enumerate(goals):
-            run_btn = PrimaryButton("Start")
-            run_btn.clicked.connect(lambda _checked=False, gid=goal_id: self._launch_basic_goal(gid))
-            card = Card(title, desc, right_widget=run_btn)
-            card.body_layout().addWidget(QLabel("Runs:"))
-            for line in runs:
-                card.body_layout().addWidget(QLabel(f"- {line}"))
-            row = idx // 2
-            col = idx % 2
-            self.pb_basic_goal_grid.addWidget(card, row, col)
-
-    def _launch_basic_goal(self, goal_id: str) -> None:
-        mapping_runbook = {
-            "wifi": "home_fix_wifi_safe",
-            "space": "home_free_up_space_safe",
-            "speed": "home_speed_up_pc_safe",
-            "printer": "home_printer_rescue",
-            "browser": "home_browser_problems",
-        }
-        if goal_id in mapping_runbook:
-            self._select_runbook(mapping_runbook[goal_id])
-            self.run_selected_runbook(True)
-            return
-        if goal_id == "crashes":
-            self.run_quick_check("Crashes")
-
-    def _set_selected_tool(self, tid: str) -> None:
-        if not tid:
-            return
-        self.selected_tool_id = tid
-        self.selected_task_id = ""
-        tool = next((x for x in TOOL_DIRECTORY if x.id == tid), None)
-        if tool is None:
-            return
-        if hasattr(self, "pb_tool_detail_text"):
-            category_label = self._tool_category_label(tool.category)
-            self.pb_tool_detail.title.setText(tool.title)
-            self.pb_tool_detail_text.setText(
-                f"{tool.plain}\n\nWhen to use:\n{tool.desc}\n\nCategory:\n{category_label}\n\nCollects/changes:\nLaunches {tool.command}\nSafety: Safe"
-            )
-        if hasattr(self, "pb_detail_steps"):
-            self.pb_detail_steps.set_text(tool.command)
-        if hasattr(self, "pb_detail_dry"):
-            self.pb_detail_dry.setEnabled(False)
-            self.pb_detail_dry.setProperty("selected_task_id", "")
-        if hasattr(self, "pb_detail_run"):
-            self.pb_detail_run.setProperty("selected_task_id", "")
-        self._update_concierge()
-
-    def _set_selected_script_task(self, task_id: str) -> None:
-        if not task_id:
-            return
-        task = script_task_map().get(task_id)
-        if task is None:
-            return
-        self.selected_tool_id = ""
-        self.selected_task_id = task.id
-        if hasattr(self, "pb_tool_detail_text"):
-            self.pb_tool_detail.title.setText(task.title)
-            self.pb_tool_detail_text.setText(
-                f"{task.desc}\n\nWhen to use:\nCategory: {task.category}\n\nCollects/changes:\nTask execution with ToolRunner artifacts.\nSafety: {task.risk}"
-            )
-        if hasattr(self, "pb_detail_steps"):
-            self.pb_detail_steps.set_text(f"Task: {task.id}\nCommand: {' '.join(task.command or ('<custom-runner>',))}")
-        if hasattr(self, "pb_detail_dry"):
-            self.pb_detail_dry.setEnabled(True)
-            self.pb_detail_dry.setProperty("selected_task_id", task.id)
-        if hasattr(self, "pb_detail_run"):
-            self.pb_detail_run.setProperty("selected_task_id", task.id)
-        self._update_concierge()
-
-    def _run_selected_tool(self) -> None:
-        task_id = str(self.pb_detail_run.property("selected_task_id") or "").strip() if hasattr(self, "pb_detail_run") else ""
-        if task_id:
-            self._run_script_task(task_id, dry_run=False)
-            return
-        if self.selected_tool_id:
-            self._launch_tool_payload(self.selected_tool_id)
-
-    def _dry_run_selected_tool(self) -> None:
-        task_id = str(self.pb_detail_dry.property("selected_task_id") or "").strip() if hasattr(self, "pb_detail_dry") else ""
-        if task_id:
-            self._run_script_task(task_id, dry_run=True)
-
-    def _build_settings(self) -> QWidget:
-        p = QWidget()
-        l = QVBoxLayout(p)
-        l.setContentsMargins(0, 0, 0, 0)
-        l.setSpacing(10)
-        l.addWidget(
-            self._header(
-                "Settings",
-                "Policy, privacy, appearance, and support settings.",
-                help_text="Each setting includes plain-English impact; details stay collapsed until needed.",
-            )
-        )
-
-        toolbar = Card("Settings Tools", "Search, reset defaults, or export current settings.")
-        tools_row = QWidget()
-        tools_row_l = QVBoxLayout(tools_row)
-        tools_row_l.setContentsMargins(0, 0, 0, 0)
-        tools_row_l.setSpacing(6)
-        tools_row_top = QHBoxLayout()
-        tools_row_top.setContentsMargins(0, 0, 0, 0)
-        tools_row_top.setSpacing(8)
-        tools_row_bottom = QHBoxLayout()
-        tools_row_bottom.setContentsMargins(0, 0, 0, 0)
-        tools_row_bottom.setSpacing(8)
-        self.settings_search = QLineEdit()
-        self.settings_search.setObjectName("SearchInput")
-        self.settings_search.setPlaceholderText("Search settings")
-        self.settings_search.textChanged.connect(self._filter_settings_nav)
-        b_reset = SoftButton("Reset Defaults")
-        self.s_export_btn = SoftButton("Export Settings JSON")
-        b_help = SoftButton("Help Center")
-        b_reset.clicked.connect(self._reset_settings_defaults)
-        self.s_export_btn.clicked.connect(self._export_settings_json)
-        b_help.clicked.connect(lambda: self._show_page_help("Settings", "Safety, privacy, and rollback guidance."))
-        tools_row_top.addWidget(self.settings_search, 1)
-        tools_row_bottom.addWidget(b_reset, 0)
-        tools_row_bottom.addWidget(self.s_export_btn, 0)
-        tools_row_bottom.addWidget(b_help, 0)
-        tools_row_bottom.addStretch(1)
-        tools_row_l.addLayout(tools_row_top)
-        tools_row_l.addLayout(tools_row_bottom)
-        toolbar.body_layout().addWidget(tools_row)
-        l.addWidget(toolbar)
-
-        shell = QHBoxLayout()
-        shell.setContentsMargins(0, 0, 0, 0)
-        shell.setSpacing(10)
-        self.settings_nav = QListWidget()
-        self.settings_nav.setObjectName("Nav")
-        self.settings_nav.setFixedWidth(220)
-        settings_row_height = resolve_density_tokens(self.settings_state.density).nav_item_height
-        settings_sections = ("Safety", "Privacy", "Appearance", "Advanced", "About", "Feedback")
-        for name in settings_sections:
-            item = QListWidgetItem(name)
-            item.setData(Qt.UserRole, name)
-            item.setSizeHint(QSize(0, settings_row_height))
-            self.settings_nav.addItem(item)
-            self.settings_nav.setItemWidget(item, self._settings_nav_item_widget(name))
-        self.settings_nav.currentRowChanged.connect(lambda idx: self.settings_stack.setCurrentIndex(max(idx, 0)))
-        shell.addWidget(self.settings_nav, 0)
-
-        self.settings_stack = QStackedWidget()
-
-        p_safety = QWidget()
-        psl = QVBoxLayout(p_safety)
-        psl.setContentsMargins(0, 0, 0, 0)
-        psl.setSpacing(10)
-        c_safe = Card("Safety", "Safe/Admin/Advanced levels and rollback guidance.")
-        self.s_safe = QCheckBox("Safe-only mode")
-        self.s_admin = QCheckBox("Enable Admin Tools")
-        self.s_admin_hint = self._setting_hint("Enable admin tools only when you need elevated actions.")
-        self.s_safe_hint = self._setting_hint("Default safety guardrail. Shows only low-risk actions.")
-        self.s_adv = QCheckBox("Show advanced tools")
-        self.s_diag = QCheckBox("Diagnostic mode")
-        for x in (self.s_safe, self.s_admin, self.s_adv, self.s_diag):
-            x.stateChanged.connect(self.save_settings_from_ui)
-        c_safe.body_layout().addWidget(self.s_safe)
-        c_safe.body_layout().addWidget(self.s_safe_hint)
-        c_safe.body_layout().addWidget(self.s_admin)
-        c_safe.body_layout().addWidget(self.s_admin_hint)
-        c_safe.body_layout().addWidget(self.s_adv)
-        c_safe.body_layout().addWidget(self._setting_hint("Shows advanced operations intended for experienced users."))
-        c_safe.body_layout().addWidget(self.s_diag)
-        c_safe.body_layout().addWidget(self._setting_hint("Adds extra diagnostic visibility in select flows."))
-        c_safe.body_layout().addWidget(QLabel("Definitions"))
-        c_safe.body_layout().addWidget(self._setting_hint("Safe: low-risk checks and guided actions."))
-        c_safe.body_layout().addWidget(self._setting_hint("Admin: elevated commands with explicit confirmation."))
-        c_safe.body_layout().addWidget(self._setting_hint("Advanced: expert workflows that may require manual verification."))
-        c_safe.body_layout().addWidget(QLabel("Restore and rollback"))
-        c_safe.body_layout().addWidget(self._setting_hint("Use rollback notes in Fixes detail before running changes."))
-        c_safe.body_layout().addWidget(self._setting_hint("If a reboot is requested, rerun diagnostics after restart to confirm outcomes."))
-        c_safe.body_layout().addWidget(self._setting_details("Advanced/admin tools may require elevation, reboots, or manual rollback."))
-        psl.addWidget(c_safe)
-        psl.addStretch(1)
-
-        p_privacy = QWidget()
-        ppl = QVBoxLayout(p_privacy)
-        ppl.setContentsMargins(0, 0, 0, 0)
-        ppl.setSpacing(10)
-        c_priv = Card("Privacy", "Local-first data handling and share-safe controls.")
-        self.s_share = QCheckBox("Enable share-safe by default")
-        self.s_ip = QCheckBox("Mask IP by default")
-        self.s_share.stateChanged.connect(self.save_settings_from_ui)
-        self.s_ip.stateChanged.connect(self.save_settings_from_ui)
-        c_priv.body_layout().addWidget(self.s_share)
-        c_priv.body_layout().addWidget(self._setting_hint("Automatically masks user/device identifiers when copying or exporting."))
-        c_priv.body_layout().addWidget(self.s_ip)
-        c_priv.body_layout().addWidget(self._setting_hint("Masks private/public IP tokens in summaries and exported text evidence."))
-        c_priv.body_layout().addWidget(QLabel("What Fix Fox stores locally"))
-        c_priv.body_layout().addWidget(self._setting_hint("Sessions, findings, selected actions, evidence file references, and optional logs."))
-        c_priv.body_layout().addWidget(QLabel("Storage location"))
-        c_priv.body_layout().addWidget(self._setting_hint(r"%LOCALAPPDATA%\\FixFox\\... (app data, sessions, exports, logs)."))
-        c_priv.body_layout().addWidget(QLabel("What is not collected"))
-        c_priv.body_layout().addWidget(self._setting_hint("Passwords, browser history content, clipboard history, and background cloud telemetry."))
-        c_priv.body_layout().addWidget(self._setting_details("Masking applies to UI copy actions, Tool Runner copy/save, and export pack generation."))
-        ppl.addWidget(c_priv)
-        ppl.addStretch(1)
-
-        p_appearance = QWidget()
-        pal = QVBoxLayout(p_appearance)
-        pal.setContentsMargins(0, 0, 0, 0)
-        pal.setSpacing(10)
-        c_look = Card("Appearance", "Theme applies live across the whole app.")
-        self.s_panel = QCheckBox("Keep concierge panel open")
-        self.s_weekly = QCheckBox("Enable weekly check reminder")
-        self.s_panel.stateChanged.connect(self.save_settings_from_ui)
-        self.s_weekly.stateChanged.connect(self.save_settings_from_ui)
-        self.s_palette = QComboBox()
-        self.s_palette.addItems(list(available_palette_labels()))
-        self.s_palette.currentTextChanged.connect(self.save_settings_from_ui)
-        self.s_mode = QComboBox()
-        self.s_mode.addItems(["dark", "light"])
-        self.s_mode.currentTextChanged.connect(self.save_settings_from_ui)
-        self.s_density = QComboBox()
-        self.s_density.addItems(["comfortable", "compact"])
-        self.s_density.currentTextChanged.connect(self.save_settings_from_ui)
-        self.s_ui_mode = QComboBox()
-        self.s_ui_mode.addItems(["basic", "pro"])
-        self.s_ui_mode.currentTextChanged.connect(self.set_ui_mode)
-        c_look.body_layout().addWidget(self.s_panel)
-        self.s_panel_hint = self._setting_hint("Keeps the right concierge panel expanded when window width allows.")
-        c_look.body_layout().addWidget(self.s_panel_hint)
-        c_look.body_layout().addWidget(self.s_weekly)
-        c_look.body_layout().addWidget(self._setting_hint("Shows a weekly reminder card on Home."))
-        c_look.body_layout().addWidget(QLabel("UI Mode"))
-        c_look.body_layout().addWidget(self.s_ui_mode)
-        c_look.body_layout().addWidget(self._setting_hint("Basic focuses on guided safe flows. Pro exposes full tool/runbook directories."))
-        c_look.body_layout().addWidget(QLabel("Palette"))
-        c_look.body_layout().addWidget(self.s_palette)
-        c_look.body_layout().addWidget(self._setting_hint("Choose one of four app color palettes."))
-        c_look.body_layout().addWidget(QLabel("Mode"))
-        c_look.body_layout().addWidget(self.s_mode)
-        c_look.body_layout().addWidget(self._setting_hint("Switch between dark and light theme mode."))
-        c_look.body_layout().addWidget(QLabel("Density"))
-        c_look.body_layout().addWidget(self.s_density)
-        c_look.body_layout().addWidget(self._setting_hint("Comfortable increases spacing; compact fits more rows on screen."))
-        c_look.body_layout().addWidget(QLabel("UI Scale"))
-        self.s_ui_scale_value = QLabel("100%")
-        self.s_ui_scale = QSlider(Qt.Horizontal)
-        self.s_ui_scale.setRange(90, 125)
-        self.s_ui_scale.setSingleStep(1)
-        self.s_ui_scale.setPageStep(5)
-        self.s_ui_scale.valueChanged.connect(self._on_ui_scale_value_changed)
-        self.s_ui_scale.sliderReleased.connect(self._persist_ui_scale_setting)
-        c_look.body_layout().addWidget(self.s_ui_scale_value)
-        c_look.body_layout().addWidget(self.s_ui_scale)
-        c_look.body_layout().addWidget(self._setting_hint("Scales typography and control density from 90% to 125%."))
-        c_look.body_layout().addWidget(self._setting_details("Theme changes apply live at QApplication scope across all pages and row widgets."))
-        preview = Card("Preview", "Changes are applied immediately. Use this panel to compare density and contrast.")
-        pal.addWidget(c_look)
-        pal.addWidget(preview)
-        pal.addStretch(1)
-
-        p_advanced = QWidget()
-        pdl = QVBoxLayout(p_advanced)
-        pdl.setContentsMargins(0, 0, 0, 0)
-        pdl.setSpacing(10)
-        c_adv = Card("Advanced", "Operational paths and logs.")
-        b_open = SoftButton("Open Logs Folder")
-        b_open.clicked.connect(lambda: os.startfile(str(logs_dir())) if os.name == "nt" else None)
-        b_copy = SoftButton("Copy Log Path")
-        b_copy.clicked.connect(lambda: self._copy_text(str(log_path())))
-        b_data = SoftButton("Open Data Folder")
-        b_data.clicked.connect(lambda: os.startfile(str(ensure_dirs()["base"])) if os.name == "nt" else None)
-        b_diag = SoftButton("Export Diagnostics")
-        b_diag.clicked.connect(self._collect_core_evidence)
-        b_logo = SoftButton("Create Desktop Logo")
-        b_logo.clicked.connect(lambda: self.create_desktop_logo(force=False))
-        b_logo_recreate = SoftButton("Recreate Desktop Logo")
-        b_logo_recreate.clicked.connect(lambda: self.create_desktop_logo(force=True))
-        b_rebuild_db = SoftButton("Rebuild Database Index")
-        b_rebuild_db.clicked.connect(self._rebuild_database_index)
-        b_vacuum_db = SoftButton("Vacuum Database")
-        b_vacuum_db.clicked.connect(self._vacuum_database_now)
-        b_clear_file_index = SoftButton("Clear File Index")
-        b_clear_file_index.clicked.connect(self._clear_file_index_now)
-        self.db_info_label = QLabel("Database: loading...")
-        self.db_info_label.setWordWrap(True)
-        c_adv.body_layout().addWidget(b_open)
-        c_adv.body_layout().addWidget(self._setting_hint("Open application log directory in File Explorer."))
-        c_adv.body_layout().addWidget(b_copy)
-        c_adv.body_layout().addWidget(self._setting_hint("Copy absolute path to the active log file."))
-        c_adv.body_layout().addWidget(b_data)
-        c_adv.body_layout().addWidget(self._setting_hint("Open app data root for sessions, state, and exports."))
-        c_adv.body_layout().addWidget(self.db_info_label)
-        c_adv.body_layout().addWidget(b_rebuild_db)
-        c_adv.body_layout().addWidget(self._setting_hint("Rebuilds SQLite index from session JSON files (safe/idempotent)."))
-        c_adv.body_layout().addWidget(b_vacuum_db)
-        c_adv.body_layout().addWidget(self._setting_hint("Compacts SQLite database and can improve read/write performance."))
-        c_adv.body_layout().addWidget(b_clear_file_index)
-        c_adv.body_layout().addWidget(self._setting_hint("Clears Everything-lite file index rows without deleting session data."))
-        c_adv.body_layout().addWidget(b_diag)
-        c_adv.body_layout().addWidget(self._setting_hint("Runs core evidence collection and attaches output for export."))
-        c_adv.body_layout().addWidget(b_logo)
-        c_adv.body_layout().addWidget(self._setting_hint("Creates FixFoxLogo.png on your Desktop (useful for support docs and screenshots)."))
-        c_adv.body_layout().addWidget(b_logo_recreate)
-        pdl.addWidget(c_adv)
-        pdl.addStretch(1)
-
-        p_about = QWidget()
-        pol = QVBoxLayout(p_about)
-        pol.setContentsMargins(0, 0, 0, 0)
-        pol.setSpacing(10)
-        c_about = Card("About", f"Version {APP_VERSION}")
-        about_header = QWidget()
-        about_header_l = QHBoxLayout(about_header)
-        about_header_l.setContentsMargins(0, 0, 0, 0)
-        about_header_l.setSpacing(10)
-        icon = QLabel()
-        pix = QPixmap(resource_path(ICON_PNG))
-        if not pix.isNull():
-            icon.setPixmap(pix.scaled(40, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-        title_block = QVBoxLayout()
-        title_block.setContentsMargins(0, 0, 0, 0)
-        title_block.setSpacing(2)
-        title_block.addWidget(QLabel(APP_DISPLAY_NAME))
-        title_block.addWidget(self._setting_hint(APP_TAGLINE))
-        about_header_l.addWidget(icon)
-        about_header_l.addLayout(title_block, 1)
-        c_about.body_layout().addWidget(about_header)
-        c_about.body_layout().addWidget(QLabel("Runs locally. No cloud uploads by default."))
-        c_about.body_layout().addWidget(QLabel("Plain English: this app runs diagnostics, fixes, runbooks, and exports locally."))
-        c_about.body_layout().addWidget(QLabel("Privacy summary: session data, evidence, and logs stay on this device unless you export/share manually."))
-        c_about.body_layout().addWidget(QLabel("Safety summary: Safe = low-risk checks, Admin = elevated actions, Advanced = expert workflows."))
-        c_about.body_layout().addWidget(QLabel("Optional online actions are explicitly labeled (for example, Microsoft Get Help)."))
-        c_about.body_layout().addWidget(QLabel(f"Build date: {_now_local().split(' ')[0]}"))
-        c_about.body_layout().addWidget(QLabel(f"Data folder: {ensure_dirs()['base']}"))
-        c_about.body_layout().addWidget(QLabel(f"Logs folder: {logs_dir()}"))
-        c_about.body_layout().addWidget(QLabel("Support: use Reports -> Ticket Pack and share ticket summary + evidence with support."))
-        c_about.body_layout().addWidget(QLabel(f"Capabilities: {len(CAPABILITIES)}"))
-        c_about.body_layout().addWidget(QLabel(f"Runbooks: {len(RUNBOOKS)}"))
-        about_privacy = SoftButton("Open Privacy Page")
-        about_privacy.clicked.connect(lambda: self._open_settings_section("Privacy"))
-        about_safety = SoftButton("Open Safety Page")
-        about_safety.clicked.connect(lambda: self._open_settings_section("Safety"))
-        c_about.body_layout().addWidget(about_privacy)
-        c_about.body_layout().addWidget(about_safety)
-        about_help = SoftButton("About / Help")
-        about_help.clicked.connect(lambda: self._show_page_help("About", "Start Here, Privacy, Safety, and KB guidance."))
-        c_about.body_layout().addWidget(about_help)
-        pol.addWidget(c_about)
-        pol.addStretch(1)
-
-        p_feedback = QWidget()
-        pfl = QVBoxLayout(p_feedback)
-        pfl.setContentsMargins(0, 0, 0, 0)
-        pfl.setSpacing(10)
-        c_fb = Card("Local Feedback", "Saved as JSON locally; no network calls.")
-        form = QWidget()
-        fl = QFormLayout(form)
-        self.fb_name = QLineEdit()
-        self.fb_mail = QLineEdit()
-        self.fb_cat = QComboBox()
-        self.fb_cat.addItems(["bug", "ui", "feature", "other"])
-        self.fb_msg = QTextEdit()
-        self.fb_msg.setMinimumHeight(120)
-        fl.addRow("Name", self.fb_name)
-        fl.addRow("Email", self.fb_mail)
-        fl.addRow("Category", self.fb_cat)
-        fl.addRow("Message", self.fb_msg)
-        b_save = SoftButton("Save Feedback")
-        b_save.clicked.connect(self.save_feedback_form)
-        c_fb.body_layout().addWidget(form)
-        c_fb.body_layout().addWidget(b_save)
-        pfl.addWidget(c_fb)
-        pfl.addStretch(1)
-
-        for page in (p_safety, p_privacy, p_appearance, p_advanced, p_about, p_feedback):
-            self.settings_stack.addWidget(page)
-        shell.addWidget(self.settings_stack, 1)
-        l.addLayout(shell, 1)
-        self.settings_nav.setCurrentRow(0)
-        return _scroll(p)
+        self.home_page = HomePage(self)
+        self.playbooks_page = PlaybooksPage(self)
+        self.diagnose_page = DiagnosePage(self)
+        self.fixes_page = FixesPage(self)
+        self.reports_page = ReportsPage(self)
+        self.history_page = HistoryPage(self)
+        self.settings_page = SettingsPage(self)
+        self.pages.addWidget(self.home_page)
+        self.pages.addWidget(self.playbooks_page)
+        self.pages.addWidget(self.diagnose_page)
+        self.pages.addWidget(self.fixes_page)
+        self.pages.addWidget(self.reports_page)
+        self.pages.addWidget(self.history_page)
+        self.pages.addWidget(self.settings_page)
 
     def _refresh_db_info_label(self) -> None:
         if not hasattr(self, "db_info_label"):
@@ -2404,6 +1343,17 @@ class MainWindow(QMainWindow):
         if isinstance(sender, QWidget):
             menu.exec(sender.mapToGlobal(sender.rect().bottomLeft()))
 
+    def _open_header_overflow_menu(self) -> None:
+        menu = QMenu(self)
+        menu.addAction("Help", self._open_help_menu)
+        menu.addAction("Settings", lambda: self.nav.setCurrentRow(self.NAV_ITEMS.index("Settings")))
+        menu.addAction("Privacy", lambda: self._open_settings_section("Privacy"))
+        menu.addAction("Safety", lambda: self._open_settings_section("Safety"))
+        menu.addAction("Command Palette", self.open_command_palette)
+        sender = self.sender()
+        if isinstance(sender, QWidget):
+            menu.exec(sender.mapToGlobal(sender.rect().bottomLeft()))
+
     def _open_settings_section(self, label: str) -> None:
         target = str(label or "").strip().lower()
         self.nav.setCurrentRow(self.NAV_ITEMS.index("Settings"))
@@ -2444,8 +1394,53 @@ class MainWindow(QMainWindow):
         if idx < 0 or idx >= len(self.NAV_ITEMS):
             return
         self.pages.setCurrentIndex(idx)
+        self.settings_state.last_page = self.NAV_ITEMS[idx]
         self._sync_context_bar_visibility()
         self._update_concierge()
+
+    def _on_settings_section_changed(self, idx: int) -> None:
+        if not hasattr(self, "settings_nav"):
+            return
+        if idx < 0 or idx >= self.settings_nav.count():
+            return
+        item = self.settings_nav.item(idx)
+        self.settings_state.last_settings_section = str(item.data(Qt.UserRole) or item.text() or "Safety")
+
+    def _restore_layout_state(self) -> None:
+        s = self.settings_state.normalized()
+        self.resize(s.window_width, s.window_height)
+        if s.window_x >= 0 and s.window_y >= 0:
+            self.move(s.window_x, s.window_y)
+        sizes = list(s.splitter_sizes or [])
+        if len(sizes) == 3:
+            self.split.setSizes([max(MIN_NAV_WIDTH, sizes[0]), max(640, sizes[1]), max(MIN_RIGHT_PANEL_WIDTH, sizes[2])])
+        page = s.last_page if s.last_page in self.NAV_ITEMS else "Home"
+        self.nav.setCurrentRow(self.NAV_ITEMS.index(page))
+        if hasattr(self, "settings_nav"):
+            target = str(s.last_settings_section or "Safety").strip().lower()
+            for idx in range(self.settings_nav.count()):
+                item = self.settings_nav.item(idx)
+                label = str(item.data(Qt.UserRole) or item.text()).strip().lower()
+                if label == target:
+                    self.settings_nav.setCurrentRow(idx)
+                    break
+
+    def _persist_layout_state(self) -> None:
+        geo = self.geometry()
+        self.settings_state.window_x = int(geo.x())
+        self.settings_state.window_y = int(geo.y())
+        self.settings_state.window_width = int(max(1080, geo.width()))
+        self.settings_state.window_height = int(max(720, geo.height()))
+        self.settings_state.splitter_sizes = [int(v) for v in self.split.sizes()]
+        nav_idx = self.nav.currentRow()
+        if 0 <= nav_idx < len(self.NAV_ITEMS):
+            self.settings_state.last_page = self.NAV_ITEMS[nav_idx]
+        if hasattr(self, "settings_nav"):
+            settings_idx = self.settings_nav.currentRow()
+            if 0 <= settings_idx < self.settings_nav.count():
+                item = self.settings_nav.item(settings_idx)
+                self.settings_state.last_settings_section = str(item.data(Qt.UserRole) or item.text() or "Safety")
+        save_settings(self.settings_state)
 
     def _toggle_concierge(self) -> None:
         self._set_concierge_collapsed(not self.concierge.collapsed, persist=True)
@@ -2468,6 +1463,18 @@ class MainWindow(QMainWindow):
             sizes = self.split.sizes()
             if len(sizes) == 3 and (not self.concierge.collapsed) and sizes[2] < MIN_RIGHT_PANEL_WIDTH:
                 self.split.setSizes([max(self.nav.width(), MIN_NAV_WIDTH), max(680, sizes[1]), MIN_RIGHT_PANEL_WIDTH])
+
+    def _apply_responsive_header(self) -> None:
+        if not hasattr(self, "top_search_stack"):
+            return
+        narrow = self.width() < 1240
+        very_narrow = self.width() < 1140
+        self.top_search_stack.setCurrentIndex(1 if narrow else 0)
+        if hasattr(self, "run_status_detail"):
+            self.run_status_detail.setVisible(not very_narrow)
+        if hasattr(self, "mode_basic_btn") and hasattr(self, "mode_pro_btn"):
+            self.mode_basic_btn.setVisible(not very_narrow)
+            self.mode_pro_btn.setVisible(not very_narrow)
 
     def _toggle_layout_debug_overlay(self) -> None:
         if self.layout_overlay is None:
@@ -2918,6 +1925,7 @@ class MainWindow(QMainWindow):
         if self._run_status_subscription_id > 0:
             self.run_event_bus.unsubscribe(self._run_status_subscription_id)
             self._run_status_subscription_id = 0
+        self._persist_layout_state()
         self._search_popup.hide_popup()
         if self.tool_runner is not None:
             self.tool_runner.close()
@@ -3932,6 +2940,223 @@ class MainWindow(QMainWindow):
             self.selected_task_id = ""
         self._refresh_script_tasks()
         self._refresh_runbooks()
+
+    def _switch_playbooks_segment(self) -> None:
+        segment = self.pb_segment.currentText().strip().lower() if hasattr(self, "pb_segment") else "tools"
+        if self.layout_policy_state.show_playbooks_pro_console:
+            self.pb_stack.setCurrentIndex(1 if segment == "runbooks" else 0)
+        else:
+            self.pb_stack.setCurrentIndex(1)
+        if hasattr(self, "pb_advanced_toggle"):
+            tools_mode = self.pb_stack.currentIndex() == 0
+            self.pb_advanced_toggle.setVisible(self.layout_policy_state.show_script_tasks and tools_mode)
+        self._apply_playbooks_mode_visibility()
+        self._refresh_toolbox()
+        self._update_concierge()
+
+    def _toggle_advanced_script_tasks(self) -> None:
+        if not self.layout_policy_state.show_script_tasks:
+            self.toasts.show_toast("Switch to Pro mode to view advanced script tasks.")
+            return
+        if not hasattr(self, "task_card"):
+            return
+        visible = not self.task_card.isVisible()
+        self.task_card.setVisible(visible)
+        if hasattr(self, "pb_advanced_toggle"):
+            self.pb_advanced_toggle.setText("Hide advanced script tasks" if visible else "Show advanced script tasks")
+
+    def _current_file_index_roots(self) -> list[str]:
+        raw = self.file_index_roots.text().strip() if hasattr(self, "file_index_roots") else ""
+        if not raw:
+            return []
+        rows = [part.strip() for part in raw.replace("\n", ";").split(";")]
+        return [row for row in rows if row]
+
+    def _pick_file_index_root(self) -> None:
+        start = str(Path.home())
+        path = QFileDialog.getExistingDirectory(self, "Select File Index Root", start)
+        if not path:
+            return
+        roots = self._current_file_index_roots()
+        if path not in roots:
+            roots.append(path)
+        self.file_index_roots.setText(";".join(roots))
+
+    def _build_file_index(self) -> None:
+        roots = self._current_file_index_roots()
+        if not roots:
+            self.toasts.show_toast("Add at least one root path to index.")
+            return
+        budget_s = int(self.file_index_budget.value()) if hasattr(self, "file_index_budget") else 90
+
+        def task(progress_cb: Any, partial_cb: Any, log_cb: Any, cancel_event: Any, timeout_s: int) -> dict[str, Any]:
+            del partial_cb, timeout_s
+            log_cb(f"[file-index] roots={';'.join(roots)}")
+            result = index_roots(
+                roots,
+                budget_seconds=budget_s,
+                cancel_event=cancel_event,
+                progress_cb=progress_cb,
+                log_cb=log_cb,
+            )
+            return result
+
+        self._start_task(
+            "Build File Index",
+            task,
+            self._on_file_index_built,
+            timeout_s=max(30, budget_s + 30),
+            risk="Safe",
+            plain_summary="Builds an SQLite-backed file index for fast local file search.",
+            details_text=f"roots={';'.join(roots)}\nbudget_s={budget_s}",
+            next_steps="Search the index and export CSV results if needed.",
+            rerun_cb=self._build_file_index,
+            run_metadata={"kind": "index", "capability_id": "fast_file_index_build"},
+        )
+
+    def _on_file_index_built(self, payload: dict[str, Any]) -> None:
+        roots = payload.get("roots", [])
+        scanned = int(payload.get("scanned", 0))
+        changed = int(payload.get("changed", 0))
+        deleted = int(payload.get("deleted", 0))
+        cancelled = bool(payload.get("cancelled"))
+        status = (
+            f"Cancelled. Scanned={scanned}, changed={changed}, removed={deleted}."
+            if cancelled
+            else f"Index ready. Scanned={scanned}, changed={changed}, removed={deleted}."
+        )
+        self.file_index_status.setText(status)
+        if isinstance(roots, list) and roots:
+            self.file_index_roots.setText(";".join([str(row) for row in roots]))
+            self.settings_state.file_index_roots = [str(row) for row in roots]
+            save_settings(self.settings_state)
+        self.toasts.show_toast("File index build complete." if not cancelled else "File index build cancelled.")
+
+    def _search_file_index(self) -> None:
+        query = self.file_index_query.text().strip() if hasattr(self, "file_index_query") else ""
+        if not query:
+            self.file_index_results.setPlainText("Enter a query to search indexed files.")
+            return
+        rows = search_files(query, limit=300)
+        self._fast_file_results = rows
+        lines: list[str] = []
+        for row in rows[:200]:
+            size_mb = float(row.get("size_bytes", 0) or 0) / (1024 * 1024)
+            lines.append(f"{row.get('name', '')} | {size_mb:.2f} MB | {row.get('path', '')}")
+        self.file_index_results.setPlainText("\n".join(lines) if lines else "No indexed files matched this query.")
+        self.file_index_status.setText(f"Query '{query}' returned {len(rows)} rows.")
+
+    def _export_file_index_results(self) -> None:
+        if not self._fast_file_results:
+            self.toasts.show_toast("No file index results to export.")
+            return
+        path, _ = QFileDialog.getSaveFileName(self, "Export File Index Results", "file_index_results.csv", "CSV (*.csv)")
+        if not path:
+            return
+        target = export_results_csv(self._fast_file_results, Path(path))
+        self._merge_files_into_session_evidence([str(target)], "storage", "file_index_search")
+        self._refresh_evidence_items()
+        self.toasts.show_toast("File index results exported.")
+
+    def _refresh_basic_playbooks_cards(self) -> None:
+        if not hasattr(self, "pb_basic_goal_grid"):
+            return
+        while self.pb_basic_goal_grid.count():
+            item = self.pb_basic_goal_grid.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+        goals: list[tuple[str, str, str, list[str]]] = [
+            ("wifi", "Fix Wi-Fi", "Collect network evidence and run guided recovery checks.", ["Wi-Fi report + DNS/proxy checks", "Network evidence pack", "Ping verification"]),
+            ("space", "Free Up Space", "Find the largest storage offenders before cleanup.", ["Storage radar", "Large file radar", "Downloads cleanup preview"]),
+            ("speed", "Speed Up PC", "Check pressure, startup load, and reboot signals.", ["Performance sample window", "Startup/autostart pack", "Pending reboot sources"]),
+            ("printer", "Printer Issues", "Capture printer health and spooler status.", ["Printer status snapshot", "Queue + service checks", "PrintService evidence"]),
+            ("browser", "Browser Problems", "Run browser + network checks together.", ["Browser rescue helper", "DNS timing test", "Hosts/proxy checks"]),
+            ("crashes", "App Crashes", "Collect crash-focused evidence for triage.", ["Crash helper", "Reliability snapshot", "Application/System event context"]),
+        ]
+        for idx, (goal_id, title, desc, runs) in enumerate(goals):
+            run_btn = PrimaryButton("Start")
+            run_btn.clicked.connect(lambda _checked=False, gid=goal_id: self._launch_basic_goal(gid))
+            card = Card(title, desc, right_widget=run_btn)
+            card.body_layout().addWidget(QLabel("Runs:"))
+            for line in runs:
+                card.body_layout().addWidget(QLabel(f"- {line}"))
+            row = idx // 2
+            col = idx % 2
+            self.pb_basic_goal_grid.addWidget(card, row, col)
+
+    def _launch_basic_goal(self, goal_id: str) -> None:
+        mapping_runbook = {
+            "wifi": "home_fix_wifi_safe",
+            "space": "home_free_up_space_safe",
+            "speed": "home_speed_up_pc_safe",
+            "printer": "home_printer_rescue",
+            "browser": "home_browser_problems",
+        }
+        if goal_id in mapping_runbook:
+            self._select_runbook(mapping_runbook[goal_id])
+            self.run_selected_runbook(True)
+            return
+        if goal_id == "crashes":
+            self.run_quick_check("Crashes")
+
+    def _set_selected_tool(self, tid: str) -> None:
+        if not tid:
+            return
+        self.selected_tool_id = tid
+        self.selected_task_id = ""
+        tool = next((x for x in TOOL_DIRECTORY if x.id == tid), None)
+        if tool is None:
+            return
+        if hasattr(self, "pb_tool_detail_text"):
+            category_label = self._tool_category_label(tool.category)
+            self.pb_tool_detail.title.setText(tool.title)
+            self.pb_tool_detail_text.setText(
+                f"{tool.plain}\n\nWhen to use:\n{tool.desc}\n\nCategory:\n{category_label}\n\nCollects/changes:\nLaunches {tool.command}\nSafety: Safe"
+            )
+        if hasattr(self, "pb_detail_steps"):
+            self.pb_detail_steps.set_text(tool.command)
+        if hasattr(self, "pb_detail_dry"):
+            self.pb_detail_dry.setEnabled(False)
+            self.pb_detail_dry.setProperty("selected_task_id", "")
+        if hasattr(self, "pb_detail_run"):
+            self.pb_detail_run.setProperty("selected_task_id", "")
+        self._update_concierge()
+
+    def _set_selected_script_task(self, task_id: str) -> None:
+        if not task_id:
+            return
+        task = script_task_map().get(task_id)
+        if task is None:
+            return
+        self.selected_tool_id = ""
+        self.selected_task_id = task.id
+        if hasattr(self, "pb_tool_detail_text"):
+            self.pb_tool_detail.title.setText(task.title)
+            self.pb_tool_detail_text.setText(
+                f"{task.desc}\n\nWhen to use:\nCategory: {task.category}\n\nCollects/changes:\nTask execution with ToolRunner artifacts.\nSafety: {task.risk}"
+            )
+        if hasattr(self, "pb_detail_steps"):
+            self.pb_detail_steps.set_text(f"Task: {task.id}\nCommand: {' '.join(task.command or ('<custom-runner>',))}")
+        if hasattr(self, "pb_detail_dry"):
+            self.pb_detail_dry.setEnabled(True)
+            self.pb_detail_dry.setProperty("selected_task_id", task.id)
+        if hasattr(self, "pb_detail_run"):
+            self.pb_detail_run.setProperty("selected_task_id", task.id)
+        self._update_concierge()
+
+    def _run_selected_tool(self) -> None:
+        task_id = str(self.pb_detail_run.property("selected_task_id") or "").strip() if hasattr(self, "pb_detail_run") else ""
+        if task_id:
+            self._run_script_task(task_id, dry_run=False)
+            return
+        if self.selected_tool_id:
+            self._launch_tool_payload(self.selected_tool_id)
+
+    def _dry_run_selected_tool(self) -> None:
+        task_id = str(self.pb_detail_dry.property("selected_task_id") or "").strip() if hasattr(self, "pb_detail_dry") else ""
+        if task_id:
+            self._run_script_task(task_id, dry_run=True)
 
     def _refresh_script_tasks(self) -> None:
         if not hasattr(self, "task_feed"):
@@ -5084,3 +4309,5 @@ class MainWindow(QMainWindow):
         self._update_weekly_status()
         self._update_context_labels()
         self.toasts.show_toast("Settings saved.")
+
+

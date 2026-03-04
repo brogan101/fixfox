@@ -113,21 +113,49 @@ QWidget#PageViewport {{
   background: transparent;
 }}
 
-QListWidget#Nav {{
+QListWidget#MainNav {{
   background: {tokens.panel};
   border: 1px solid {border_soft};
   border-radius: {d.corner_radius + 6}px;
   padding: 8px;
   outline: 0;
 }}
-QListWidget#Nav::item {{
+QListWidget#MainNav::item {{
   height: {d.nav_item_height}px;
   padding: 0;
   border-radius: {d.corner_radius}px;
 }}
-QListWidget#Nav::item:selected {{
+QListWidget#MainNav::item:selected {{
   background: {accent_tint};
   border: 1px solid {focus_ring};
+}}
+QListWidget#MainNav::item:hover {{
+  background: {surface_alt};
+}}
+QListWidget#MainNav::item:disabled {{
+  color: {disabled_text};
+}}
+
+QListWidget#SettingsNav {{
+  background: {tokens.panel};
+  border: 1px solid {border_soft};
+  border-radius: {d.corner_radius + 6}px;
+  padding: 8px;
+  outline: 0;
+}}
+QListWidget#SettingsNav::item {{
+  height: {max(d.nav_item_height, d.input_height + 6)}px;
+  border-radius: {d.corner_radius}px;
+}}
+QListWidget#SettingsNav::item:selected {{
+  background: {accent_tint};
+  border: 1px solid {focus_ring};
+}}
+QListWidget#SettingsNav::item:hover {{
+  background: {surface_alt};
+}}
+QListWidget#SettingsNav::item:disabled {{
+  color: {disabled_text};
 }}
 
 QLabel#Title {{
@@ -267,6 +295,8 @@ QLineEdit#SearchInput:focus,
 QLineEdit:focus,
 QComboBox:focus,
 QListWidget:focus,
+QListWidget#MainNav:focus,
+QListWidget#SettingsNav:focus,
 QTreeWidget:focus,
 QTextEdit:focus,
 QPlainTextEdit:focus {{

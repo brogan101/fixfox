@@ -23,7 +23,7 @@ class AppSettings:
     weekly_reminder_day: int = 0
     last_weekly_check_utc: str = ""
     pinned_actions: list[str] | None = None
-    theme_palette: str = "fixfox_m3"
+    theme_palette: str = "fixfox"
     theme_mode: str = "light"
     density: str = "comfortable"
     ui_scale_pct: int = 100
@@ -32,6 +32,13 @@ class AppSettings:
     favorites_tools: list[str] | None = None
     favorites_runbooks: list[str] | None = None
     file_index_roots: list[str] | None = None
+    window_x: int = -1
+    window_y: int = -1
+    window_width: int = 1380
+    window_height: int = 900
+    splitter_sizes: list[int] | None = None
+    last_page: str = "Home"
+    last_settings_section: str = "Safety"
 
     def normalized(self) -> "AppSettings":
         self.ui_mode = "pro" if str(self.ui_mode).strip().lower() == "pro" else "basic"
@@ -40,6 +47,35 @@ class AppSettings:
         except Exception:
             scale = 100
         self.ui_scale_pct = max(90, min(125, scale))
+        self.theme_mode = "dark" if str(self.theme_mode).strip().lower() == "dark" else "light"
+        self.density = "compact" if str(self.density).strip().lower() == "compact" else "comfortable"
+        self.theme_palette = str(self.theme_palette or "fixfox").strip() or "fixfox"
+        self.last_page = str(self.last_page or "Home").strip() or "Home"
+        self.last_settings_section = str(self.last_settings_section or "Safety").strip() or "Safety"
+        try:
+            self.window_width = max(1080, int(self.window_width))
+        except Exception:
+            self.window_width = 1380
+        try:
+            self.window_height = max(720, int(self.window_height))
+        except Exception:
+            self.window_height = 900
+        try:
+            self.window_x = int(self.window_x)
+            self.window_y = int(self.window_y)
+        except Exception:
+            self.window_x = -1
+            self.window_y = -1
+        if self.splitter_sizes is None:
+            self.splitter_sizes = [224, 860, 300]
+        else:
+            cleaned: list[int] = []
+            for value in self.splitter_sizes:
+                try:
+                    cleaned.append(max(80, int(value)))
+                except Exception:
+                    continue
+            self.splitter_sizes = cleaned[:3] if cleaned else [224, 860, 300]
         if self.pinned_actions is None:
             self.pinned_actions = []
         if self.favorites_fixes is None:

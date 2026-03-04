@@ -65,6 +65,11 @@ Outputs:
 - Exports: `%LOCALAPPDATA%\FixFox\exports`
 - Logs: `%LOCALAPPDATA%\FixFox\logs`
 
+## Typography
+
+- App UI bundles `DejaVu Sans` from `src/assets/fonts/DejaVuSans.ttf`.
+- License details: `docs/font-license.md` and `src/assets/fonts/LICENSE-DejaVu.txt`.
+
 ## Support Pack Export Flow
 
 - Use Reports stepper:

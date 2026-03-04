@@ -95,6 +95,25 @@ def _load_runtime_imports():
     )
 
 
+def _load_bundled_font(logger, resource_path) -> None:
+    from PySide6.QtGui import QFont, QFontDatabase
+    from PySide6.QtWidgets import QApplication
+
+    for rel in ("src/assets/fonts/DejaVuSans.ttf", "assets/fonts/DejaVuSans.ttf"):
+        font_id = QFontDatabase.addApplicationFont(str(resource_path(rel)))
+        if font_id < 0:
+            continue
+        families = QFontDatabase.applicationFontFamilies(font_id)
+        if not families:
+            continue
+        app = QApplication.instance()
+        if app is not None:
+            app.setFont(QFont(families[0]))
+        logger.info("Bundled font loaded: %s", families[0])
+        return
+    logger.warning("Bundled font not found or failed to load.")
+
+
 def main():
     try:
         (
@@ -130,6 +149,7 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
     app.setWindowIcon(QIcon(resource_path(ICON_PNG)))
+    _load_bundled_font(logger, resource_path)
     try:
         ensure_logo_on_desktop(overwrite=False)
     except Exception as exc:
