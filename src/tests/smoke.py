@@ -115,6 +115,11 @@ def _ui_module_smoke() -> None:
         window._launch_tool_payload("tool_storage")
         wait_for_worker()
         _assert(window.tool_runner is not None, "ToolRunner window missing after safe tool run")
+        window.tool_runner.hide()
+        app.processEvents()
+        window.run_status_panel.clicked.emit()
+        app.processEvents()
+        _assert(window.tool_runner.isVisible(), "run status card click did not open/focus ToolRunner")
         assert_run_events(window.tool_runner.run_id, "safe_tool")
         _assert(bool(window.run_status_detail.text().strip()), "run status detail did not update")
         sid = str(window.current_session.get("session_id", "")) if isinstance(window.current_session, dict) else ""

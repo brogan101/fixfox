@@ -65,7 +65,7 @@ def _load_runtime_imports():
         from .core.utils import resource_path
         from .ui.app_qss import build_qss
         from .ui.theme import resolve_theme_tokens
-        from .ui.main_window import MainWindow
+        from .ui.shell import AppShell
     except ImportError:
         _ensure_repo_on_sys_path()
         from src.core.brand import APP_NAME, ICON_PNG
@@ -76,7 +76,7 @@ def _load_runtime_imports():
         from src.core.utils import resource_path
         from src.ui.app_qss import build_qss
         from src.ui.theme import resolve_theme_tokens
-        from src.ui.main_window import MainWindow
+        from src.ui.shell import AppShell
     return (
         QIcon,
         QApplication,
@@ -90,7 +90,7 @@ def _load_runtime_imports():
         resource_path,
         build_qss,
         resolve_theme_tokens,
-        MainWindow,
+        AppShell,
     )
 
 
@@ -109,7 +109,7 @@ def main():
             resource_path,
             build_qss,
             resolve_theme_tokens,
-            MainWindow,
+            AppShell,
         ) = _load_runtime_imports()
     except (ImportError, ModuleNotFoundError) as exc:
         if _is_missing_required_dependency(exc):
@@ -135,7 +135,7 @@ def main():
     settings = load_settings()
     tokens = resolve_theme_tokens(settings.theme_palette, settings.theme_mode)
     app.setStyleSheet(build_qss(tokens, settings.theme_mode, settings.density))
-    w = MainWindow()
+    w = AppShell()
     w.show()
     return app.exec()
 

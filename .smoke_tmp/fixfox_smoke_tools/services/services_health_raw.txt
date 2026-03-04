@@ -1,7 +1,0 @@
-Name      Status StartType
-----      ------ ---------
-bits     Stopped    Manual
-eventlog Running Automatic
-spooler  Running Automatic
-winmgmt  Running Automatic
-wuauserv Running    Manual

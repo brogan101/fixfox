@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import subprocess
 import time
 import traceback
 from pathlib import Path
@@ -47,7 +46,6 @@ from PySide6.QtWidgets import (
 from ..core import diagnostics
 from ..core.brand import APP_DISPLAY_NAME, APP_TAGLINE, ICON_PNG
 from ..core.brand_assets import ensure_logo_on_desktop
-from ..core.command_runner import run_command
 from ..core.db import (
     db_stats,
     get_run,
@@ -91,8 +89,8 @@ from ..core.sessions import (
 )
 from ..core.settings import AppSettings, load_settings, save_settings
 from ..core.script_tasks import list_script_tasks, run_script_task, script_task_map
-from ..core.toolbox import TOP_TOOLS, TOOL_DIRECTORY, search_tools
-from ..core.utils import open_uri, resource_path
+from ..core.toolbox import TOP_TOOLS, TOOL_DIRECTORY, launch_tool, search_tools
+from ..core.utils import resource_path
 from ..core.version import APP_VERSION
 from ..core.workers import TaskWorker, WorkerConfig, start_worker
 from .app_qss import build_qss
@@ -112,6 +110,16 @@ from .layout_guardrails import (
     should_auto_collapse_right_panel,
 )
 from .ui_state import LayoutPolicy, is_basic, is_pro, layout_policy
+from .pages import (
+    build_diagnose_page,
+    build_fixes_page,
+    build_history_page,
+    build_home_page,
+    build_playbooks_page,
+    build_reports_page,
+    build_settings_page,
+)
+from .style import spacing
 from .theme import (
     available_palette_labels,
     normalize_density,
@@ -436,6 +444,7 @@ class MainWindow(QMainWindow):
         self._last_run_status = "Ready"
         self._last_run_line = "Ready."
         self._last_run_log_line = ""
+        self._run_status_detail_raw = "No active run."
         self.selected_finding: dict[str, Any] = {}
         self.selected_fix_key = ""
         self.selected_tool_id = ""
@@ -522,6 +531,8 @@ class MainWindow(QMainWindow):
     def resizeEvent(self, event: Any) -> None:
         super().resizeEvent(event)
         self._apply_responsive_concierge()
+        if hasattr(self, "run_status_title") and hasattr(self, "run_status_detail"):
+            self._set_run_status(self.run_status_title.text(), self._run_status_detail_raw)
         if self.layout_overlay is not None and self.layout_overlay.isVisible():
             self.layout_overlay.sync_geometry()
 
@@ -543,9 +554,9 @@ class MainWindow(QMainWindow):
         row = QWidget()
         row.setAttribute(Qt.WA_TransparentForMouseEvents, True)
         lay = QHBoxLayout(row)
-        pad = max(8, d.card_padding_h - 2)
+        pad = max(spacing("sm"), d.card_padding_h - 2)
         lay.setContentsMargins(pad, 0, pad, 0)
-        lay.setSpacing(max(8, d.icon_size // 2 + 1))
+        lay.setSpacing(max(spacing("sm"), d.icon_size // 2 + 1))
         icon = QLabel()
         icon.setAttribute(Qt.WA_TransparentForMouseEvents, True)
         icon.setPixmap(get_icon(icon_name, self).pixmap(d.icon_size, d.icon_size))
@@ -559,20 +570,20 @@ class MainWindow(QMainWindow):
         f = QFrame()
         f.setObjectName("TopBar")
         l = QHBoxLayout(f)
-        l.setContentsMargins(12, 10, 12, 10)
-        l.setSpacing(8)
+        l.setContentsMargins(spacing("sm"), spacing("sm"), spacing("sm"), spacing("sm"))
+        l.setSpacing(spacing("sm"))
         min_btn = min_button_size(self.settings_state.density)
 
         self.run_status_panel = RunStatusPanel()
         self.run_status_panel.setObjectName("RunStatusCard")
-        self.run_status_panel.setMinimumWidth(660)
+        self.run_status_panel.setMinimumWidth(700)
         status_l = QHBoxLayout(self.run_status_panel)
-        status_l.setContentsMargins(12, 10, 12, 10)
-        status_l.setSpacing(12)
+        status_l.setContentsMargins(spacing("sm"), spacing("sm"), spacing("sm"), spacing("sm"))
+        status_l.setSpacing(spacing("sm"))
         self.run_status_icon = QLabel()
         icon_pix = QPixmap(resource_path(ICON_PNG))
         if not icon_pix.isNull():
-            self.run_status_icon.setPixmap(icon_pix.scaled(28, 28, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            self.run_status_icon.setPixmap(icon_pix.scaled(30, 30, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         status_text = QVBoxLayout()
         status_text.setContentsMargins(0, 0, 0, 0)
         status_text.setSpacing(2)
@@ -601,7 +612,7 @@ class MainWindow(QMainWindow):
         mode_shell = QWidget()
         mode_l = QHBoxLayout(mode_shell)
         mode_l.setContentsMargins(0, 0, 0, 0)
-        mode_l.setSpacing(4)
+        mode_l.setSpacing(spacing("xs"))
         self.mode_basic_btn = SoftButton("Basic")
         self.mode_pro_btn = SoftButton("Pro")
         for btn in (self.mode_basic_btn, self.mode_pro_btn):
@@ -831,10 +842,11 @@ class MainWindow(QMainWindow):
         return f"{int(max(0.0, time.monotonic() - self.active_run_started))}s"
 
     def _set_run_status(self, title: str, detail: str) -> None:
+        self._run_status_detail_raw = str(detail or "").strip()
         if hasattr(self, "run_status_title"):
             self.run_status_title.setText(title)
         if hasattr(self, "run_status_detail"):
-            clean = " ".join(str(detail or "").splitlines()).strip()
+            clean = " ".join(self._run_status_detail_raw.splitlines()).strip()
             metrics = QFontMetrics(self.run_status_detail.font())
             max_width = max(120, self.run_status_detail.width() - 8)
             self.run_status_detail.setText(metrics.elidedText(clean, Qt.ElideRight, max_width))
@@ -1022,13 +1034,13 @@ class MainWindow(QMainWindow):
         self.toasts.show_toast("Settings exported.")
 
     def _build_pages(self) -> None:
-        self.pages.addWidget(self._build_home())
-        self.pages.addWidget(self._build_toolbox())
-        self.pages.addWidget(self._build_diagnose())
-        self.pages.addWidget(self._build_fixes())
-        self.pages.addWidget(self._build_reports())
-        self.pages.addWidget(self._build_history())
-        self.pages.addWidget(self._build_settings())
+        self.pages.addWidget(build_home_page(self))
+        self.pages.addWidget(build_playbooks_page(self))
+        self.pages.addWidget(build_diagnose_page(self))
+        self.pages.addWidget(build_fixes_page(self))
+        self.pages.addWidget(build_reports_page(self))
+        self.pages.addWidget(build_history_page(self))
+        self.pages.addWidget(build_settings_page(self))
 
     def _build_home(self) -> QWidget:
         p = QWidget(); l = QVBoxLayout(p); l.setContentsMargins(0, 0, 0, 0); l.setSpacing(10)
@@ -3791,25 +3803,9 @@ class MainWindow(QMainWindow):
                 return {"code": 130, "cancelled": True, "user_message": "Launch cancelled."}
             progress_cb(15, "Launching tool")
             log_cb(f"[tool] {t.id} -> {t.command}")
-            if t.command.startswith("ms-"):
-                code, out = open_uri(t.command)
-            elif os.name == "nt":
-                try:
-                    subprocess.Popen(t.command, shell=True)
-                    code, out = 0, f"Launched: {t.command}"
-                except Exception as exc:
-                    code, out = 1, str(exc)
-            else:
-                parts = t.command.split()
-                result = run_command(
-                    parts,
-                    timeout_s=max(8, timeout_s),
-                    on_stdout_line=log_cb,
-                    on_stderr_line=lambda line: log_cb(f"[stderr] {line}"),
-                    event_bus=self.run_event_bus,
-                    run_id=run_id,
-                )
-                code, out = result.code, result.combined
+            code, out = launch_tool(t.id, dry_run=False)
+            if cancel_event.is_set():
+                return {"code": 130, "cancelled": True, "user_message": "Launch cancelled."}
             out_dir = ensure_dirs()["state"] / "tool_runs" / sid
             out_dir.mkdir(parents=True, exist_ok=True)
             artifact = out_dir / f"{t.id}_result.txt"

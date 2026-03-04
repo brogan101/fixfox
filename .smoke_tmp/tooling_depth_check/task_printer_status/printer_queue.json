@@ -1,6 +1,0 @@
-Get-PrintJob : Parameter set cannot be resolved using the specified named parameters.
-At line:1 char:1
-+ Get-PrintJob -ErrorAction SilentlyContinue | Select-Object PrinterNam ...
-+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : InvalidArgument: (:) [Get-PrintJob], ParameterBindingException
-    + FullyQualifiedErrorId : AmbiguousParameterSet,Get-PrintJob

@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
+import subprocess
+
+from .utils import open_uri
 
 
 @dataclass(frozen=True)
@@ -37,3 +41,32 @@ def search_tools(query: str) -> list[ToolItem]:
     if not q:
         return list(TOOL_DIRECTORY)
     return [tool for tool in TOOL_DIRECTORY if q in tool.title.lower() or q in tool.desc.lower() or q in tool.category.lower()]
+
+
+def tool_map() -> dict[str, ToolItem]:
+    return {row.id: row for row in TOOL_DIRECTORY}
+
+
+def launch_tool(tool_id: str, *, dry_run: bool = False) -> tuple[int, str]:
+    tool = tool_map().get(str(tool_id or "").strip())
+    if tool is None:
+        return 2, f"Unknown tool id: {tool_id}"
+    if dry_run:
+        return 0, f"[dry-run] Would launch {tool.id}: {tool.command}"
+    command = str(tool.command or "").strip()
+    if not command:
+        return 1, f"Tool {tool.id} has no command configured."
+    if command.startswith("ms-"):
+        return open_uri(command)
+    if os.name == "nt":
+        try:
+            subprocess.Popen(command, shell=True)
+            return 0, f"Launched: {command}"
+        except Exception as exc:
+            return 1, str(exc)
+    try:
+        proc = subprocess.run(command.split(), capture_output=True, text=True, timeout=30)
+    except Exception as exc:
+        return 1, str(exc)
+    output = (proc.stdout or proc.stderr or "").strip()
+    return int(proc.returncode), output

@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..icons import get_icon
+from ..style import spacing, tight_spacing
 from ..theme import resolve_density_tokens
 
 
@@ -99,7 +100,7 @@ class BaseRow(QFrame):
         self.setAutoFillBackground(True)
 
         shell = QHBoxLayout(self)
-        shell.setSpacing(10)
+        shell.setSpacing(spacing("sm"))
 
         left = QVBoxLayout()
         left.setContentsMargins(0, 0, 0, 0)
@@ -115,7 +116,7 @@ class BaseRow(QFrame):
         self.left_container = left
         self.right_container = QHBoxLayout()
         self.right_container.setContentsMargins(0, 0, 0, 0)
-        self.right_container.setSpacing(6)
+        self.right_container.setSpacing(spacing("xs"))
 
         shell.addLayout(left, 1)
         shell.addLayout(self.right_container, 0)
@@ -124,7 +125,9 @@ class BaseRow(QFrame):
     def set_density(self, density: str) -> None:
         self._density = density
         d = resolve_density_tokens(density)
-        self.layout().setContentsMargins(d.card_padding_h, 6, d.card_padding_h, 6)
+        row_vpad = max(4, d.card_padding_v - 6)
+        self.layout().setContentsMargins(d.card_padding_h, row_vpad, d.card_padding_h, row_vpad)
+        self.layout().setSpacing(tight_spacing(density))
 
     def bind_to_list(self, list_widget: QListWidget, list_item: QListWidgetItem) -> None:
         self.list_widget = list_widget

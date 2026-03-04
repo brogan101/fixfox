@@ -242,6 +242,33 @@ QListWidget::item {{
 QListWidget::item:selected {{
   background: {selection};
 }}
+QTreeWidget::item,
+QTreeView::item {{
+  min-height: {max(24, d.list_row_height - 24)}px;
+  padding: 2px 4px;
+}}
+QHeaderView::section {{
+  background: {_alpha(tokens.panel2, 0.90)};
+  border: 0;
+  border-bottom: 1px solid {_alpha(tokens.border, 0.46)};
+  padding: 4px 8px;
+  color: {tokens.text_muted};
+}}
+QTabBar::tab {{
+  min-height: {max(24, d.input_height - 6)}px;
+  padding: 0 10px;
+  margin-right: 4px;
+  background: {_alpha(tokens.panel2, 0.78)};
+  border: 1px solid {_alpha(tokens.border, 0.52)};
+  border-radius: {max(6, d.corner_radius - 4)}px;
+}}
+QTabBar::tab:selected {{
+  background: {selection};
+  border-color: {outline};
+}}
+QTabBar::tab:hover {{
+  background: {_alpha(tokens.accent, 0.14)};
+}}
 QScrollBar:vertical {{
   background: {_alpha(tokens.panel2, 0.74)};
   width: {scroll_size}px;

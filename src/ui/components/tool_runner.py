@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..font_utils import safe_copy_font
+from ..style import spacing, tight_spacing
 from ..widgets import Card, PrimaryButton, SoftButton
 from ...core.run_events import RunEvent, RunEventBus, RunEventType
 
@@ -78,8 +79,8 @@ class ToolRunnerWindow(QDialog):
         self._running_hint = "Running... waiting for live output."
 
         root = QVBoxLayout(self)
-        root.setContentsMargins(12, 12, 12, 12)
-        root.setSpacing(10)
+        root.setContentsMargins(spacing("sm"), spacing("sm"), spacing("sm"), spacing("sm"))
+        root.setSpacing(spacing("sm"))
 
         header = Card(tool_name, "Running")
         row = QHBoxLayout()
@@ -122,7 +123,7 @@ class ToolRunnerWindow(QDialog):
         self.next_actions = QWidget()
         next_actions_layout = QHBoxLayout(self.next_actions)
         next_actions_layout.setContentsMargins(0, 0, 0, 0)
-        next_actions_layout.setSpacing(6)
+        next_actions_layout.setSpacing(spacing("xs"))
         next_actions_layout.addStretch(1)
 
         self.tabs.addTab(self.txt_overview, "Overview")
@@ -131,7 +132,7 @@ class ToolRunnerWindow(QDialog):
         next_tab = QWidget()
         next_tab_layout = QVBoxLayout(next_tab)
         next_tab_layout.setContentsMargins(0, 0, 0, 0)
-        next_tab_layout.setSpacing(8)
+        next_tab_layout.setSpacing(tight_spacing("comfortable"))
         next_tab_layout.addWidget(self.txt_next, 1)
         next_tab_layout.addWidget(self.next_actions, 0)
         self.tabs.addTab(next_tab, "Next Steps")

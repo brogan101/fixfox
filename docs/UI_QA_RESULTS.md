@@ -1,44 +1,50 @@
-# UI QA Results
+# UI QA Results (2026-03-04)
 
-Date: 2026-03-03
+## Automated gates
+- `.\\.venv\\Scripts\\python.exe -m src.tests.smoke`
+  - Result: **pass**.
+- `.\\.venv\\Scripts\\python.exe scripts/capability_audit.py`
+  - Result: **pass** (`140 ok / 0 failing`).
+- Offscreen UI launch check (`AppShell` + timed quit)
+  - Result: **pass** (`UI_STARTUP_OK`).
 
-## Window Size Coverage
-- Minimum window (`1100x700`): pass
-  - No inaccessible controls in active viewport paths.
-  - Overflow content remains reachable via page scroll areas.
-- 1080p windowed (`1920x1080`): pass
-- Wide desktop (`1600x900` and above): pass
+## Required checks
 
-## Right Panel Behavior
-- Auto-collapse below threshold width: pass
-- Manual toggle open/close: pass
-- Essential page actions remain on page body while panel is collapsed: pass
+### Min window size
+- Baseline min size (`MIN_WINDOW_SIZE`) respected.
+- No blocked controls found in smoke navigation traversal.
+- Right panel responsive collapse still works.
 
-## Page Consistency
-- Home: goals + quick actions + what changed + recent sessions: pass
-- Playbooks: directory + detail + advanced toggle behavior: pass
-- Diagnose: grouped feed + toolbar filters + right-panel detail: pass
-- Fixes: master->detail + risk chips + rollback center: pass
-- Reports: 3-step flow + evidence checklist + redaction preview: pass
-- History: case summary + compare drawer: pass
-- Settings: hub nav styling + search + reset/export actions: pass
+### 1080p window
+- Top bar run status card remains readable with larger icon + two-line status.
+- Home/Playbooks/Diagnose/Fixes/Reports/History/Settings are navigable without control overlap.
 
-## ToolRunner Surface
-- Run output remains in ToolRunner (no embedded page output widgets for runbook flow): pass
-- Primary controls reduced, secondary actions under `More`: pass
-- Deterministic overview sections present: pass
+### Basic/Pro layout behavior
+- Basic:
+  - Playbooks guided container visible.
+  - Pro console hidden.
+  - concierge default collapsed.
+- Pro:
+  - Playbooks pro console visible.
+  - script tasks visible.
 
-## Keyboard Navigation Sanity
-- Tab traversal between top bar, nav rail, page actions, and ToolRunner controls: pass
-- Enter/Space activation on row widgets and action buttons: pass
-- Context-menu key support on list rows retained: pass
-- Automated Tab-cycle focus sampling per page returned valid focus targets across:
-  - `QLineEdit`, `QListWidget`, `QComboBox`, `QCheckBox`, `PrimaryButton`, `SoftButton`, `IconButton`, `QTabBar`.
+### ToolRunner and run status
+- Starting safe tool creates ToolRunner.
+- Run events include at least `START`, `STATUS`, `END`.
+- Top bar status detail updates during runs.
+- Clicking top status card opens/focuses ToolRunner.
 
-## Manual Flow Checks
-1. Home -> Fix Wi-Fi path -> ToolRunner -> export Home Share Pack: pass
-2. IT Ticket Triage -> export Ticket Pack -> open `report.html`: pass
-3. History reopen -> re-export without rerun: pass
+### Scrollbar/theme consistency
+- Scrollbars themed via global QSS (no default Qt bars observed in tested flows).
+- Splitter handle styling active with hover/pressed states.
+- Tree/list/tab/header styles consistent with token-driven theme.
 
-## Notes
-- Some lower-page controls are naturally below fold at minimum size by design; all are reachable through scroll policies.
+### QFont warning check
+- `QFont::setPointSize: Point size <= 0 (-1)` warnings observed during launch/tests: **0**.
+
+## Known residual risks
+- `src/ui/main_window.py` remains large; extraction is in-progress via `src/ui/pages/*` wrappers and `AppShell` entrypoint.
+- Full per-page method migration to dedicated page modules is still technical debt, not a release blocker for current behavior.
+
+## Release gate verdict
+- **Pass** for current polish scope (UI consistency, run-status/log reliability, capability wiring integrity, smoke coverage).

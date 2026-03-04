@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .style import control_height, spacing, tight_spacing
 from .theme import resolve_density_tokens
 
 
@@ -23,7 +24,7 @@ class Card(QFrame):
         self.setFrameShape(QFrame.NoFrame)
         self.layout_main = QVBoxLayout(self)
         self.layout_main.setContentsMargins(14, 12, 14, 12)
-        self.layout_main.setSpacing(8)
+        self.layout_main.setSpacing(spacing("sm"))
         self.set_density(density)
 
         top = QHBoxLayout()
@@ -47,7 +48,7 @@ class Card(QFrame):
         self._density = density
         d = resolve_density_tokens(density)
         self.layout_main.setContentsMargins(d.card_padding_h, d.card_padding_v, d.card_padding_h, d.card_padding_v)
-        self.layout_main.setSpacing(8 if density == "comfortable" else 6)
+        self.layout_main.setSpacing(tight_spacing(density))
         self.update()
 
 
@@ -56,14 +57,14 @@ class Pill(QLabel):
         super().__init__(text)
         self.setObjectName("Pill")
         self.setAlignment(Qt.AlignCenter)
-        self.setMinimumHeight(26)
+        self.setMinimumHeight(24)
 
 
 class PrimaryButton(QPushButton):
     def __init__(self, text: str):
         super().__init__(text)
         self.setObjectName("PrimaryButton")
-        self.setMinimumHeight(36)
+        self.setMinimumHeight(control_height("comfortable"))
 
     def set_density(self, density: str) -> None:
         self.setMinimumHeight(resolve_density_tokens(density).button_height)
@@ -73,7 +74,7 @@ class SoftButton(QPushButton):
     def __init__(self, text: str):
         super().__init__(text)
         self.setObjectName("SoftButton")
-        self.setMinimumHeight(34)
+        self.setMinimumHeight(control_height("comfortable") - 2)
 
     def set_density(self, density: str) -> None:
         self.setMinimumHeight(resolve_density_tokens(density).button_height - 2)
@@ -105,7 +106,7 @@ class ToastHost(QWidget):
         self.setAttribute(Qt.WA_TransparentForMouseEvents)
         self.layout_main = QVBoxLayout(self)
         self.layout_main.setContentsMargins(0, 0, 0, 0)
-        self.layout_main.setSpacing(8)
+        self.layout_main.setSpacing(spacing("sm"))
         self.layout_main.addStretch(1)
         self.setMaximumWidth(360)
 
@@ -113,7 +114,7 @@ class ToastHost(QWidget):
         frame = QFrame()
         frame.setObjectName("Toast")
         lay = QHBoxLayout(frame)
-        lay.setContentsMargins(12, 8, 12, 8)
+        lay.setContentsMargins(spacing("sm"), spacing("xs"), spacing("sm"), spacing("xs"))
         label = QLabel(text)
         label.setWordWrap(True)
         lay.addWidget(label)
@@ -129,8 +130,8 @@ class ConciergePanel(Card):
         super().__init__("Concierge Panel", "Context help and next action.", right_widget=self.collapse_btn, object_name="ConciergePanel")
         self.content = QWidget()
         self.content_layout = QVBoxLayout(self.content)
-        self.content_layout.setContentsMargins(0, 4, 0, 0)
-        self.content_layout.setSpacing(8)
+        self.content_layout.setContentsMargins(0, spacing("xs"), 0, 0)
+        self.content_layout.setSpacing(spacing("sm"))
         self.body_layout().addWidget(self.content)
         self._collapsed = False
         self.collapse_btn.clicked.connect(self.toggle_collapsed)

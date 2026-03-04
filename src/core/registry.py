@@ -377,7 +377,7 @@ def _tool_capabilities() -> tuple[Capability, ...]:
                 pro=False,
                 default_visibility="recommended",
                 contexts=("playbooks", "home"),
-                entrypoint=f"ui.main_window.launch_tool:{tool.id}",
+                entrypoint=f"core.toolbox.launch_tool:{tool.id}",
                 kind="tool",
                 category=tool.category.lower(),
                 plain_1liner=tool.plain,

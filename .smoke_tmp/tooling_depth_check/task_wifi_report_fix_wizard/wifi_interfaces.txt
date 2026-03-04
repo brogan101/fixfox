@@ -1,1 +1,0 @@
-The following command was not found: wlan show interfaces.
