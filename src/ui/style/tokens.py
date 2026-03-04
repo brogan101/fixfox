@@ -74,7 +74,7 @@ DENSITY_TOKENS: dict[str, DensityTokens] = {
         input_height=36,
         card_padding_v=16,
         card_padding_h=16,
-        corner_radius=14,
+        corner_radius=16,
         icon_size=18,
     ),
     "compact": DensityTokens(
@@ -85,7 +85,7 @@ DENSITY_TOKENS: dict[str, DensityTokens] = {
         input_height=30,
         card_padding_v=12,
         card_padding_h=12,
-        corner_radius=10,
+        corner_radius=12,
         icon_size=16,
     ),
 }

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QTimer, Qt, Signal
+from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QTimer, Qt, Signal
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -134,8 +134,12 @@ class DrawerCard(Card):
         self.text = QTextEdit()
         self.text.setReadOnly(True)
         self.text.setMinimumHeight(120)
+        self.text.setMaximumHeight(0)
         self.text.hide()
         self.body_layout().addWidget(self.text)
+        self._anim = QPropertyAnimation(self.text, b"maximumHeight", self)
+        self._anim.setDuration(180)
+        self._anim.setEasingCurve(QEasingCurve.OutCubic)
         self.toggle_btn.clicked.connect(self._toggle)
 
     def set_text(self, text: str) -> None:
@@ -143,8 +147,28 @@ class DrawerCard(Card):
 
     def _toggle(self) -> None:
         visible = self.text.isVisible()
-        self.text.setVisible(not visible)
-        self.toggle_btn.setText("Hide details" if not visible else "Show details")
+        if visible:
+            self._anim.stop()
+            self._anim.setStartValue(self.text.maximumHeight())
+            self._anim.setEndValue(0)
+            self._anim.finished.connect(self._hide_drawer_once)
+            self._anim.start()
+            self.toggle_btn.setText("Show details")
+            return
+        self.text.setVisible(True)
+        self._anim.stop()
+        self._anim.setStartValue(0)
+        self._anim.setEndValue(180)
+        self._anim.start()
+        self.toggle_btn.setText("Hide details")
+
+    def _hide_drawer_once(self) -> None:
+        if self.text.maximumHeight() <= 0:
+            self.text.hide()
+        try:
+            self._anim.finished.disconnect(self._hide_drawer_once)
+        except Exception:
+            pass
 
 
 class ToastHost(QWidget):

@@ -13,6 +13,7 @@ from src.core.onboarding import OnboardingState
 from src.core.registry import CAPABILITIES
 from src.core.runbooks import execute_runbook
 from src.core.script_tasks import run_script_task
+from src.core.settings import AppSettings
 from src.ui.layout_guardrails import should_auto_collapse_right_panel
 
 
@@ -142,6 +143,16 @@ class OnboardingTests(unittest.TestCase):
         state.mark_skipped(dont_show_again=True)
         self.assertTrue(state.completed)
         self.assertFalse(state.should_show())
+
+
+class SettingsTests(unittest.TestCase):
+    def test_ui_scale_is_clamped_on_normalize(self) -> None:
+        low = AppSettings(ui_scale_pct=10).normalized()
+        high = AppSettings(ui_scale_pct=300).normalized()
+        ok = AppSettings(ui_scale_pct=110).normalized()
+        self.assertEqual(low.ui_scale_pct, 90)
+        self.assertEqual(high.ui_scale_pct, 125)
+        self.assertEqual(ok.ui_scale_pct, 110)
 
 
 if __name__ == "__main__":

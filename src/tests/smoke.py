@@ -131,6 +131,38 @@ def _ui_module_smoke() -> None:
         _assert(hasattr(window, "pb_pro_console") and not window.pb_pro_console.isHidden(), "Pro Playbooks console should be visible")
         _assert("script_task.task_wifi_report_fix_wizard" in window._visible_capability_ids(), "pro script task missing in pro mode")
 
+        # Global search is debounced, grouped, and keyboard-driven.
+        window.top_search.setFocus()
+        window.top_search.setText("wifi")
+        app.processEvents()
+        time.sleep(0.25)
+        app.processEvents()
+        _assert(window._search_popup.isVisible(), "global search popup did not open")
+        _assert(window._search_popup.has_visible_results(), "global search popup has no grouped results")
+        QTest.keyClick(window.top_search, Qt.Key_Down)
+        app.processEvents()
+
+        # Settings appearance exposes persisted UI scale control.
+        window._open_settings_section("Appearance")
+        app.processEvents()
+        _assert(hasattr(window, "s_ui_scale"), "UI scale slider missing from appearance settings")
+        window.s_ui_scale.setValue(110)
+        app.processEvents()
+        time.sleep(0.15)
+        app.processEvents()
+        _assert(window.settings_state.ui_scale_pct == 110, "UI scale live apply did not update settings state")
+        window.s_ui_scale.sliderReleased.emit()
+        app.processEvents()
+        _assert(window.settings_state.ui_scale_pct == 110, "UI scale persisted value mismatch")
+
+        # Help-routed pages are accessible in settings.
+        window._open_settings_section("Privacy")
+        app.processEvents()
+        _assert("privacy" in window.settings_nav.currentItem().text().lower(), "privacy page navigation failed")
+        window._open_settings_section("Safety")
+        app.processEvents()
+        _assert("safety" in window.settings_nav.currentItem().text().lower(), "safety page navigation failed")
+
         # Single-click must not launch any action.
         tool_row = find_tool_row("tool_storage")
         QTest.mouseClick(tool_row, Qt.LeftButton, Qt.NoModifier, tool_row.rect().center())

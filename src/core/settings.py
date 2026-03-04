@@ -26,6 +26,7 @@ class AppSettings:
     theme_palette: str = "fixfox_m3"
     theme_mode: str = "light"
     density: str = "comfortable"
+    ui_scale_pct: int = 100
     ui_mode: str = "basic"
     favorites_fixes: list[str] | None = None
     favorites_tools: list[str] | None = None
@@ -34,6 +35,11 @@ class AppSettings:
 
     def normalized(self) -> "AppSettings":
         self.ui_mode = "pro" if str(self.ui_mode).strip().lower() == "pro" else "basic"
+        try:
+            scale = int(self.ui_scale_pct)
+        except Exception:
+            scale = 100
+        self.ui_scale_pct = max(90, min(125, scale))
         if self.pinned_actions is None:
             self.pinned_actions = []
         if self.favorites_fixes is None:

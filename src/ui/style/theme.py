@@ -11,6 +11,7 @@ from .tokens import (
 )
 
 PALETTE_ORDER = ("fixfox_m3",)
+_UI_SCALE_PERCENT = 100
 
 PALETTE_LABELS: dict[str, str] = {
     "fixfox_m3": "Fix Fox M3",
@@ -49,7 +50,7 @@ PALETTE_TOKENS_LIGHT: dict[str, ThemeTokens] = {
         crit="#DC2626",
         info="#2563EB",
         shadow1="#CFD6DF",
-        shadow2="#E6E9EE",
+        shadow2="#EEF1F5",
     ),
 }
 
@@ -70,7 +71,7 @@ PALETTE_TOKENS_DARK: dict[str, ThemeTokens] = {
         crit="#DC2626",
         info="#2563EB",
         shadow1="#07090E",
-        shadow2="#04060A",
+        shadow2="#1A2336",
     ),
 }
 
@@ -114,6 +115,26 @@ def normalize_density(density: str) -> str:
     return density if density in DENSITY_TOKENS else "comfortable"
 
 
+def clamp_ui_scale(scale_percent: int) -> int:
+    return max(90, min(125, int(scale_percent)))
+
+
+def set_ui_scale_percent(scale_percent: int) -> int:
+    global _UI_SCALE_PERCENT
+    _UI_SCALE_PERCENT = clamp_ui_scale(scale_percent)
+    return _UI_SCALE_PERCENT
+
+
+def ui_scale_percent() -> int:
+    return _UI_SCALE_PERCENT
+
+
+def spacing_multiplier(scale_percent: int | None = None) -> float:
+    pct = clamp_ui_scale(scale_percent if scale_percent is not None else _UI_SCALE_PERCENT)
+    # Keep spacing adjustments subtle across the 90%-125% UI scale range.
+    return 1.0 + ((pct - 100) / 400.0)
+
+
 def resolve_theme_tokens(palette: str, mode: str) -> ThemeTokens:
     palette_key = normalize_palette(palette)
     mode_key = normalize_mode(mode)
@@ -121,8 +142,29 @@ def resolve_theme_tokens(palette: str, mode: str) -> ThemeTokens:
     return source[palette_key]
 
 
-def resolve_density_tokens(density: str) -> DensityTokens:
-    return DENSITY_TOKENS[normalize_density(density)]
+def resolve_density_tokens(density: str, scale_percent: int | None = None) -> DensityTokens:
+    key = normalize_density(density)
+    base = DENSITY_TOKENS[key]
+    pct = clamp_ui_scale(scale_percent if scale_percent is not None else _UI_SCALE_PERCENT)
+    if pct == 100:
+        return base
+
+    factor = pct / 100.0
+
+    def _scaled(value: int, minimum: int = 1) -> int:
+        return max(minimum, int(round(float(value) * factor)))
+
+    return DensityTokens(
+        font_size=_scaled(base.font_size, 8),
+        nav_item_height=_scaled(base.nav_item_height, 28),
+        list_row_height=_scaled(base.list_row_height, 40),
+        button_height=_scaled(base.button_height, 28),
+        input_height=_scaled(base.input_height, 26),
+        card_padding_v=_scaled(base.card_padding_v, 8),
+        card_padding_h=_scaled(base.card_padding_h, 8),
+        corner_radius=_scaled(base.corner_radius, 8),
+        icon_size=_scaled(base.icon_size, 14),
+    )
 
 
 __all__ = [
@@ -145,6 +187,10 @@ __all__ = [
     "palette_key_from_label",
     "normalize_mode",
     "normalize_density",
+    "clamp_ui_scale",
+    "set_ui_scale_percent",
+    "ui_scale_percent",
+    "spacing_multiplier",
     "resolve_theme_tokens",
     "resolve_density_tokens",
 ]

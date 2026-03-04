@@ -381,6 +381,30 @@ QRadioButton::indicator:checked {{
   border-radius: 8px;
 }}
 
+QSlider::groove:horizontal {{
+  height: 6px;
+  background: {tokens.panel2};
+  border: 1px solid {border_soft};
+  border-radius: 3px;
+}}
+QSlider::sub-page:horizontal {{
+  background: {_alpha(tokens.accent, 0.70)};
+  border-radius: 3px;
+}}
+QSlider::handle:horizontal {{
+  width: 14px;
+  margin: -6px 0;
+  border-radius: 7px;
+  background: {tokens.accent};
+  border: 1px solid {_alpha(tokens.accent_pressed, 0.95)};
+}}
+QSlider::handle:horizontal:hover {{
+  background: {tokens.accent_hover};
+}}
+QSlider::handle:horizontal:pressed {{
+  background: {tokens.accent_pressed};
+}}
+
 QListWidget {{
   background: {tokens.panel};
   border: 1px solid {border_soft};
@@ -577,6 +601,41 @@ QToolTip {{
   border: 1px solid {border_soft};
   border-radius: {max(6, d.corner_radius - 4)}px;
   padding: 6px 8px;
+}}
+
+QFrame#GlobalSearchPopup {{
+  background: {tokens.panel};
+  border: 1px solid {border_soft};
+  border-radius: {d.corner_radius + 2}px;
+}}
+QLabel#GlobalSearchEmpty {{
+  color: {tokens.text_muted};
+  padding: 8px 10px;
+}}
+QListWidget#GlobalSearchList {{
+  background: transparent;
+  border: 0;
+  border-radius: {d.corner_radius}px;
+  outline: 0;
+}}
+QListWidget#GlobalSearchList::item {{
+  border-radius: {max(8, d.corner_radius - 4)}px;
+  padding: 8px 10px;
+  margin: 1px 0;
+}}
+QListWidget#GlobalSearchList::item:disabled {{
+  color: {tokens.text_muted};
+  font-weight: 650;
+  background: transparent;
+  border: 0;
+  padding: 6px 2px;
+}}
+QListWidget#GlobalSearchList::item:selected {{
+  background: {accent_tint};
+  border: 1px solid {focus_ring};
+}}
+QListWidget#GlobalSearchList::item:hover {{
+  background: {surface_alt};
 }}
 
 QWidget:disabled {{

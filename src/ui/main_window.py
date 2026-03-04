@@ -10,7 +10,7 @@ from datetime import datetime
 from functools import partial
 from typing import Any, Callable
 
-from PySide6.QtCore import QPoint, QSize, Qt, QTimer, Signal
+from PySide6.QtCore import QEvent, QPoint, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QFontMetrics, QIcon, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
     QMenu,
     QMessageBox,
     QScrollArea,
+    QSlider,
     QSpinBox,
     QSplitter,
     QStackedWidget,
@@ -76,7 +77,7 @@ from ..core.registry import get_visible_capabilities
 from ..core.runbooks import RUNBOOKS, execute_runbook, runbook_map
 from ..core.run_events import RunEventBus, RunEventType, get_run_event_bus
 from ..core.safety import policy_from_settings
-from ..core.search import query_index
+from ..core.search import SearchItem, query_index
 from ..core.sessions import (
     SessionMeta,
     add_or_update_meta,
@@ -99,15 +100,16 @@ from .components.context_menu import ContextAction, show_context_menu
 from .components.feed_renderer import FeedItemAdapter, FeedRenderer, SkeletonLoader
 from .components.rows import BaseRow, FindingRow, FixRow, IconButton, SessionRow, ToolRow, row_height_for_density
 from .components.tool_runner import ToolRunnerWindow
+from .components.global_search import GlobalSearchPopup
 from .icons import get_icon
 from .layout_guardrails import (
     MIN_NAV_WIDTH,
     MIN_RIGHT_PANEL_WIDTH,
-    MIN_WINDOW_SIZE,
     LayoutDebugOverlay,
     apply_button_guardrails,
     min_button_size,
     should_auto_collapse_right_panel,
+    scaled_min_window_size,
 )
 from .ui_state import LayoutPolicy, is_basic, is_pro, layout_policy
 from .pages import (
@@ -122,6 +124,7 @@ from .pages import (
 from .style import spacing
 from .theme import (
     available_palette_labels,
+    clamp_ui_scale,
     normalize_density,
     normalize_mode,
     normalize_palette,
@@ -129,6 +132,7 @@ from .theme import (
     palette_label,
     resolve_density_tokens,
     resolve_theme_tokens,
+    set_ui_scale_percent,
 )
 from .widgets import Card, ConciergePanel, DrawerCard, EmptyState, Pill, PrimaryButton, SoftButton, ToastHost
 
@@ -422,6 +426,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         ensure_dirs()
         self.settings_state = load_settings()
+        set_ui_scale_percent(getattr(self.settings_state, "ui_scale_pct", 100))
         self.layout_policy_state: LayoutPolicy = layout_policy(self.settings_state)
         if is_basic(self.settings_state):
             self.settings_state.show_advanced_tools = False
@@ -451,6 +456,17 @@ class MainWindow(QMainWindow):
         self.selected_task_id = ""
         self.rb_selected_id = ""
         self._syncing_settings = False
+        self._search_debounce_timer = QTimer(self)
+        self._search_debounce_timer.setSingleShot(True)
+        self._search_debounce_timer.setInterval(180)
+        self._search_debounce_timer.timeout.connect(self._refresh_global_search_results)
+        self._scale_apply_timer = QTimer(self)
+        self._scale_apply_timer.setSingleShot(True)
+        self._scale_apply_timer.setInterval(80)
+        self._scale_apply_timer.timeout.connect(self._apply_pending_ui_scale)
+        self._pending_ui_scale_pct = int(getattr(self.settings_state, "ui_scale_pct", 100))
+        self._search_popup = GlobalSearchPopup(self)
+        self._search_popup.result_activated.connect(self._apply_global_search_result)
         self._persist_concierge_events = True
         self._auto_concierge_collapse = False
         self.layout_overlay: LayoutDebugOverlay | None = None
@@ -463,7 +479,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Fix Fox")
         self.setWindowIcon(QIcon(resource_path(ICON_PNG)))
         self.resize(1380, 900)
-        self.setMinimumSize(MIN_WINDOW_SIZE)
+        self.setMinimumSize(scaled_min_window_size(self.settings_state.ui_scale_pct))
         self.setObjectName("RootWindow")
 
         shell = QFrame(); shell.setObjectName("Shell")
@@ -604,8 +620,10 @@ class MainWindow(QMainWindow):
 
         self.top_search = QLineEdit()
         self.top_search.setObjectName("SearchInput")
-        self.top_search.setPlaceholderText("Search findings, fixes, tools, runbooks, sessions, KB")
-        self.top_search.returnPressed.connect(self.open_command_palette)
+        self.top_search.setPlaceholderText("Search goals, tools, runbooks, fixes, and sessions")
+        self.top_search.textChanged.connect(self._schedule_global_search)
+        self.top_search.returnPressed.connect(self._activate_global_search_or_palette)
+        self.top_search.installEventFilter(self)
         self.btn_cancel_task = SoftButton("Cancel Task")
         self.btn_cancel_task.setEnabled(False)
 
@@ -629,7 +647,7 @@ class MainWindow(QMainWindow):
         self.btn_menu = IconButton("menu", f, "Menu")
         self.btn_panel_toggle = IconButton("panel_open", f, "Toggle concierge panel")
         self.btn_export.clicked.connect(lambda: self.nav.setCurrentRow(self.NAV_ITEMS.index("Reports")))
-        self.btn_help.clicked.connect(lambda: self._show_page_help("Start Here", "Use local Help tabs for Start Here, Privacy, and Safety guidance."))
+        self.btn_help.clicked.connect(self._open_help_menu)
         self.btn_menu.clicked.connect(self._open_profile_menu)
         self.btn_cancel_task.setMinimumSize(min_btn)
         for btn in (self.btn_export, self.btn_help, self.btn_panel_toggle, self.btn_menu):
@@ -669,6 +687,104 @@ class MainWindow(QMainWindow):
         l.addWidget(self.ctx_hint)
         l.addWidget(self.ctx_full)
         return f
+
+    def eventFilter(self, watched: Any, event: Any) -> bool:  # type: ignore[override]
+        if watched is self.top_search and self._search_popup.isVisible():
+            if event.type() == QEvent.KeyPress:
+                key = event.key()
+                if key == Qt.Key_Down:
+                    self._search_popup.move_selection(1)
+                    return True
+                if key == Qt.Key_Up:
+                    self._search_popup.move_selection(-1)
+                    return True
+                if key in {Qt.Key_Return, Qt.Key_Enter} and self._search_popup.activate_current():
+                    return True
+                if key == Qt.Key_Escape:
+                    self._search_popup.hide_popup()
+                    return True
+            if event.type() == QEvent.FocusOut:
+                QTimer.singleShot(120, self._search_popup.hide_popup)
+        return super().eventFilter(watched, event)
+
+    def _schedule_global_search(self) -> None:
+        query = self.top_search.text().strip() if hasattr(self, "top_search") else ""
+        if not query:
+            self._search_popup.hide_popup()
+            return
+        self._search_debounce_timer.start()
+
+    def _refresh_global_search_results(self) -> None:
+        query = self.top_search.text().strip() if hasattr(self, "top_search") else ""
+        if not query:
+            self._search_popup.hide_popup()
+            return
+        visible = self._visible_capability_ids()
+        rows = query_index(query, limit=80, allowed_capability_ids=visible)
+        basic = self.layout_policy_state.mode == "basic"
+        groups: dict[str, list[dict[str, str]]] = {
+            "Goals": [],
+            "Tools": [],
+            "Runbooks": [],
+            "Fixes": [],
+            "Sessions": [],
+        }
+        for row in rows:
+            group = self._search_group_for_item(row, basic=basic)
+            payload = {
+                "kind": row.kind,
+                "key": row.key,
+                "title": row.title,
+                "subtitle": row.subtitle,
+            }
+            bucket = groups.get(group, groups["Tools"])
+            if len(bucket) < 6:
+                bucket.append(payload)
+        order = ("Goals", "Fixes", "Runbooks", "Tools", "Sessions") if basic else ("Goals", "Tools", "Runbooks", "Fixes", "Sessions")
+        grouped_rows = [(name, groups[name]) for name in order]
+        self._search_popup.show_results(self.top_search, grouped_rows, query)
+
+    def _search_group_for_item(self, row: SearchItem, *, basic: bool) -> str:
+        kind = str(row.kind or "").strip().lower()
+        key = str(row.key or "").strip().lower()
+        title = str(row.title or "").strip().lower()
+        if kind == "session" or kind == "run":
+            return "Sessions"
+        if kind == "fix" or key.startswith("fix_action."):
+            return "Fixes"
+        if kind == "tool" or kind == "task":
+            return "Tools"
+        if kind == "runbook":
+            if key.startswith("home_"):
+                return "Goals"
+            return "Runbooks"
+        if kind == "capability":
+            if key.startswith("runbook.home_") or "goal" in title or "quick check" in title:
+                return "Goals"
+            if key.startswith("tool.") or key.startswith("script_task."):
+                return "Tools"
+            if key.startswith("runbook."):
+                return "Runbooks"
+            if key.startswith("fix_action."):
+                return "Fixes"
+        if basic and kind in {"finding", "kb"}:
+            return "Goals"
+        return "Tools"
+
+    def _activate_global_search_or_palette(self) -> None:
+        if self._search_popup.activate_current():
+            return
+        self.open_command_palette()
+
+    def _apply_global_search_result(self, payload: Any) -> None:
+        if not isinstance(payload, dict):
+            return
+        kind = str(payload.get("kind", "")).strip()
+        key = str(payload.get("key", "")).strip()
+        if not kind or not key:
+            return
+        self._search_popup.hide_popup()
+        self._dispatch_search_selection(kind, key)
 
     def open_tool_runner(self) -> None:
         if self.tool_runner is None:
@@ -783,6 +899,10 @@ class MainWindow(QMainWindow):
                 self.s_safe.setChecked(False)
         if hasattr(self, "s_safe_hint"):
             self.s_safe_hint.setText("Safe-only turns off while admin tools are enabled.")
+        if hasattr(self, "s_export_btn"):
+            self.s_export_btn.setVisible(not basic)
+            self.s_export_btn.setEnabled(not basic)
+            self.s_export_btn.setToolTip("Switch to Pro mode to export settings JSON." if basic else "Export settings JSON.")
 
     def _apply_playbooks_mode_visibility(self) -> None:
         policy = self.layout_policy_state
@@ -872,7 +992,7 @@ class MainWindow(QMainWindow):
             except Exception:
                 line = ""
         if not line:
-            line = "Running..."
+            line = "Running... waiting for live output."
         detail = f"{spinner} {line} | {elapsed}"
         self._set_run_status(title, detail)
 
@@ -978,8 +1098,8 @@ class MainWindow(QMainWindow):
         basic = self.settings_state.ui_mode == "basic"
         desc = {
             "safety": "risk admin advanced rollback",
-            "privacy/masking": "share-safe redaction export masking ip",
-            "appearance": "theme density palette right panel",
+            "privacy": "sessions evidence logs local-only masking share-safe not collected storage path",
+            "appearance": "theme density palette right panel scale ui",
             "advanced": "logs diagnostics data folder evidence",
             "about": "version help start here privacy safety",
             "feedback": "bug ui feature message",
@@ -1011,6 +1131,9 @@ class MainWindow(QMainWindow):
         self.toasts.show_toast("Settings reset to defaults.")
 
     def _export_settings_json(self) -> None:
+        if self.settings_state.ui_mode != "pro":
+            self.toasts.show_toast("Export Settings JSON is available in Pro mode.")
+            return
         path, _ = QFileDialog.getSaveFileName(self, "Export Settings JSON", "fixfox_settings.json", "JSON (*.json)")
         if not path:
             return
@@ -1026,6 +1149,7 @@ class MainWindow(QMainWindow):
             "theme_palette": self.settings_state.theme_palette,
             "theme_mode": self.settings_state.theme_mode,
             "density": self.settings_state.density,
+            "ui_scale_pct": self.settings_state.ui_scale_pct,
             "favorites_fixes": self.settings_state.favorites_fixes or [],
             "favorites_tools": self.settings_state.favorites_tools or [],
             "favorites_runbooks": self.settings_state.favorites_runbooks or [],
@@ -1879,14 +2003,14 @@ class MainWindow(QMainWindow):
         self.settings_search.setPlaceholderText("Search settings")
         self.settings_search.textChanged.connect(self._filter_settings_nav)
         b_reset = SoftButton("Reset Defaults")
-        b_export = SoftButton("Export Settings")
+        self.s_export_btn = SoftButton("Export Settings JSON")
         b_help = SoftButton("Help Center")
         b_reset.clicked.connect(self._reset_settings_defaults)
-        b_export.clicked.connect(self._export_settings_json)
+        self.s_export_btn.clicked.connect(self._export_settings_json)
         b_help.clicked.connect(lambda: self._show_page_help("Settings", "Safety, privacy, and rollback guidance."))
         tools_row_top.addWidget(self.settings_search, 1)
         tools_row_bottom.addWidget(b_reset, 0)
-        tools_row_bottom.addWidget(b_export, 0)
+        tools_row_bottom.addWidget(self.s_export_btn, 0)
         tools_row_bottom.addWidget(b_help, 0)
         tools_row_bottom.addStretch(1)
         tools_row_l.addLayout(tools_row_top)
@@ -1901,7 +2025,7 @@ class MainWindow(QMainWindow):
         self.settings_nav.setObjectName("Nav")
         self.settings_nav.setFixedWidth(220)
         settings_row_height = resolve_density_tokens(self.settings_state.density).nav_item_height
-        settings_sections = ("Safety", "Privacy/Masking", "Appearance", "Advanced", "About", "Feedback")
+        settings_sections = ("Safety", "Privacy", "Appearance", "Advanced", "About", "Feedback")
         for name in settings_sections:
             item = QListWidgetItem(name)
             item.setData(Qt.UserRole, name)
@@ -1917,7 +2041,7 @@ class MainWindow(QMainWindow):
         psl = QVBoxLayout(p_safety)
         psl.setContentsMargins(0, 0, 0, 0)
         psl.setSpacing(10)
-        c_safe = Card("Safety Policy", "Keep safe-only mode enabled unless you need admin tools.")
+        c_safe = Card("Safety", "Safe/Admin/Advanced levels and rollback guidance.")
         self.s_safe = QCheckBox("Safe-only mode")
         self.s_admin = QCheckBox("Enable Admin Tools")
         self.s_admin_hint = self._setting_hint("Enable admin tools only when you need elevated actions.")
@@ -1934,6 +2058,13 @@ class MainWindow(QMainWindow):
         c_safe.body_layout().addWidget(self._setting_hint("Shows advanced operations intended for experienced users."))
         c_safe.body_layout().addWidget(self.s_diag)
         c_safe.body_layout().addWidget(self._setting_hint("Adds extra diagnostic visibility in select flows."))
+        c_safe.body_layout().addWidget(QLabel("Definitions"))
+        c_safe.body_layout().addWidget(self._setting_hint("Safe: low-risk checks and guided actions."))
+        c_safe.body_layout().addWidget(self._setting_hint("Admin: elevated commands with explicit confirmation."))
+        c_safe.body_layout().addWidget(self._setting_hint("Advanced: expert workflows that may require manual verification."))
+        c_safe.body_layout().addWidget(QLabel("Restore and rollback"))
+        c_safe.body_layout().addWidget(self._setting_hint("Use rollback notes in Fixes detail before running changes."))
+        c_safe.body_layout().addWidget(self._setting_hint("If a reboot is requested, rerun diagnostics after restart to confirm outcomes."))
         c_safe.body_layout().addWidget(self._setting_details("Advanced/admin tools may require elevation, reboots, or manual rollback."))
         psl.addWidget(c_safe)
         psl.addStretch(1)
@@ -1942,7 +2073,7 @@ class MainWindow(QMainWindow):
         ppl = QVBoxLayout(p_privacy)
         ppl.setContentsMargins(0, 0, 0, 0)
         ppl.setSpacing(10)
-        c_priv = Card("Privacy and Masking", "Applied to copy/export outputs when enabled.")
+        c_priv = Card("Privacy", "Local-first data handling and share-safe controls.")
         self.s_share = QCheckBox("Enable share-safe by default")
         self.s_ip = QCheckBox("Mask IP by default")
         self.s_share.stateChanged.connect(self.save_settings_from_ui)
@@ -1951,6 +2082,12 @@ class MainWindow(QMainWindow):
         c_priv.body_layout().addWidget(self._setting_hint("Automatically masks user/device identifiers when copying or exporting."))
         c_priv.body_layout().addWidget(self.s_ip)
         c_priv.body_layout().addWidget(self._setting_hint("Masks private/public IP tokens in summaries and exported text evidence."))
+        c_priv.body_layout().addWidget(QLabel("What Fix Fox stores locally"))
+        c_priv.body_layout().addWidget(self._setting_hint("Sessions, findings, selected actions, evidence file references, and optional logs."))
+        c_priv.body_layout().addWidget(QLabel("Storage location"))
+        c_priv.body_layout().addWidget(self._setting_hint(r"%LOCALAPPDATA%\\FixFox\\... (app data, sessions, exports, logs)."))
+        c_priv.body_layout().addWidget(QLabel("What is not collected"))
+        c_priv.body_layout().addWidget(self._setting_hint("Passwords, browser history content, clipboard history, and background cloud telemetry."))
         c_priv.body_layout().addWidget(self._setting_details("Masking applies to UI copy actions, Tool Runner copy/save, and export pack generation."))
         ppl.addWidget(c_priv)
         ppl.addStretch(1)
@@ -1993,6 +2130,17 @@ class MainWindow(QMainWindow):
         c_look.body_layout().addWidget(QLabel("Density"))
         c_look.body_layout().addWidget(self.s_density)
         c_look.body_layout().addWidget(self._setting_hint("Comfortable increases spacing; compact fits more rows on screen."))
+        c_look.body_layout().addWidget(QLabel("UI Scale"))
+        self.s_ui_scale_value = QLabel("100%")
+        self.s_ui_scale = QSlider(Qt.Horizontal)
+        self.s_ui_scale.setRange(90, 125)
+        self.s_ui_scale.setSingleStep(1)
+        self.s_ui_scale.setPageStep(5)
+        self.s_ui_scale.valueChanged.connect(self._on_ui_scale_value_changed)
+        self.s_ui_scale.sliderReleased.connect(self._persist_ui_scale_setting)
+        c_look.body_layout().addWidget(self.s_ui_scale_value)
+        c_look.body_layout().addWidget(self.s_ui_scale)
+        c_look.body_layout().addWidget(self._setting_hint("Scales typography and control density from 90% to 125%."))
         c_look.body_layout().addWidget(self._setting_details("Theme changes apply live at QApplication scope across all pages and row widgets."))
         preview = Card("Preview", "Changes are applied immediately. Use this panel to compare density and contrast.")
         pal.addWidget(c_look)
@@ -2077,6 +2225,12 @@ class MainWindow(QMainWindow):
         c_about.body_layout().addWidget(QLabel("Support: use Reports -> Ticket Pack and share ticket summary + evidence with support."))
         c_about.body_layout().addWidget(QLabel(f"Capabilities: {len(CAPABILITIES)}"))
         c_about.body_layout().addWidget(QLabel(f"Runbooks: {len(RUNBOOKS)}"))
+        about_privacy = SoftButton("Open Privacy Page")
+        about_privacy.clicked.connect(lambda: self._open_settings_section("Privacy"))
+        about_safety = SoftButton("Open Safety Page")
+        about_safety.clicked.connect(lambda: self._open_settings_section("Safety"))
+        c_about.body_layout().addWidget(about_privacy)
+        c_about.body_layout().addWidget(about_safety)
         about_help = SoftButton("About / Help")
         about_help.clicked.connect(lambda: self._show_page_help("About", "Start Here, Privacy, Safety, and KB guidance."))
         c_about.body_layout().addWidget(about_help)
@@ -2185,14 +2339,41 @@ class MainWindow(QMainWindow):
         palette = normalize_palette(self.settings_state.theme_palette)
         mode = normalize_mode(self.settings_state.theme_mode)
         density = normalize_density(self.settings_state.density)
+        scale_pct = clamp_ui_scale(getattr(self.settings_state, "ui_scale_pct", 100))
         self.settings_state.theme_palette = palette
         self.settings_state.theme_mode = mode
         self.settings_state.density = density
+        self.settings_state.ui_scale_pct = scale_pct
+        set_ui_scale_percent(scale_pct)
+        self.setMinimumSize(scaled_min_window_size(scale_pct))
         app = QApplication.instance()
         if app is not None:
             app.setStyleSheet(build_qss(resolve_theme_tokens(palette, mode), mode, density))
         self._apply_density()
         self._sync_panel_toggle_icon()
+
+    def _on_ui_scale_value_changed(self, value: int) -> None:
+        pct = clamp_ui_scale(value)
+        self._pending_ui_scale_pct = pct
+        if hasattr(self, "s_ui_scale_value"):
+            self.s_ui_scale_value.setText(f"{pct}%")
+        if self._syncing_settings:
+            return
+        self._scale_apply_timer.start()
+
+    def _apply_pending_ui_scale(self) -> None:
+        pct = clamp_ui_scale(getattr(self, "_pending_ui_scale_pct", 100))
+        if pct == self.settings_state.ui_scale_pct:
+            return
+        self.settings_state.ui_scale_pct = pct
+        self._apply_theme()
+
+    def _persist_ui_scale_setting(self) -> None:
+        if self._syncing_settings:
+            return
+        self.settings_state.ui_scale_pct = clamp_ui_scale(getattr(self, "_pending_ui_scale_pct", self.settings_state.ui_scale_pct))
+        save_settings(self.settings_state)
+        self.toasts.show_toast(f"UI scale set to {self.settings_state.ui_scale_pct}%.")
 
     def _apply_density(self) -> None:
         density = self.settings_state.density
@@ -2213,6 +2394,28 @@ class MainWindow(QMainWindow):
             self.nav.setCurrentRow(min(current_nav, len(self.NAV_ITEMS) - 1))
         self._apply_mode_visibility()
         self._refresh_home_history(); self._refresh_history(); self._refresh_run_center(); self._refresh_fixes(); self._refresh_toolbox(); self._refresh_runbooks(); self._refresh_home_favorites(); self._rebuild_diagnose_sections(self.current_session.get("findings", []))
+
+    def _open_help_menu(self) -> None:
+        menu = QMenu(self)
+        menu.addAction("Start Here", lambda: self._show_page_help("Start Here", "Use local guidance for setup, runs, and exports."))
+        menu.addAction("Privacy", lambda: self._open_settings_section("Privacy"))
+        menu.addAction("Safety", lambda: self._open_settings_section("Safety"))
+        sender = self.sender()
+        if isinstance(sender, QWidget):
+            menu.exec(sender.mapToGlobal(sender.rect().bottomLeft()))
+
+    def _open_settings_section(self, label: str) -> None:
+        target = str(label or "").strip().lower()
+        self.nav.setCurrentRow(self.NAV_ITEMS.index("Settings"))
+        if not hasattr(self, "settings_nav"):
+            return
+        for idx in range(self.settings_nav.count()):
+            item = self.settings_nav.item(idx)
+            name = str(item.data(Qt.UserRole) or item.text()).strip().lower()
+            if name == target or name.startswith(target) or target in name:
+                item.setHidden(False)
+                self.settings_nav.setCurrentRow(idx)
+                return
 
     def _open_profile_menu(self) -> None:
         m = QMenu(self)
@@ -2715,6 +2918,7 @@ class MainWindow(QMainWindow):
         if self._run_status_subscription_id > 0:
             self.run_event_bus.unsubscribe(self._run_status_subscription_id)
             self._run_status_subscription_id = 0
+        self._search_popup.hide_popup()
         if self.tool_runner is not None:
             self.tool_runner.close()
             self.tool_runner = None
@@ -4326,10 +4530,16 @@ class MainWindow(QMainWindow):
         return sid
 
     def open_command_palette(self) -> None:
+        self._search_popup.hide_popup()
         d = CommandPaletteDialog(self, allowed_capability_ids=self._visible_capability_ids()); d.search.setText(self.top_search.text())
         if d.exec() != QDialog.Accepted:
             return
-        k, v = d.selected_kind, d.selected_key
+        self._dispatch_search_selection(d.selected_kind, d.selected_key)
+
+    def _dispatch_search_selection(self, kind: str, key: str) -> None:
+        k, v = str(kind or "").strip(), str(key or "").strip()
+        if not k or not v:
+            return
         if k == "session":
             self._load_session(v); self.nav.setCurrentRow(self.NAV_ITEMS.index("History"))
         elif k == "fix":
@@ -4819,6 +5029,13 @@ class MainWindow(QMainWindow):
         self.s_diag.setChecked(s.diagnostic_mode); self.s_share.setChecked(s.share_safe_default); self.s_ip.setChecked(s.mask_ip_default)
         self.s_panel.setChecked(s.right_panel_open); self.s_weekly.setChecked(s.weekly_reminder_enabled)
         self.s_palette.setCurrentText(palette_label(s.theme_palette)); self.s_mode.setCurrentText(normalize_mode(s.theme_mode)); self.s_density.setCurrentText(normalize_density(s.density))
+        if hasattr(self, "s_ui_scale"):
+            self._pending_ui_scale_pct = clamp_ui_scale(getattr(s, "ui_scale_pct", 100))
+            self.s_ui_scale.blockSignals(True)
+            self.s_ui_scale.setValue(self._pending_ui_scale_pct)
+            self.s_ui_scale.blockSignals(False)
+        if hasattr(self, "s_ui_scale_value"):
+            self.s_ui_scale_value.setText(f"{self._pending_ui_scale_pct}%")
         if hasattr(self, "s_ui_mode"):
             self.s_ui_mode.blockSignals(True)
             self.s_ui_mode.setCurrentText("pro" if s.ui_mode == "pro" else "basic")
@@ -4832,6 +5049,8 @@ class MainWindow(QMainWindow):
         self.settings_state.safe_only_mode = self.s_safe.isChecked(); self.settings_state.show_admin_tools = self.s_admin.isChecked(); self.settings_state.show_advanced_tools = self.s_adv.isChecked(); self.settings_state.diagnostic_mode = self.s_diag.isChecked()
         self.settings_state.share_safe_default = self.s_share.isChecked(); self.settings_state.mask_ip_default = self.s_ip.isChecked(); self.settings_state.right_panel_open = self.s_panel.isChecked(); self.settings_state.weekly_reminder_enabled = self.s_weekly.isChecked()
         self.settings_state.theme_palette = palette_key_from_label(self.s_palette.currentText()); self.settings_state.theme_mode = self.s_mode.currentText(); self.settings_state.density = self.s_density.currentText()
+        if hasattr(self, "s_ui_scale"):
+            self.settings_state.ui_scale_pct = clamp_ui_scale(self.s_ui_scale.value())
         if hasattr(self, "s_ui_mode"):
             self.settings_state.ui_mode = "pro" if self.s_ui_mode.currentText().strip().lower() == "pro" else "basic"
         self.layout_policy_state = layout_policy(self.settings_state)

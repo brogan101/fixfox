@@ -64,7 +64,7 @@ def _load_runtime_imports():
         from .core.settings import load_settings
         from .core.utils import resource_path
         from .ui.app_qss import build_qss
-        from .ui.theme import resolve_theme_tokens
+        from .ui.theme import resolve_theme_tokens, set_ui_scale_percent
         from .ui.shell import AppShell
     except ImportError:
         _ensure_repo_on_sys_path()
@@ -75,7 +75,7 @@ def _load_runtime_imports():
         from src.core.settings import load_settings
         from src.core.utils import resource_path
         from src.ui.app_qss import build_qss
-        from src.ui.theme import resolve_theme_tokens
+        from src.ui.theme import resolve_theme_tokens, set_ui_scale_percent
         from src.ui.shell import AppShell
     return (
         QIcon,
@@ -90,6 +90,7 @@ def _load_runtime_imports():
         resource_path,
         build_qss,
         resolve_theme_tokens,
+        set_ui_scale_percent,
         AppShell,
     )
 
@@ -109,6 +110,7 @@ def main():
             resource_path,
             build_qss,
             resolve_theme_tokens,
+            set_ui_scale_percent,
             AppShell,
         ) = _load_runtime_imports()
     except (ImportError, ModuleNotFoundError) as exc:
@@ -133,6 +135,7 @@ def main():
     except Exception as exc:
         logger.warning("Desktop logo setup skipped: %s", exc)
     settings = load_settings()
+    set_ui_scale_percent(getattr(settings, "ui_scale_pct", 100))
     tokens = resolve_theme_tokens(settings.theme_palette, settings.theme_mode)
     app.setStyleSheet(build_qss(tokens, settings.theme_mode, settings.density))
     w = AppShell()

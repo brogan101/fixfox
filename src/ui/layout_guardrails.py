@@ -43,6 +43,17 @@ def should_auto_collapse_right_panel(width: int, threshold_width: int = RIGHT_PA
     return int(width) < int(threshold_width)
 
 
+def scaled_min_window_size(scale_percent: int) -> QSize:
+    pct = max(90, min(125, int(scale_percent)))
+    if pct == 100:
+        return QSize(MIN_WINDOW_SIZE.width(), MIN_WINDOW_SIZE.height())
+    factor = pct / 100.0
+    return QSize(
+        max(MIN_WINDOW_SIZE.width(), int(round(MIN_WINDOW_SIZE.width() * factor))),
+        max(MIN_WINDOW_SIZE.height(), int(round(MIN_WINDOW_SIZE.height() * factor))),
+    )
+
+
 def apply_button_guardrails(root: QWidget, density: str) -> None:
     button_size = min_button_size(density)
     for button in root.findChildren(QPushButton):

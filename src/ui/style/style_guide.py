@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from ..theme import SPACING_SCALE, resolve_density_tokens
+from ..theme import SPACING_SCALE, resolve_density_tokens, spacing_multiplier
 
 
 def spacing(key: str) -> int:
-    return int(SPACING_SCALE.get(key, SPACING_SCALE["sm"]))
+    base = int(SPACING_SCALE.get(key, SPACING_SCALE["sm"]))
+    return max(2, int(round(base * spacing_multiplier())))
 
 
 def tight_spacing(density: str) -> int:

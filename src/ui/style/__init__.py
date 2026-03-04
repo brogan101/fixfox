@@ -22,10 +22,14 @@ from .theme import (
     normalize_density,
     normalize_mode,
     normalize_palette,
+    clamp_ui_scale,
     palette_key_from_label,
     palette_label,
     resolve_density_tokens,
     resolve_theme_tokens,
+    set_ui_scale_percent,
+    spacing_multiplier,
+    ui_scale_percent,
 )
 
 __all__ = [
@@ -45,6 +49,7 @@ __all__ = [
     "build_qss",
     "control_height",
     "icon_size",
+    "clamp_ui_scale",
     "normalize_density",
     "normalize_mode",
     "normalize_palette",
@@ -52,6 +57,9 @@ __all__ = [
     "palette_label",
     "resolve_density_tokens",
     "resolve_theme_tokens",
+    "set_ui_scale_percent",
+    "spacing_multiplier",
     "spacing",
     "tight_spacing",
+    "ui_scale_percent",
 ]
