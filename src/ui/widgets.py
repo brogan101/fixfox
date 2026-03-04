@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QScrollArea,
     QStackedLayout,
     QTextEdit,
     QVBoxLayout,
@@ -199,10 +200,15 @@ class ConciergePanel(Card):
     def __init__(self) -> None:
         self.collapse_btn = SoftButton("Collapse")
         super().__init__("Concierge Panel", "Context help and next action.", right_widget=self.collapse_btn, object_name="ConciergePanel")
-        self.content = QWidget()
-        self.content_layout = QVBoxLayout(self.content)
+        self.content = QScrollArea()
+        self.content.setObjectName("ConciergeScroll")
+        self.content.setWidgetResizable(True)
+        self.content.setFrameShape(QFrame.NoFrame)
+        self.content_host = QWidget()
+        self.content_layout = QVBoxLayout(self.content_host)
         self.content_layout.setContentsMargins(0, spacing("xs"), 0, 0)
         self.content_layout.setSpacing(spacing("sm"))
+        self.content.setWidget(self.content_host)
         self.body_layout().addWidget(self.content)
         self._collapsed = False
         self.collapse_btn.clicked.connect(self.toggle_collapsed)

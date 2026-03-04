@@ -39,6 +39,8 @@ class AppSettings:
     splitter_sizes: list[int] | None = None
     last_page: str = "Home"
     last_settings_section: str = "Safety"
+    nav_collapsed: bool = False
+    details_drawer_pinned: bool = True
 
     def normalized(self) -> "AppSettings":
         self.ui_mode = "pro" if str(self.ui_mode).strip().lower() == "pro" else "basic"
@@ -52,6 +54,8 @@ class AppSettings:
         self.theme_palette = str(self.theme_palette or "fixfox").strip() or "fixfox"
         self.last_page = str(self.last_page or "Home").strip() or "Home"
         self.last_settings_section = str(self.last_settings_section or "Safety").strip() or "Safety"
+        self.nav_collapsed = bool(self.nav_collapsed)
+        self.details_drawer_pinned = bool(self.details_drawer_pinned)
         try:
             self.window_width = max(1080, int(self.window_width))
         except Exception:

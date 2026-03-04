@@ -67,8 +67,8 @@ Outputs:
 
 ## Typography
 
-- App UI bundles `DejaVu Sans` from `src/assets/fonts/DejaVuSans.ttf`.
-- License details: `docs/font-license.md` and `src/assets/fonts/LICENSE-DejaVu.txt`.
+- App UI bundles `Noto Sans` from `src/assets/fonts/NotoSans-Regular.ttf`.
+- License details: `docs/font-license.md` and `src/assets/fonts/LICENSE-Noto.txt`.
 
 ## Support Pack Export Flow
 

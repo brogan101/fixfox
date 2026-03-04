@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 from pathlib import Path
 import sys
 
@@ -95,23 +96,72 @@ def _load_runtime_imports():
     )
 
 
-def _load_bundled_font(logger, resource_path) -> None:
+def _font_candidates(resource_path) -> list[Path]:
+    candidates: list[Path] = []
+    app_root = Path(__file__).resolve().parent
+    candidates.append(app_root / "assets" / "fonts" / "NotoSans-Regular.ttf")
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        candidates.append(Path(meipass) / "assets" / "fonts" / "NotoSans-Regular.ttf")
+    try:
+        candidates.append(Path(resource_path("assets/fonts/NotoSans-Regular.ttf")))
+    except Exception:
+        pass
+    deduped: list[Path] = []
+    seen: set[str] = set()
+    for path in candidates:
+        key = str(path.resolve()) if path.exists() else str(path)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(path)
+    return deduped
+
+
+def _is_valid_font_blob(blob: bytes) -> bool:
+    if len(blob) <= 50 * 1024:
+        return False
+    magic = blob[:4]
+    return magic == b"\x00\x01\x00\x00" or magic == b"OTTO"
+
+
+def _load_bundled_font(logger, resource_path) -> str:
+    from PySide6.QtCore import QByteArray
     from PySide6.QtGui import QFont, QFontDatabase
     from PySide6.QtWidgets import QApplication
 
-    for rel in ("src/assets/fonts/DejaVuSans.ttf", "assets/fonts/DejaVuSans.ttf"):
-        font_id = QFontDatabase.addApplicationFont(str(resource_path(rel)))
-        if font_id < 0:
-            continue
-        families = QFontDatabase.applicationFontFamilies(font_id)
-        if not families:
-            continue
-        app = QApplication.instance()
-        if app is not None:
-            app.setFont(QFont(families[0]))
-        logger.info("Bundled font loaded: %s", families[0])
-        return
-    logger.warning("Bundled font not found or failed to load.")
+    app = QApplication.instance()
+    if app is None:
+        return "Segoe UI"
+
+    for path in _font_candidates(resource_path):
+        try:
+            if not path.exists():
+                continue
+            raw = path.read_bytes()
+            if not _is_valid_font_blob(raw):
+                logger.warning("Font validation failed for %s", path)
+                continue
+            font_id = QFontDatabase.addApplicationFontFromData(QByteArray(raw))
+            if font_id < 0:
+                logger.warning("Qt rejected font data from %s", path)
+                continue
+            families = QFontDatabase.applicationFontFamilies(font_id)
+            if not families:
+                logger.warning("Qt returned no families for %s", path)
+                continue
+            family = str(families[0]).strip() or "Segoe UI"
+            app.setFont(QFont(family))
+            logger.info("Selected UI font: %s (%s)", family, path)
+            print(f"[FixFox] UI font: {family}")
+            return family
+        except Exception as exc:
+            logger.warning("Font load failed for %s: %s", path, exc)
+    fallback = "Segoe UI"
+    app.setFont(QFont(fallback))
+    logger.info("Selected UI font fallback: %s", fallback)
+    print(f"[FixFox] UI font: {fallback}")
+    return fallback
 
 
 def main():
@@ -160,6 +210,14 @@ def main():
     app.setStyleSheet(build_qss(tokens, settings.theme_mode, settings.density))
     w = AppShell()
     w.show()
+    try:
+        auto_exit_ms = int(os.environ.get("FIXFOX_AUTO_EXIT_MS", "0").strip() or "0")
+    except Exception:
+        auto_exit_ms = 0
+    if auto_exit_ms > 0:
+        from PySide6.QtCore import QTimer
+
+        QTimer.singleShot(max(200, auto_exit_ms), app.quit)
     return app.exec()
 
 if __name__ == "__main__":

@@ -128,3 +128,39 @@ Smoke test passed.
 ### 6) Deferred Items
 - Interactive human visual sign-off on physical 1080p monitor and touch input remains recommended before store submission.
   - Reason: this run validated UI behavior in offscreen automation and code-level checks, not a full manual operator pass on a production display stack.
+## Run Start: 2026-03-04T16:43:02.0910936-05:00
+- Starting commit: 42715ed792f1ee4efc2e540e793071b5314573a5
+- Goals:
+  - Full UI rebuild with new app shell structure (left rail, top bar, details drawer, status bar)
+  - Token-driven design system with 3 real palettes + light/dark + density
+  - Font loading hardening (path-independent loading, validation, fallback)
+  - Overlap elimination and responsive behavior at 1024x768+
+  - Settings truthfulness audit (all controls real or disabled/removed)
+  - Page architecture extraction + reusable components + 40% MainWindow LOC reduction
+  - Add UI layout sanity test and run smoke/unit/layout tests
+  - Commit and push
+- Planned files:
+  - src/ui/main_window.py
+  - src/ui/components/app_shell.py
+  - src/ui/components/cards.py
+  - src/ui/components/toolbar.py
+  - src/ui/components/nav.py
+  - src/ui/pages/*.py
+  - src/ui/style/theme.py
+  - src/ui/style/tokens.py
+  - src/ui/style/qss_builder.py
+  - src/core/settings.py
+  - src/app.py
+  - src/tests/test_ui_layout_sanity.py
+  - docs/font-license.md
+  - docs/CODEX_RUN_LOG.md
+
+### Run End: 2026-03-04T17:06:03.6690226-05:00
+- MainWindow LOC before: 4313
+- MainWindow LOC after: 10 (src/ui/main_window.py) with implementation moved to src/ui/main_window_impl.py.
+- Tests executed:
+  - python -m src.tests.smoke -> PASS
+  - python -m src.tests.test_unit -> PASS
+  - python -m src.tests.test_ui_layout_sanity -> PASS
+- Font startup check:
+  - python -m src.app (offscreen auto-exit) -> [FixFox] UI font: Noto Sans

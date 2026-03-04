@@ -60,6 +60,32 @@ QFrame#TopBar {{
   border-radius: {d.corner_radius + 4}px;
 }}
 
+QWidget#IconRail {{
+  background: {tokens.panel};
+  border: 1px solid {border_soft};
+  border-radius: {d.corner_radius + 6}px;
+  min-width: 56px;
+  max-width: 56px;
+}}
+
+QListWidget#IconRailList {{
+  background: transparent;
+  border: 0;
+  outline: 0;
+}}
+QListWidget#IconRailList::item {{
+  border-radius: {max(8, d.corner_radius - 4)}px;
+  margin: 2px;
+  min-height: {d.nav_item_height}px;
+}}
+QListWidget#IconRailList::item:selected {{
+  background: {accent_tint};
+  border: 1px solid {focus_ring};
+}}
+QLabel#IconRailGlyph {{
+  font-weight: 700;
+}}
+
 QFrame#RunStatusCard {{
   background: {surface_raised};
   border: 1px solid {border_soft};
@@ -102,6 +128,22 @@ QFrame#SessionContext {{
   background: {_alpha(tokens.panel2, 0.92)};
   border: 1px solid {border_soft};
   border-radius: {d.corner_radius + 2}px;
+}}
+
+QWidget#DetailsDrawer {{
+  background: {tokens.panel};
+  border: 1px solid {border_soft};
+  border-radius: {d.corner_radius + 4}px;
+}}
+
+QFrame#BottomStatusBar {{
+  background: {tokens.panel2};
+  border: 1px solid {border_soft};
+  border-radius: {max(6, d.corner_radius - 2)}px;
+}}
+QLabel#BottomStatusText {{
+  color: {tokens.text_muted};
+  font-size: {max(8, d.font_size - 1)}pt;
 }}
 
 QScrollArea#PageScroll {{
@@ -161,10 +203,12 @@ QListWidget#SettingsNav::item:disabled {{
 QLabel#Title {{
   font-size: {d.font_size + 5}pt;
   font-weight: 650;
+  min-height: {max(26, d.font_size + 14)}px;
 }}
 QLabel#SubTitle {{
   color: {tokens.text_muted};
   font-size: {d.font_size - 1}pt;
+  min-height: {max(16, d.font_size + 6)}px;
 }}
 QLabel#SectionTitle {{
   font-size: {d.font_size + 1}pt;

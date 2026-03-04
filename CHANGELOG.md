@@ -7,7 +7,7 @@
 - Split nav styling targets (`MainNav` and `SettingsNav`) and improved selected/hover/focus accessibility states in QSS.
 - Added persistent layout state: window geometry, splitter sizes, last page, and last settings section.
 - Added `Privacy & Safety` settings section with explicit local-only/telemetry/storage behavior copy.
-- Bundled `DejaVu Sans` and loaded fonts at startup; added font licensing docs and QA checklist.
+- Bundled `Noto Sans` and loaded fonts at startup; added font licensing docs and QA checklist.
 
 ## 0.9.0-beta1 - 2026-03-02
 - Full audit documented.
