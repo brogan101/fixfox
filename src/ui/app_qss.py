@@ -32,7 +32,7 @@ QWidget {{
   color: {tokens.text};
   background: transparent;
   font-family: {BASE_FONT_FAMILY};
-  font-size: {d.font_size}px;
+  font-size: {d.font_size}pt;
 }}
 QMainWindow {{
   background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 {tokens.bg0}, stop:1 {tokens.bg1});
@@ -55,12 +55,12 @@ QFrame#RunStatusCard:hover {{
   background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {_alpha(tokens.accent, 0.12)}, stop:1 {_alpha(tokens.panel, 0.82)});
 }}
 QLabel#RunStatusTitle {{
-  font-size: {d.font_size + 2}px;
+  font-size: {d.font_size + 2}pt;
   font-weight: 700;
 }}
 QLabel#RunStatusDetail {{
   color: {tokens.text_muted};
-  font-size: {d.font_size - 1}px;
+  font-size: {d.font_size - 1}pt;
 }}
 QFrame#SessionContext {{
   background: {_alpha(tokens.accent, 0.11)};
@@ -91,19 +91,19 @@ QListWidget#Nav::item:selected {{
   border: 1px solid {outline};
 }}
 QLabel#Title {{
-  font-size: {d.font_size + 9}px;
+  font-size: {d.font_size + 9}pt;
   font-weight: 700;
 }}
 QLabel#SubTitle {{
   color: {tokens.text_muted};
-  font-size: {d.font_size - 1}px;
+  font-size: {d.font_size - 1}pt;
 }}
 QLabel#SectionTitle {{
-  font-size: {d.font_size + 1}px;
+  font-size: {d.font_size + 1}pt;
   font-weight: 700;
 }}
 QLabel#CardTitle {{
-  font-size: {d.font_size + 1}px;
+  font-size: {d.font_size + 1}pt;
   font-weight: 650;
 }}
 QLabel#CardSubtitle {{
@@ -171,7 +171,8 @@ QLineEdit#SearchInput:focus,
 QComboBox:focus,
 QListWidget:focus,
 QTreeWidget:focus,
-QTextEdit:focus {{
+QTextEdit:focus,
+QPlainTextEdit:focus {{
   border: 1px solid {outline};
 }}
 QToolButton#IconButton {{
@@ -183,7 +184,7 @@ QToolButton#IconButton {{
 QToolButton#KebabMenuButton {{
   min-width: {d.button_height}px;
   max-width: {d.button_height}px;
-  font-size: {d.font_size + 2}px;
+  font-size: {d.font_size + 2}pt;
   icon-size: {d.icon_size}px;
   padding: 0;
 }}
@@ -205,7 +206,7 @@ QLabel#TagINFO, QLabel#BadgeINFO {{ color: {tokens.info}; font-weight: 700; }}
 QLabel#BadgeRiskSafe {{ color: {tokens.ok}; font-weight: 700; }}
 QLabel#BadgeRiskAdmin {{ color: {tokens.warn}; font-weight: 700; }}
 QLabel#BadgeRiskAdvanced {{ color: {tokens.crit}; font-weight: 700; }}
-QLineEdit#SearchInput, QComboBox, QTextEdit, QTreeWidget {{
+QLineEdit#SearchInput, QComboBox, QTextEdit, QPlainTextEdit, QTreeWidget {{
   background: {_alpha(tokens.panel2, 0.86)};
   border: 1px solid {subtle_line};
   border-radius: {d.corner_radius}px;
@@ -222,6 +223,9 @@ QComboBox {{
   padding: 0 8px;
 }}
 QTextEdit {{
+  padding: 8px;
+}}
+QPlainTextEdit {{
   padding: 8px;
 }}
 QListWidget {{

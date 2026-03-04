@@ -60,6 +60,7 @@ def _ui_module_smoke() -> None:
         events, _cursor = bus.events_since(run_id, 0)
         event_types = {event.event_type for event in events}
         _assert(RunEventType.START in event_types, f"{context}: missing START event")
+        _assert(RunEventType.STATUS in event_types, f"{context}: missing STATUS event")
         _assert(RunEventType.END in event_types, f"{context}: missing END event")
         _assert(
             any(kind in event_types for kind in {RunEventType.PROGRESS, RunEventType.STDOUT, RunEventType.STDERR, RunEventType.WARNING, RunEventType.ERROR}),

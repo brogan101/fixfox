@@ -11,6 +11,7 @@ from uuid import uuid4
 class RunEventType:
     START = "START"
     PROGRESS = "PROGRESS"
+    STATUS = "STATUS"
     STDOUT = "STDOUT"
     STDERR = "STDERR"
     ARTIFACT = "ARTIFACT"
@@ -116,6 +117,22 @@ class RunEventBus:
                 buffer = self._buffers.get(rid)
                 if buffer is not None:
                     replay_rows = buffer.since(max(0, int(replay_since)))
+        for event in replay_rows:
+            self._notify_subscriber(callback, event)
+        return sid
+
+    def subscribe_global(self, callback: Callable[[RunEvent], None], *, replay_buffered: bool = False) -> int:
+        replay_rows: list[RunEvent] = []
+        with self._lock:
+            self._next_subscription_id += 1
+            sid = self._next_subscription_id
+            bucket = self._subscribers.setdefault("*", {})
+            bucket[sid] = callback
+            self._subscription_index[sid] = "*"
+            if replay_buffered:
+                for buffer in self._buffers.values():
+                    replay_rows.extend(list(buffer.events))
+        replay_rows.sort(key=lambda row: row.timestamp_utc)
         for event in replay_rows:
             self._notify_subscriber(callback, event)
         return sid

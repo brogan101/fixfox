@@ -2883,6 +2883,7 @@ def run_script_task(
         f"Script task started: {effective.title}",
         data={"task_id": effective.id, "category": effective.category, "dry_run": dry_run},
     )
+    _publish_event(context, RunEventType.STATUS, f"Script task running: {effective.title}")
     if effective.runner is not None:
         result = effective.runner(effective, context, dry_run)
     else:
@@ -2896,5 +2897,8 @@ def run_script_task(
     code = int(final.get("code", 0 if final.get("dry_run") else 1))
     if code != 0:
         _publish_event(context, RunEventType.ERROR, str(final.get("user_message", "Script task failed.")))
+        _publish_event(context, RunEventType.STATUS, f"Script task failed with code {code}.")
+    else:
+        _publish_event(context, RunEventType.STATUS, "Script task completed successfully.")
     _publish_event(context, RunEventType.END, f"Script task finished with code {code}.", data={"code": code})
     return final

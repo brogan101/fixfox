@@ -419,6 +419,7 @@ class MainWindow(QMainWindow):
         self._status_spinner_index = 0
         self._last_run_status = "Ready"
         self._last_run_line = "Ready."
+        self._last_run_log_line = ""
         self.selected_finding: dict[str, Any] = {}
         self.selected_fix_key = ""
         self.selected_tool_id = ""
@@ -429,6 +430,10 @@ class MainWindow(QMainWindow):
         self._auto_concierge_collapse = False
         self.layout_overlay: LayoutDebugOverlay | None = None
         self.run_bus_event.connect(self._handle_run_bus_event)
+        self._run_status_subscription_id = self.run_event_bus.subscribe_global(
+            lambda event: self.run_bus_event.emit(event),
+            replay_buffered=False,
+        )
 
         self.setWindowTitle("Fix Fox")
         self.setWindowIcon(QIcon(resource_path(ICON_PNG)))
@@ -543,14 +548,14 @@ class MainWindow(QMainWindow):
 
         self.run_status_panel = RunStatusPanel()
         self.run_status_panel.setObjectName("RunStatusCard")
-        self.run_status_panel.setMinimumWidth(620)
+        self.run_status_panel.setMinimumWidth(660)
         status_l = QHBoxLayout(self.run_status_panel)
         status_l.setContentsMargins(12, 10, 12, 10)
         status_l.setSpacing(12)
         self.run_status_icon = QLabel()
         icon_pix = QPixmap(resource_path(ICON_PNG))
         if not icon_pix.isNull():
-            self.run_status_icon.setPixmap(icon_pix.scaled(52, 52, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            self.run_status_icon.setPixmap(icon_pix.scaled(28, 28, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         status_text = QVBoxLayout()
         status_text.setContentsMargins(0, 0, 0, 0)
         status_text.setSpacing(2)
@@ -827,46 +832,41 @@ class MainWindow(QMainWindow):
         spinner = self._status_spinner_frames[self._status_spinner_index]
         elapsed = self._status_elapsed_text()
         title = f"Running: {self.active_run_name or 'Task'}"
-        line = self._last_run_line[:120].strip() or "Running..."
+        line = self._last_run_log_line[:120].strip() or self._last_run_line[:120].strip() or "Running..."
         detail = f"{spinner} {line} | {elapsed}"
         self._set_run_status(title, detail)
 
     def _subscribe_run_status_events(self, run_id: str) -> None:
-        self._unsubscribe_run_status_events()
-        rid = str(run_id or "").strip()
-        if not rid:
-            return
-        self._run_status_subscription_id = self.run_event_bus.subscribe(
-            rid,
-            lambda event: self.run_bus_event.emit(event),
-            replay_since=0,
-        )
+        self.active_run_id = str(run_id or "").strip()
 
     def _unsubscribe_run_status_events(self) -> None:
-        if self._run_status_subscription_id <= 0:
-            return
-        self.run_event_bus.unsubscribe(self._run_status_subscription_id)
-        self._run_status_subscription_id = 0
+        self.active_run_id = ""
 
     def _handle_run_bus_event(self, event: Any) -> None:
+        event_run_id = str(getattr(event, "run_id", "") or "").strip()
+        if self.active_run_id and event_run_id and event_run_id != self.active_run_id:
+            return
         kind = str(getattr(event, "event_type", "")).strip().upper()
         message = str(getattr(event, "message", "") or "").strip()
         if kind == RunEventType.START:
             self._last_run_status = "Running"
+            self._last_run_log_line = ""
             if message:
                 self._last_run_line = message
             return
-        if kind == RunEventType.PROGRESS:
+        if kind in {RunEventType.PROGRESS, RunEventType.STATUS}:
             if message:
                 self._last_run_line = message
             return
         if kind in {RunEventType.STDOUT, RunEventType.STDERR, RunEventType.WARNING}:
             if message:
+                self._last_run_log_line = message
                 self._last_run_line = message
             return
         if kind == RunEventType.ERROR:
             self._last_run_status = "Failed"
             if message:
+                self._last_run_log_line = message
                 self._last_run_line = message
             return
         if kind != RunEventType.END:
@@ -2253,7 +2253,9 @@ class MainWindow(QMainWindow):
         self.active_run_started = time.monotonic()
         self._last_run_status = "Running"
         self._last_run_line = "Starting..."
+        self._last_run_log_line = ""
         self._subscribe_run_status_events(resolved_run_id)
+        self.run_event_bus.publish(resolved_run_id, RunEventType.STATUS, message=f"Running: {name}")
         self._set_run_status(f"Running: {name}", "Starting... | 0s")
         self.tool_runner = ToolRunnerWindow(
             name,
@@ -2302,18 +2304,22 @@ class MainWindow(QMainWindow):
             message=str(text or "").strip(),
             progress=max(0, min(100, int(pct))),
         )
+        if text:
+            self.run_event_bus.publish(run_id, RunEventType.STATUS, message=str(text).strip())
 
     def _on_run_partial(self, run_id: str, payload: Any) -> None:
         if self.tool_runner is not None:
             self.tool_runner.on_partial(payload)
         data = payload if isinstance(payload, dict) else {"payload": str(payload)}
         self._last_run_line = "Received partial update."
+        self.run_event_bus.publish(run_id, RunEventType.STATUS, message="Received partial update.")
         self.run_event_bus.publish(run_id, RunEventType.WARNING, message="Partial update received.", data=data)
 
     def _on_run_log_line(self, run_id: str, line: str) -> None:
         text = str(line or "").rstrip()
         if not text:
             return
+        self._last_run_log_line = text
         self._last_run_line = text
         if text.lower().startswith("[stderr]"):
             self.run_event_bus.publish(run_id, RunEventType.STDERR, message=text)
@@ -2339,15 +2345,18 @@ class MainWindow(QMainWindow):
         if code != 0:
             message = str(data.get("user_message", "")).strip() or f"Run finished with code {code}."
             self.run_event_bus.publish(run_id, RunEventType.ERROR, message=message, data={"code": code})
+            self.run_event_bus.publish(run_id, RunEventType.STATUS, message=f"Failed: {message}")
             self._last_run_status = "Failed"
             self._last_run_line = message
         else:
+            self.run_event_bus.publish(run_id, RunEventType.STATUS, message="Completed successfully.")
             self._last_run_status = "Success"
             self._last_run_line = "Run completed successfully."
         self.run_event_bus.publish(run_id, RunEventType.END, message=f"Run finished with code {code}.", data={"code": code})
 
     def _on_run_cancelled(self, run_id: str, name: str) -> None:
         self.toasts.show_toast(f"{name} cancelled.")
+        self.run_event_bus.publish(run_id, RunEventType.STATUS, message="Cancelled by user.")
         self.run_event_bus.publish(run_id, RunEventType.WARNING, message="Cancellation requested by user.")
         self.run_event_bus.publish(run_id, RunEventType.END, message="Run cancelled.", data={"code": 130})
         self._last_run_status = "Cancelled"
@@ -2390,6 +2399,7 @@ class MainWindow(QMainWindow):
         self._last_run_line = reason
         rid = str(run_id or self.active_run_id or "").strip()
         if rid:
+            self.run_event_bus.publish(rid, RunEventType.STATUS, message=f"Failed: {reason}")
             self.run_event_bus.publish(rid, RunEventType.ERROR, message=reason)
             for step in next_steps[:3]:
                 self.run_event_bus.publish(rid, RunEventType.WARNING, message=f"Try next: {step}")
@@ -2399,6 +2409,9 @@ class MainWindow(QMainWindow):
 
     def _cancel_task(self) -> None:
         if self.active_worker:
+            rid = str(self.active_run_id or "").strip()
+            if rid:
+                self.run_event_bus.publish(rid, RunEventType.STATUS, message="Cancellation requested by user.")
             self.active_worker.cancel()
             self.toasts.show_toast("Cancellation requested.")
 
@@ -2413,6 +2426,9 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event: Any) -> None:  # type: ignore[override]
         self._unsubscribe_run_status_events()
+        if self._run_status_subscription_id > 0:
+            self.run_event_bus.unsubscribe(self._run_status_subscription_id)
+            self._run_status_subscription_id = 0
         if self.tool_runner is not None:
             self.tool_runner.close()
             self.tool_runner = None

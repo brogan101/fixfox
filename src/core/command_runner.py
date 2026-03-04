@@ -97,6 +97,7 @@ def run_command(
     try:
         if event_bus is not None and run_id:
             event_bus.publish(run_id, RunEventType.START, message="Process started.", data={"cmd": list(cmd)})
+            event_bus.publish(run_id, RunEventType.STATUS, message="Process launched.")
         process = subprocess.Popen(
             list(cmd),
             stdout=subprocess.PIPE,
@@ -159,6 +160,7 @@ def run_command(
                     message=f"Running... {elapsed}s elapsed.",
                     data={"elapsed_s": elapsed},
                 )
+                event_bus.publish(run_id, RunEventType.STATUS, message=f"Running... {elapsed}s elapsed.")
                 last_heartbeat = now
             time.sleep(0.05)
     finally:
@@ -187,17 +189,20 @@ def run_command(
         _emit(on_stderr_line, "Timed out.")
         if event_bus is not None and run_id:
             event_bus.publish(run_id, RunEventType.WARNING, message="Command timed out.", data={"code": 124})
+            event_bus.publish(run_id, RunEventType.STATUS, message="Timed out.")
         code = 124
     elif cancelled or (cancel_event and cancel_event.is_set()):
         stderr_lines.append("Cancelled.")
         _emit(on_stderr_line, "Cancelled.")
         if event_bus is not None and run_id:
             event_bus.publish(run_id, RunEventType.WARNING, message="Command cancelled.", data={"code": 130})
+            event_bus.publish(run_id, RunEventType.STATUS, message="Cancelled.")
         code = 130
     if event_bus is not None and run_id:
         level = RunEventType.END if code == 0 else RunEventType.ERROR
         message = "Process completed." if code == 0 else f"Process ended with code {code}."
         event_bus.publish(run_id, level, message=message, data={"code": code, "timed_out": timed_out})
+        event_bus.publish(run_id, RunEventType.STATUS, message=("Completed." if code == 0 else f"Completed with code {code}."))
         event_bus.publish(run_id, RunEventType.END, message="Command run finished.", data={"code": code})
 
     return CommandResult(

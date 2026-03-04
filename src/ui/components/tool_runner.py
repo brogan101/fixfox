@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from PySide6.QtCore import Qt, Signal, QTimer
-from PySide6.QtGui import QFont, QTextCursor
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMenu,
+    QPlainTextEdit,
     QPushButton,
     QProgressBar,
     QTabWidget,
@@ -24,6 +25,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..font_utils import safe_copy_font
 from ..widgets import Card, PrimaryButton, SoftButton
 from ...core.run_events import RunEvent, RunEventBus, RunEventType
 
@@ -34,6 +36,7 @@ class ToolRunnerWindow(QDialog):
     export_requested = Signal()
     output_saved = Signal(str)
     bus_event_received = Signal(object)
+    append_output_requested = Signal(str, str)
 
     def __init__(
         self,
@@ -60,6 +63,7 @@ class ToolRunnerWindow(QDialog):
         self._start_utc = datetime.utcnow()
         self._last_status = "Running"
         self._auto_scroll = True
+        self._auto_scroll_forced: bool | None = None
         self._paused = False
         self._paused_buffer: list[str] = []
         self._evidence_root = evidence_root
@@ -71,6 +75,7 @@ class ToolRunnerWindow(QDialog):
         self._received_output = False
         self._spinner_frames = ("|", "/", "-", "\\")
         self._spinner_index = 0
+        self._running_hint = "Running... waiting for live output."
 
         root = QVBoxLayout(self)
         root.setContentsMargins(12, 12, 12, 12)
@@ -98,12 +103,14 @@ class ToolRunnerWindow(QDialog):
         self.tabs = QTabWidget()
         self.txt_overview = QTextEdit()
         self.txt_overview.setReadOnly(True)
-        self.txt_overview.setPlainText(plain_summary or "Plain English: running task.")
+        self.txt_overview.setPlainText(self._running_overview())
 
-        self.txt_output = QTextEdit()
+        self.txt_output = QPlainTextEdit()
         self.txt_output.setReadOnly(True)
-        self.txt_output.setFont(QFont("Consolas"))
-        self.txt_output.setPlaceholderText("Running... waiting for live output.")
+        mono = safe_copy_font(QFont("Consolas"), default_ps=10)
+        self.txt_output.setFont(mono)
+        self.txt_output.setPlaceholderText(self._running_hint)
+        self.txt_output.verticalScrollBar().valueChanged.connect(self._on_output_scroll)
 
         self.txt_details = QTextEdit()
         self.txt_details.setReadOnly(True)
@@ -132,7 +139,7 @@ class ToolRunnerWindow(QDialog):
 
         controls = QHBoxLayout()
         self.btn_cancel = SoftButton("Cancel")
-        self.btn_copy_summary = SoftButton("Copy Summary")
+        self.btn_copy_summary = SoftButton("Copy Simple Summary")
         self.btn_export = PrimaryButton("Export Pack")
         self.btn_more = QToolButton()
         self.btn_more.setObjectName("MoreButton")
@@ -141,10 +148,11 @@ class ToolRunnerWindow(QDialog):
         self.btn_more_menu = QMenu(self.btn_more)
         self.btn_more_menu.addAction("Copy Ticket Summary", self.copy_ticket_summary)
         self.btn_more_menu.addAction("Copy Technical Appendix", self.copy_technical_appendix)
-        self.btn_more_menu.addAction("Copy Raw Output", self.copy_raw)
+        self.btn_more_menu.addAction("Copy Raw Logs", self.copy_raw)
         self.btn_more_menu.addAction("Save Output", self.save_output)
         self.btn_more_menu.addAction("Open Evidence Folder", self.open_evidence_folder)
         self.btn_more_menu.addAction("Pause/Resume Output", self.toggle_pause)
+        self.btn_more_menu.addAction("Toggle Auto-Scroll", self.toggle_auto_scroll)
         self.btn_more_menu.addAction("Re-run", self.rerun_requested.emit)
         self.btn_more.setMenu(self.btn_more_menu)
         for b in (self.btn_cancel, self.btn_copy_summary, self.btn_export):
@@ -157,6 +165,7 @@ class ToolRunnerWindow(QDialog):
         self.btn_copy_summary.clicked.connect(self.copy_summary)
         self.btn_export.clicked.connect(self.export_requested.emit)
         self.bus_event_received.connect(self._apply_bus_event)
+        self.append_output_requested.connect(self._append_output_line)
 
         self._tick_timer = QTimer(self)
         self._tick_timer.timeout.connect(self._tick_elapsed)
@@ -170,6 +179,7 @@ class ToolRunnerWindow(QDialog):
             self._spinner_index = (self._spinner_index + 1) % len(self._spinner_frames)
             spinner = self._spinner_frames[self._spinner_index]
             self.lbl_status.setText(f"Status: Running {spinner}")
+            self.txt_output.setPlaceholderText(f"{self._running_hint} Elapsed: {elapsed}s")
 
     def attach_event_bus(self, event_bus: RunEventBus | None, run_id: str) -> None:
         self._unsubscribe_event_bus()
@@ -197,9 +207,15 @@ class ToolRunnerWindow(QDialog):
         kind = str(event.event_type).strip().upper()
         message = str(event.message or "").strip()
         if kind == RunEventType.START:
+            self._last_status = "Running"
             self.lbl_status.setText("Status: Running")
             if message:
-                self._append(f"[start] {message}")
+                self._queue_output_line(f"[start] {message}", "status")
+            return
+        if kind == RunEventType.STATUS:
+            self.lbl_status.setText("Status: Running")
+            if message:
+                self._queue_output_line(f"[status] {message}", "status")
             return
         if kind == RunEventType.PROGRESS:
             pct = int(event.progress if event.progress is not None else 0)
@@ -207,29 +223,29 @@ class ToolRunnerWindow(QDialog):
             self.progress.setValue(max(0, min(100, pct)))
             self.lbl_status.setText(f"Status: Running ({pct}%)")
             if message:
-                self._append(f"[progress] {pct}% {message}")
+                self._queue_output_line(f"[progress] {pct}% {message}", "progress")
             return
         if kind == RunEventType.STDOUT:
             if message:
                 self._received_output = True
-                self._append(message)
+                self._queue_output_line(message, "stdout")
             return
         if kind == RunEventType.STDERR:
             if message:
                 self._received_output = True
-                self._append(message if message.startswith("[stderr]") else f"[stderr] {message}")
+                self._queue_output_line(message if message.startswith("[stderr]") else f"[stderr] {message}", "stderr")
             return
         if kind == RunEventType.ARTIFACT:
             if message:
-                self._append(f"[artifact] {message}")
+                self._queue_output_line(f"[artifact] {message}", "artifact")
             return
         if kind == RunEventType.WARNING:
             if message:
-                self._append(f"[warn] {message}")
+                self._queue_output_line(f"[warn] {message}", "warn")
             return
         if kind == RunEventType.ERROR:
             if message:
-                self._append(f"[error] {message}")
+                self._queue_output_line(f"[error] {message}", "error")
             return
         if kind == RunEventType.END:
             if self._last_status == "Running":
@@ -243,46 +259,65 @@ class ToolRunnerWindow(QDialog):
                     self._last_status = "Failed"
                 self.lbl_status.setText(f"Status: {self._last_status}")
             if message:
-                self._append(f"[end] {message}")
+                self._queue_output_line(f"[end] {message}", "status")
 
-    def _append(self, line: str) -> None:
+    def _queue_output_line(self, line: str, kind: str = "stdout") -> None:
+        if not line:
+            return
+        self.append_output_requested.emit(line, kind)
+
+    def _append_output_line(self, line: str, _kind: str = "stdout") -> None:
         if not line:
             return
         if self._paused:
             self._paused_buffer.append(line)
             return
-        self.txt_output.append(line)
-        if self._auto_scroll:
-            cursor = self.txt_output.textCursor()
-            cursor.movePosition(QTextCursor.End)
-            self.txt_output.setTextCursor(cursor)
+        bar = self.txt_output.verticalScrollBar()
+        at_bottom = bar.value() >= max(0, bar.maximum() - 2)
+        self.txt_output.appendPlainText(line)
+        follow = self._auto_scroll_forced if self._auto_scroll_forced is not None else self._auto_scroll
+        if follow and at_bottom:
+            bar.setValue(bar.maximum())
+
+    def _on_output_scroll(self, value: int) -> None:
+        if self._auto_scroll_forced is not None:
+            return
+        bar = self.txt_output.verticalScrollBar()
+        self._auto_scroll = value >= max(0, bar.maximum() - 2)
 
     def toggle_pause(self) -> None:
         self._paused = not self._paused
         if self._paused:
-            self.txt_output.append("[output] Paused.")
+            self.txt_output.appendPlainText("[output] Paused.")
         else:
-            self.txt_output.append("[output] Resumed.")
+            self.txt_output.appendPlainText("[output] Resumed.")
         if not self._paused and self._paused_buffer:
             chunk = self._paused_buffer
             self._paused_buffer = []
             for line in chunk:
-                self._append(line)
+                self._queue_output_line(line, "stdout")
+
+    def toggle_auto_scroll(self) -> None:
+        current = self._auto_scroll_forced if self._auto_scroll_forced is not None else self._auto_scroll
+        self._auto_scroll_forced = not current
+        self.txt_output.appendPlainText(
+            "[output] Auto-scroll enabled." if self._auto_scroll_forced else "[output] Auto-scroll paused (manual scroll mode)."
+        )
 
     def on_progress(self, pct: int, text: str) -> None:
         self.lbl_status.setText(f"Status: Running ({pct}%)")
         self.progress.setRange(0, 100)
         self.progress.setValue(max(0, min(100, pct)))
         if text:
-            self._append(f"[progress] {pct}% {text}")
+            self._queue_output_line(f"[progress] {pct}% {text}", "progress")
 
     def on_log_line(self, line: str) -> None:
-        self._append(line)
+        self._queue_output_line(line, "stdout")
 
     def on_partial(self, payload: Any) -> None:
         self.lbl_status.setText("Status: Partial update")
         if isinstance(payload, dict):
-            self._append("[partial] " + json.dumps(payload, ensure_ascii=False)[:1400])
+            self._queue_output_line("[partial] " + json.dumps(payload, ensure_ascii=False)[:1400], "status")
 
     def on_result(self, payload: dict[str, Any]) -> None:
         self._drain_event_bus()
@@ -318,7 +353,7 @@ class ToolRunnerWindow(QDialog):
         if not reason and self._last_status in {"Failed", "Partial"}:
             reason = str(self._result_payload.get("stderr", "")).strip() or "One or more steps returned a non-zero code."
         if reason:
-            self._append(f"[reason] {reason}")
+            self._queue_output_line(f"[reason] {reason}", "status")
         findings_count = int(self._result_payload.get("findings_count", 0)) if str(self._result_payload.get("findings_count", "")).isdigit() else failures
         artifacts = len(self._result_payload.get("output_files", [])) + len(self._result_payload.get("evidence_files", []))
         reboot = bool(self._result_payload.get("reboot_likely"))
@@ -331,7 +366,7 @@ class ToolRunnerWindow(QDialog):
         self.txt_overview.setPlainText(self._build_overview(findings_count, artifacts, next_steps))
         self.txt_next.setPlainText("\n".join([f"- {row}" for row in next_steps]))
         self._rebuild_next_action_buttons(next_steps)
-        self._append(f"[done] {self._last_status}.")
+        self._queue_output_line(f"[done] {self._last_status}.", "status")
         self._drain_event_bus()
 
     def on_error(self, message: str) -> None:
@@ -340,15 +375,15 @@ class ToolRunnerWindow(QDialog):
         self.lbl_status.setText("Status: Failed")
         self.btn_cancel.setEnabled(False)
         reason = self._parse_reason(message)
-        self._append("[error] " + reason)
+        self._queue_output_line("[error] " + reason, "error")
         steps = self._failure_next_steps(message)
         self.txt_overview.setPlainText(
             "\n".join(
                 [
-                    f"What ran:\n- {self._tool_name}",
-                    f"What was found:\n- Run failed before completion. Reason: {reason}",
+                    f"What we checked:\n- {self._tool_name}",
+                    f"What we found:\n- Run failed before completion. Reason: {reason}",
                     "What changed:\n- Operation stopped; partial artifacts may still be available.",
-                    "Next steps:",
+                    "What to do next:",
                     *[f"- {row}" for row in steps],
                     "",
                     self._context_block(artifacts=0),
@@ -364,7 +399,7 @@ class ToolRunnerWindow(QDialog):
         self._last_status = "Cancelled"
         self.lbl_status.setText("Status: Cancelled")
         self.btn_cancel.setEnabled(False)
-        self._append("[cancelled] Cancellation requested.")
+        self._queue_output_line("[cancelled] Cancellation requested.", "status")
         self._drain_event_bus()
 
     def copy_summary(self) -> None:
@@ -445,7 +480,7 @@ class ToolRunnerWindow(QDialog):
     def _extract_next_steps(self) -> list[str]:
         if not isinstance(self._result_payload, dict):
             return self._dedupe_steps([
-                "Re-run the tool.",
+                "Re-run this action now.",
                 "Try a related safe diagnostic.",
                 "Export a partial support pack.",
             ])
@@ -463,7 +498,7 @@ class ToolRunnerWindow(QDialog):
         if text:
             return self._merge_with_baseline_steps([line.strip("- ").strip() for line in text.splitlines() if line.strip()])
         return self._merge_with_baseline_steps([
-            "Re-run the tool.",
+            "Re-run this action now.",
             "Try a related safe diagnostic.",
             "Export a partial support pack.",
         ])
@@ -502,7 +537,7 @@ class ToolRunnerWindow(QDialog):
     def _merge_with_baseline_steps(self, steps: list[str]) -> list[str]:
         if self._last_status in {"Failed", "Partial", "Cancelled"}:
             baseline = [
-                "Re-run the same action.",
+                "Re-run this action now.",
                 "Run a related safe diagnostic first.",
                 "Export a partial support pack.",
             ]
@@ -528,6 +563,20 @@ class ToolRunnerWindow(QDialog):
                 break
         return out
 
+    def _running_overview(self) -> str:
+        checked = self._plain_summary.strip() or self._tool_name
+        return "\n".join(
+            [
+                f"What we checked:\n- {checked}",
+                "What we found:\n- Task is currently running.",
+                "What changed:\n- No confirmed changes yet.",
+                "What to do next:",
+                "- Watch Live Output for streaming logs.",
+                "- Review Details for technical context.",
+                "- Cancel if this is not the intended action.",
+            ]
+        )
+
     def _build_overview(self, findings_count: int, artifacts: int, next_steps: list[str]) -> str:
         summary = ""
         if isinstance(self._result_payload, dict):
@@ -542,11 +591,12 @@ class ToolRunnerWindow(QDialog):
                 changed_line = "Action was cancelled before full completion."
             else:
                 changed_line = "Action encountered issues; review details tab for technical context."
+        what_checked = f"{self._tool_name} (risk: {self.lbl_risk.text().replace('Risk:', '').strip() or 'Safe'})"
         lines = [
-            f"What ran:\n- {self._tool_name}",
-            f"What was found:\n- {what_found}",
+            f"What we checked:\n- {what_checked}",
+            f"What we found:\n- {what_found}",
             f"What changed:\n- {changed_line}",
-            "Next steps:",
+            "What to do next:",
         ]
         for row in next_steps[:4]:
             lines.append(f"- {row}")
@@ -591,6 +641,9 @@ class ToolRunnerWindow(QDialog):
         lower = (text or "").strip().lower()
         if "export" in lower:
             self.export_requested.emit()
+            return
+        if "re-run" in lower or "rerun" in lower:
+            self.rerun_requested.emit()
             return
         if "copy ticket summary" in lower:
             self.copy_ticket_summary()

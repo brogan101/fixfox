@@ -284,6 +284,7 @@ def execute_runbook(
             message=f"Runbook started: {runbook.title}",
             data={"runbook_id": runbook.id, "audience": runbook.audience, "dry_run": dry_run},
         )
+        bus.publish(rid, RunEventType.STATUS, message=f"Runbook running: {runbook.title}")
 
     if (not dry_run) and requires_admin and create_restore_point_before_admin:
         if progress_cb:
@@ -303,6 +304,7 @@ def execute_runbook(
         if cancel_event is not None and getattr(cancel_event, "is_set", lambda: False)():
             if bus is not None and rid:
                 bus.publish(rid, RunEventType.WARNING, message="Runbook cancelled before completion.")
+                bus.publish(rid, RunEventType.STATUS, message="Runbook cancelled.")
                 bus.publish(rid, RunEventType.END, message="Runbook cancelled.", data={"code": 130})
             return {
                 "runbook_id": runbook.id,
@@ -329,6 +331,7 @@ def execute_runbook(
             progress_cb(pct, f"Step {index}/{total}: {step.title}")
         if bus is not None and rid:
             bus.publish(rid, RunEventType.PROGRESS, message=f"Step {index}/{total}: {step.title}", progress=pct)
+            bus.publish(rid, RunEventType.STATUS, message=f"Step {index}/{total}: {step.title}")
         if log_cb:
             log_cb(f"[runbook] Step {index}/{total}: {step.title} ({step.task_id})")
         task = tasks.get(step.task_id)
@@ -365,6 +368,7 @@ def execute_runbook(
         progress_cb(100, "Runbook complete")
     if bus is not None and rid:
         bus.publish(rid, RunEventType.PROGRESS, message="Runbook complete.", progress=100)
+        bus.publish(rid, RunEventType.STATUS, message="Runbook complete.")
     codes = [int((row.get("result", {}) or {}).get("code", 0 if dry_run else 1)) for row in rows]
     failures = [code for code in codes if code not in (0,)]
     checkpoints = [row for row in rows if row.get("checkpoint")]
@@ -425,6 +429,9 @@ def execute_runbook(
         code = 1 if failures else 0
         if failures:
             bus.publish(rid, RunEventType.ERROR, message="One or more runbook steps failed.", data={"code": code})
+            bus.publish(rid, RunEventType.STATUS, message="Runbook completed with failures.")
+        else:
+            bus.publish(rid, RunEventType.STATUS, message="Runbook completed successfully.")
         bus.publish(rid, RunEventType.END, message=f"Runbook finished with code {code}.", data={"code": code})
     return payload
 

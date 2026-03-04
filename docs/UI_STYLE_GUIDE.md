@@ -1,71 +1,63 @@
-# UI STYLE GUIDE
+# UI Style Guide (Release Baseline)
 
-## Design system source
+## Single source of truth
 - Theme tokens: `src/ui/theme.py`
-- Global styling: `src/ui/app_qss.py`
-- Layout/density guardrails: `src/ui/layout_guardrails.py`
+- Global stylesheet builder: `src/ui/app_qss.py`
+- Runtime theme application: `src/app.py` and `MainWindow._apply_theme(...)`
+- Mode/layout policy: `src/ui/ui_state.py`
 
 ## Typography
-- Font family: `Segoe UI` (with system fallbacks)
-- Title/H1: `22px`
-- Section/H2: `14px`
-- Body: `13px` (comfortable), `12px` (compact)
-- Caption/Subtext: `12px`
-- Monospace only for live command/log output: `Consolas`
+- Font family: `Segoe UI` via `BASE_FONT_FAMILY`
+- QSS typography unit: `pt` (not `px`)
+- Scale (comfortable density base):
+  - Body: `13pt`
+  - Run status title emphasis: `+2pt`
+  - Page title emphasis: `+9pt`
+  - Subtitle/caption: `-1pt`
+  - Section/card title: `+1pt`
+- Monospace log surface: `Consolas` using `safe_copy_font(...)` in ToolRunner.
 
-## Spacing scale
-Use only this scale for margins/padding/gaps:
-- `6`, `10`, `14`, `18`, `22`
+## Density and sizing
+From `DensityTokens` in `theme.py`:
+- Comfortable: row `66`, nav `40`, button `36`, input `34`, icon `18`
+- Compact: row `56`, nav `34`, button `32`, input `30`, icon `16`
 
-## Corner radius + borders
-- Small radius: `12` (comfortable), `10` (compact)
-- Medium radius: `16`
-- Border thickness: `1px` (default), `2px` only for explicit focus/error emphasis
+Shared constants:
+- Spacing scale: `6 / 10 / 14 / 18 / 22`
+- Border thickness: `1px` baseline
+- Corner radius: density-token driven
 
-## Density tokens
-From `DensityTokens`:
-- Comfortable:
-  - `nav_item_height: 40`
-  - `list_row_height: 66`
-  - `button_height: 36`
-  - `input_height: 34`
-- Compact:
-  - `nav_item_height: 34`
-  - `list_row_height: 56`
-  - `button_height: 32`
-  - `input_height: 30`
+## Runtime status surface
+Top-bar run status card:
+- 2-line content model:
+  - Line 1: state (`Running: <tool>`, `Ready`, `Failed`, `Cancelled`)
+  - Line 2: latest line + elapsed time (ellipsized)
+- Min width: `660px`
+- Icon size: `28px`
 
-## Color/palette rules
-- Single source: `ThemeTokens` only.
-- Supported palettes: Graphite, Slate, Indigo, Mono.
-- Accent color is CTA-focused; avoid using accent as default background everywhere.
-- No ad-hoc page-level hardcoded UI colors in app shell widgets.
+## Scrollbars and splitters
+All defined in global QSS (`build_qss`), no widget-local overrides.
 
-## Scrollbar spec
-Themed in `app_qss.py` for both axes.
+Scrollbars:
+- Vertical + horizontal themed
+- States: base, hover, pressed
 - Thickness:
   - Comfortable: `12px`
   - Compact: `10px`
-- States:
-  - Track
-  - Handle
-  - Hover
-  - Pressed
-  - Add/sub line hidden
-- Background and border always theme-token driven.
 
-## Splitter spec
-Themed in `app_qss.py`.
-- Handle thickness:
+Splitter handles:
+- Horizontal + vertical themed
+- States: base, hover, pressed
+- Thickness:
   - Comfortable: `8px`
   - Compact: `6px`
-- States:
-  - Base
-  - Hover
-  - Pressed
-- Subtle contrast, no bright separators.
 
-## Consistency rules
-- Shared row widgets (`ToolRow`, `FixRow`, `FindingRow`, `SessionRow`) define row behavior and alignment.
-- Shared cards (`Card`, `DrawerCard`, `EmptyState`) define page section styling.
-- Avoid page-specific inline QSS overrides.
+## Text input surfaces
+Styled consistently in global QSS:
+- `QLineEdit`, `QComboBox`, `QTextEdit`, `QPlainTextEdit`, `QTreeWidget`
+- Shared background, border, radius, and focus ring behavior.
+
+## Guardrails
+- No page/widget ad-hoc `setStyleSheet(...)` overrides.
+- No hardcoded runtime colors outside token/QSS builder flow.
+- Accent color reserved for focus/CTA/high-signal state, not full-surface saturation.
