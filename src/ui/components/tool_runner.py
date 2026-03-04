@@ -33,6 +33,7 @@ class ToolRunnerWindow(QDialog):
     rerun_requested = Signal()
     export_requested = Signal()
     output_saved = Signal(str)
+    bus_event_received = Signal(object)
 
     def __init__(
         self,
@@ -66,6 +67,10 @@ class ToolRunnerWindow(QDialog):
         self._run_id = str(run_id or "").strip()
         self._event_bus = event_bus
         self._event_cursor = 0
+        self._event_subscription_id = 0
+        self._received_output = False
+        self._spinner_frames = ("|", "/", "-", "\\")
+        self._spinner_index = 0
 
         root = QVBoxLayout(self)
         root.setContentsMargins(12, 12, 12, 12)
@@ -98,6 +103,7 @@ class ToolRunnerWindow(QDialog):
         self.txt_output = QTextEdit()
         self.txt_output.setReadOnly(True)
         self.txt_output.setFont(QFont("Consolas"))
+        self.txt_output.setPlaceholderText("Running... waiting for live output.")
 
         self.txt_details = QTextEdit()
         self.txt_details.setReadOnly(True)
@@ -150,34 +156,42 @@ class ToolRunnerWindow(QDialog):
         self.btn_cancel.clicked.connect(self.cancel_requested.emit)
         self.btn_copy_summary.clicked.connect(self.copy_summary)
         self.btn_export.clicked.connect(self.export_requested.emit)
+        self.bus_event_received.connect(self._apply_bus_event)
 
         self._tick_timer = QTimer(self)
         self._tick_timer.timeout.connect(self._tick_elapsed)
         self._tick_timer.start(1000)
-        self._event_timer = QTimer(self)
-        self._event_timer.timeout.connect(self._drain_event_bus)
-        self._event_timer.start(80)
         self.attach_event_bus(event_bus, self._run_id)
 
     def _tick_elapsed(self) -> None:
         elapsed = int((datetime.utcnow() - self._start_utc).total_seconds())
         self.lbl_elapsed.setText(f"Elapsed: {elapsed}s")
+        if self._last_status == "Running" and not self._received_output:
+            self._spinner_index = (self._spinner_index + 1) % len(self._spinner_frames)
+            spinner = self._spinner_frames[self._spinner_index]
+            self.lbl_status.setText(f"Status: Running {spinner}")
 
     def attach_event_bus(self, event_bus: RunEventBus | None, run_id: str) -> None:
+        self._unsubscribe_event_bus()
         self._event_bus = event_bus
         self._run_id = str(run_id or "").strip()
         self._event_cursor = 0
-        self._drain_event_bus()
-
-    def _drain_event_bus(self) -> None:
         if self._event_bus is None or not self._run_id:
             return
-        events, cursor = self._event_bus.events_since(self._run_id, self._event_cursor)
-        if not events:
+        self._event_subscription_id = self._event_bus.subscribe(
+            self._run_id,
+            lambda event: self.bus_event_received.emit(event),
+            replay_since=0,
+        )
+
+    def _drain_event_bus(self) -> None:
+        return
+
+    def _unsubscribe_event_bus(self) -> None:
+        if self._event_bus is None or self._event_subscription_id <= 0:
             return
-        self._event_cursor = cursor
-        for event in events:
-            self._apply_bus_event(event)
+        self._event_bus.unsubscribe(self._event_subscription_id)
+        self._event_subscription_id = 0
 
     def _apply_bus_event(self, event: RunEvent) -> None:
         kind = str(event.event_type).strip().upper()
@@ -197,10 +211,12 @@ class ToolRunnerWindow(QDialog):
             return
         if kind == RunEventType.STDOUT:
             if message:
+                self._received_output = True
                 self._append(message)
             return
         if kind == RunEventType.STDERR:
             if message:
+                self._received_output = True
                 self._append(message if message.startswith("[stderr]") else f"[stderr] {message}")
             return
         if kind == RunEventType.ARTIFACT:
@@ -244,9 +260,9 @@ class ToolRunnerWindow(QDialog):
     def toggle_pause(self) -> None:
         self._paused = not self._paused
         if self._paused:
-            self._append("[output] Paused.")
+            self.txt_output.append("[output] Paused.")
         else:
-            self._append("[output] Resumed.")
+            self.txt_output.append("[output] Resumed.")
         if not self._paused and self._paused_buffer:
             chunk = self._paused_buffer
             self._paused_buffer = []
@@ -584,3 +600,7 @@ class ToolRunnerWindow(QDialog):
     @property
     def run_id(self) -> str:
         return self._run_id
+
+    def closeEvent(self, event: Any) -> None:  # type: ignore[override]
+        self._unsubscribe_event_bus()
+        super().closeEvent(event)

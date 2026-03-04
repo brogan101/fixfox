@@ -12,7 +12,7 @@ from functools import partial
 from typing import Any, Callable
 
 from PySide6.QtCore import QPoint, QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QAction, QIcon, QKeySequence, QPixmap, QShortcut
+from PySide6.QtGui import QAction, QFontMetrics, QIcon, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -100,6 +100,7 @@ from .layout_guardrails import (
     min_button_size,
     should_auto_collapse_right_panel,
 )
+from .ui_state import LayoutPolicy, is_basic, is_pro, layout_policy
 from .theme import (
     available_palette_labels,
     normalize_density,
@@ -303,6 +304,9 @@ class HelpCenterDialog(QDialog):
                 "Exports and share-safe:\n"
                 "- Reports can mask user/device/IP tokens before sharing.\n"
                 "- Export packs are generated locally.\n\n"
+                "Optional online actions:\n"
+                "- Opening Microsoft Get Help is optional and clearly labeled.\n"
+                "- Core diagnostics, fixes, runbooks, and exports work offline.\n\n"
                 "Data location:\n"
                 "- App data, sessions, and exports are stored under local FixFox app folders."
             ),
@@ -379,6 +383,7 @@ class RunStatusPanel(QFrame):
 
 
 class MainWindow(QMainWindow):
+    run_bus_event = Signal(object)
     NAV_ITEMS = ("Home", "Playbooks", "Diagnose", "Fixes", "Reports", "History", "Settings")
     NAV_ICONS = {
         "Home": "home",
@@ -394,10 +399,12 @@ class MainWindow(QMainWindow):
         super().__init__()
         ensure_dirs()
         self.settings_state = load_settings()
-        if self.settings_state.ui_mode == "basic":
-            self.settings_state.safe_only_mode = True
-            self.settings_state.show_admin_tools = False
+        self.layout_policy_state: LayoutPolicy = layout_policy(self.settings_state)
+        if is_basic(self.settings_state):
             self.settings_state.show_advanced_tools = False
+            if not self.settings_state.show_admin_tools:
+                self.settings_state.safe_only_mode = True
+        self.layout_policy_state = layout_policy(self.settings_state)
         self.safety_policy = policy_from_settings(self.settings_state)
         self.current_session: dict[str, Any] = {}
         self.last_export: dict[str, Any] = {}
@@ -407,6 +414,7 @@ class MainWindow(QMainWindow):
         self.active_run_id = ""
         self.active_run_name = ""
         self.active_run_started = 0.0
+        self._run_status_subscription_id = 0
         self._status_spinner_frames = ("|", "/", "-", "\\")
         self._status_spinner_index = 0
         self._last_run_status = "Ready"
@@ -420,6 +428,7 @@ class MainWindow(QMainWindow):
         self._persist_concierge_events = True
         self._auto_concierge_collapse = False
         self.layout_overlay: LayoutDebugOverlay | None = None
+        self.run_bus_event.connect(self._handle_run_bus_event)
 
         self.setWindowTitle("Fix Fox")
         self.setWindowIcon(QIcon(resource_path(ICON_PNG)))
@@ -474,7 +483,8 @@ class MainWindow(QMainWindow):
         self._sync_settings_ui()
         self._apply_theme()
         apply_button_guardrails(self, self.settings_state.density)
-        self._set_concierge_collapsed(not self.settings_state.right_panel_open, persist=False)
+        default_open = self.settings_state.right_panel_open and self.layout_policy_state.right_panel_default_open
+        self._set_concierge_collapsed(not default_open, persist=False)
         self._apply_responsive_concierge()
         self.layout_overlay = LayoutDebugOverlay(self)
 
@@ -533,14 +543,14 @@ class MainWindow(QMainWindow):
 
         self.run_status_panel = RunStatusPanel()
         self.run_status_panel.setObjectName("RunStatusCard")
-        self.run_status_panel.setMinimumWidth(500)
+        self.run_status_panel.setMinimumWidth(620)
         status_l = QHBoxLayout(self.run_status_panel)
-        status_l.setContentsMargins(10, 8, 10, 8)
-        status_l.setSpacing(10)
+        status_l.setContentsMargins(12, 10, 12, 10)
+        status_l.setSpacing(12)
         self.run_status_icon = QLabel()
         icon_pix = QPixmap(resource_path(ICON_PNG))
         if not icon_pix.isNull():
-            self.run_status_icon.setPixmap(icon_pix.scaled(40, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            self.run_status_icon.setPixmap(icon_pix.scaled(52, 52, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         status_text = QVBoxLayout()
         status_text.setContentsMargins(0, 0, 0, 0)
         status_text.setSpacing(2)
@@ -551,7 +561,7 @@ class MainWindow(QMainWindow):
         self.run_status_detail.setWordWrap(False)
         status_text.addWidget(self.run_status_title)
         status_text.addWidget(self.run_status_detail)
-        self.btn_open_runner = SoftButton("Open Runner")
+        self.btn_open_runner = SoftButton("Open ToolRunner")
         self.btn_open_runner.setMinimumHeight(min_btn.height())
         self.btn_open_runner.clicked.connect(self.open_tool_runner)
         self.run_status_panel.clicked.connect(self.open_tool_runner)
@@ -586,7 +596,7 @@ class MainWindow(QMainWindow):
         self.btn_menu = IconButton("menu", f, "Menu")
         self.btn_panel_toggle = IconButton("panel_open", f, "Toggle concierge panel")
         self.btn_export.clicked.connect(lambda: self.nav.setCurrentRow(self.NAV_ITEMS.index("Reports")))
-        self.btn_help.clicked.connect(lambda: open_uri("ms-contact-support:"))
+        self.btn_help.clicked.connect(lambda: self._show_page_help("Start Here", "Use local Help tabs for Start Here, Privacy, and Safety guidance."))
         self.btn_menu.clicked.connect(self._open_profile_menu)
         self.btn_cancel_task.setMinimumSize(min_btn)
         for btn in (self.btn_export, self.btn_help, self.btn_panel_toggle, self.btn_menu):
@@ -655,10 +665,13 @@ class MainWindow(QMainWindow):
             self.settings_state.safe_only_mode = True
             self.settings_state.show_admin_tools = False
             self.settings_state.show_advanced_tools = False
+            self.settings_state.right_panel_open = False
         else:
             self.settings_state.safe_only_mode = False
             self.settings_state.show_admin_tools = True
             self.settings_state.show_advanced_tools = True
+            self.settings_state.right_panel_open = True
+        self.layout_policy_state = layout_policy(self.settings_state)
         save_settings(self.settings_state)
         self.safety_policy = policy_from_settings(self.settings_state)
         self._sync_ui_mode_controls()
@@ -671,6 +684,7 @@ class MainWindow(QMainWindow):
         self._refresh_run_center()
         self._update_context_labels()
         self._update_concierge()
+        self._set_concierge_collapsed(not self.settings_state.right_panel_open, persist=False)
         self.toasts.show_toast(f"Mode switched to {next_mode.title()}.")
 
     def _visible_capability_ids(self) -> set[str]:
@@ -691,62 +705,75 @@ class MainWindow(QMainWindow):
         return out
 
     def _playbooks_available(self) -> bool:
-        return self.settings_state.ui_mode == "pro"
+        return True
 
     def _apply_nav_mode_visibility(self) -> None:
-        if not hasattr(self, "nav"):
-            return
-        playbooks_idx = self.NAV_ITEMS.index("Playbooks")
-        item = self.nav.item(playbooks_idx)
-        if item is not None:
-            item.setHidden(self.settings_state.ui_mode == "basic")
-        if self.settings_state.ui_mode == "basic" and self.nav.currentRow() == playbooks_idx:
-            self.nav.setCurrentRow(self.NAV_ITEMS.index("Home"))
+        return
 
     def _apply_settings_mode_visibility(self) -> None:
         if not hasattr(self, "settings_nav"):
             return
-        basic = self.settings_state.ui_mode == "basic"
+        policy = self.layout_policy_state
+        basic = policy.mode == "basic"
         for index in range(self.settings_nav.count()):
             item = self.settings_nav.item(index)
             label = str(item.data(Qt.UserRole) or item.text()).strip().lower()
             if label == "advanced":
-                item.setHidden(basic)
-        if basic and hasattr(self, "run_card_widget"):
-            self.run_card_widget.setVisible(False)
-        elif hasattr(self, "run_card_widget"):
-            self.run_card_widget.setVisible(True)
+                item.setHidden(not policy.show_settings_advanced)
+        if hasattr(self, "run_card_widget"):
+            self.run_card_widget.setVisible(policy.show_run_center)
         if hasattr(self, "s_admin"):
+            self.s_admin.setText("Allow admin tools" if basic else "Enable Admin Tools")
             self.s_admin.setEnabled(True)
         if hasattr(self, "s_adv"):
             self.s_adv.blockSignals(True)
-            if basic:
-                self.s_adv.setChecked(False)
+            self.s_adv.setChecked(False if basic else self.s_adv.isChecked())
             self.s_adv.setEnabled(not basic)
             self.s_adv.blockSignals(False)
         if hasattr(self, "s_admin_hint"):
             self.s_admin_hint.setText(
-                "Enable Admin Tools in Basic mode only if you need elevated fixes."
+                "Enable admin tools in Basic only when a recommended action requires elevation."
                 if basic
                 else "Show admin-only fixes and runbooks."
             )
+        if hasattr(self, "s_panel"):
+            self.s_panel.setEnabled(not basic)
+        if hasattr(self, "s_panel_hint"):
+            self.s_panel_hint.setText(
+                "Basic mode starts with the concierge panel collapsed. Use the panel button in the top bar to expand it when needed."
+                if basic
+                else "Keeps the right concierge panel expanded when window width allows."
+            )
+        if hasattr(self, "s_safe"):
+            self.s_safe.setEnabled(not self.settings_state.show_admin_tools)
+            if self.settings_state.show_admin_tools and self.s_safe.isChecked():
+                self.s_safe.setChecked(False)
+        if hasattr(self, "s_safe_hint"):
+            self.s_safe_hint.setText("Safe-only turns off while admin tools are enabled.")
 
     def _apply_playbooks_mode_visibility(self) -> None:
-        basic = self.settings_state.ui_mode == "basic"
+        policy = self.layout_policy_state
+        basic = policy.mode == "basic"
         if hasattr(self, "pb_advanced_toggle"):
-            self.pb_advanced_toggle.setVisible((not basic) and self.pb_stack.currentIndex() == 0)
-        if hasattr(self, "task_card") and basic:
+            self.pb_advanced_toggle.setVisible(policy.show_script_tasks and self.pb_stack.currentIndex() == 0)
+        if hasattr(self, "pb_basic_container"):
+            self.pb_basic_container.setVisible(policy.show_playbooks_guided_basic)
+        if hasattr(self, "pb_pro_console"):
+            self.pb_pro_console.setVisible(policy.show_playbooks_pro_console)
+        if hasattr(self, "task_card") and not policy.show_script_tasks:
             self.task_card.setVisible(False)
         if hasattr(self, "rb_audience"):
             self.rb_audience.blockSignals(True)
             self.rb_audience.clear()
             self.rb_audience.addItems(["All Audiences", "home"] if basic else ["All Audiences", "home", "it"])
             self.rb_audience.blockSignals(False)
+        self._refresh_basic_playbooks_cards()
 
     def _apply_reports_mode_visibility(self) -> None:
         if not hasattr(self, "rep_preset"):
             return
-        wanted = ["home_share"] if self.settings_state.ui_mode == "basic" else list(PRESETS)
+        policy = self.layout_policy_state
+        wanted = ["home_share"] if not policy.show_reports_full_presets else list(PRESETS)
         current = self.rep_preset.currentText().strip().lower() if self.rep_preset.count() else ""
         self.rep_preset.blockSignals(True)
         self.rep_preset.clear()
@@ -754,11 +781,20 @@ class MainWindow(QMainWindow):
         target = current if current in wanted else wanted[0]
         self.rep_preset.setCurrentText(target)
         self.rep_preset.blockSignals(False)
+        if hasattr(self, "rep_preset"):
+            self.rep_preset.setEnabled(policy.show_reports_full_presets)
+        if hasattr(self, "rep_preset_hint"):
+            self.rep_preset_hint.setVisible(not policy.show_reports_full_presets)
         if hasattr(self, "rep_logs"):
-            self.rep_logs.setChecked(False if self.settings_state.ui_mode == "basic" else self.rep_logs.isChecked())
+            self.rep_logs.setVisible(policy.show_reports_advanced_options)
+            self.rep_logs.setChecked(False if not policy.show_reports_advanced_options else self.rep_logs.isChecked())
+        if hasattr(self, "rep_generate_override"):
+            self.rep_generate_override.setVisible(policy.show_reports_advanced_options)
         self._update_context_labels()
+        self._sync_reports_empty_state()
 
     def _apply_mode_visibility(self) -> None:
+        self.layout_policy_state = layout_policy(self.settings_state)
         self._apply_nav_mode_visibility()
         self._apply_settings_mode_visibility()
         self._apply_playbooks_mode_visibility()
@@ -774,7 +810,10 @@ class MainWindow(QMainWindow):
         if hasattr(self, "run_status_title"):
             self.run_status_title.setText(title)
         if hasattr(self, "run_status_detail"):
-            self.run_status_detail.setText(detail[:180])
+            clean = " ".join(str(detail or "").splitlines()).strip()
+            metrics = QFontMetrics(self.run_status_detail.font())
+            max_width = max(120, self.run_status_detail.width() - 8)
+            self.run_status_detail.setText(metrics.elidedText(clean, Qt.ElideRight, max_width))
 
     def _update_run_status_indicator(self) -> None:
         if self.active_worker is None:
@@ -788,8 +827,63 @@ class MainWindow(QMainWindow):
         spinner = self._status_spinner_frames[self._status_spinner_index]
         elapsed = self._status_elapsed_text()
         title = f"Running: {self.active_run_name or 'Task'}"
-        detail = f"{spinner} {self._last_run_line[:100]} | {elapsed}"
+        line = self._last_run_line[:120].strip() or "Running..."
+        detail = f"{spinner} {line} | {elapsed}"
         self._set_run_status(title, detail)
+
+    def _subscribe_run_status_events(self, run_id: str) -> None:
+        self._unsubscribe_run_status_events()
+        rid = str(run_id or "").strip()
+        if not rid:
+            return
+        self._run_status_subscription_id = self.run_event_bus.subscribe(
+            rid,
+            lambda event: self.run_bus_event.emit(event),
+            replay_since=0,
+        )
+
+    def _unsubscribe_run_status_events(self) -> None:
+        if self._run_status_subscription_id <= 0:
+            return
+        self.run_event_bus.unsubscribe(self._run_status_subscription_id)
+        self._run_status_subscription_id = 0
+
+    def _handle_run_bus_event(self, event: Any) -> None:
+        kind = str(getattr(event, "event_type", "")).strip().upper()
+        message = str(getattr(event, "message", "") or "").strip()
+        if kind == RunEventType.START:
+            self._last_run_status = "Running"
+            if message:
+                self._last_run_line = message
+            return
+        if kind == RunEventType.PROGRESS:
+            if message:
+                self._last_run_line = message
+            return
+        if kind in {RunEventType.STDOUT, RunEventType.STDERR, RunEventType.WARNING}:
+            if message:
+                self._last_run_line = message
+            return
+        if kind == RunEventType.ERROR:
+            self._last_run_status = "Failed"
+            if message:
+                self._last_run_line = message
+            return
+        if kind != RunEventType.END:
+            return
+        data = getattr(event, "data", {}) or {}
+        if isinstance(data, dict):
+            code = int(data.get("code", 0))
+        else:
+            code = 0
+        if code == 0:
+            self._last_run_status = "Success"
+        elif code == 130:
+            self._last_run_status = "Cancelled"
+        else:
+            self._last_run_status = "Failed"
+        if message:
+            self._last_run_line = message
 
     def _header(self, title: str, subtitle: str, cta: QWidget | None = None, help_text: str = "") -> QWidget:
         w = QWidget(); l = QVBoxLayout(w); l.setContentsMargins(0, 0, 0, 0); l.setSpacing(8)
@@ -861,6 +955,7 @@ class MainWindow(QMainWindow):
 
     def _reset_settings_defaults(self) -> None:
         self.settings_state = AppSettings().normalized()
+        self.layout_policy_state = layout_policy(self.settings_state)
         save_settings(self.settings_state)
         self._sync_settings_ui()
         self.safety_policy = policy_from_settings(self.settings_state)
@@ -992,7 +1087,10 @@ class MainWindow(QMainWindow):
         self.diag_summary = Card("No active session", "Run Quick Check from Home.")
         self.diag_counts = Card("Severity Snapshot", "CRIT 0 | WARN 0 | OK 0 | INFO 0")
         self.diag_top3 = Card("Top 3 Findings", "No findings yet.")
-        ll.addWidget(self.diag_summary); ll.addWidget(self.diag_counts); ll.addWidget(self.diag_top3); ll.addStretch(1)
+        self.diag_next_btn = PrimaryButton("Run Quick Check")
+        self.diag_next_btn.clicked.connect(self._run_next_best_action)
+        self.diag_next = Card("Next Best Action", "Run Quick Check to generate findings.", right_widget=self.diag_next_btn)
+        ll.addWidget(self.diag_summary); ll.addWidget(self.diag_counts); ll.addWidget(self.diag_top3); ll.addWidget(self.diag_next); ll.addStretch(1)
 
         center = QWidget(); cl = QVBoxLayout(center); cl.setContentsMargins(0, 0, 0, 0); cl.setSpacing(10)
         toolbar = Card("Findings Toolbar", "Search and filter findings.")
@@ -1014,7 +1112,9 @@ class MainWindow(QMainWindow):
         cl.addWidget(toolbar)
         self.diag_loading = SkeletonLoader(rows=5, density=self.settings_state.density); self.diag_loading.hide(); cl.addWidget(self.diag_loading)
         self.diag_feed = QWidget(); self.diag_feed_layout = QVBoxLayout(self.diag_feed); self.diag_feed_layout.setContentsMargins(0, 0, 0, 0); self.diag_feed_layout.setSpacing(8)
-        self.diag_feed_layout.addWidget(EmptyState("No Findings", "Run a scan to populate findings.", icon="!"))
+        run_cta = PrimaryButton("Run Quick Check")
+        run_cta.clicked.connect(lambda: self.run_quick_check("Quick Check"))
+        self.diag_feed_layout.addWidget(EmptyState("No Findings", "Run a scan to populate findings.", cta=run_cta, icon="!"))
         cl.addWidget(self.diag_feed, 1)
 
         l.addWidget(left, 1); l.addWidget(center, 3)
@@ -1089,6 +1189,16 @@ class MainWindow(QMainWindow):
         p = QWidget(); l = QVBoxLayout(p); l.setContentsMargins(0, 0, 0, 0); l.setSpacing(10)
         l.addWidget(self._header("Reports", "Export validated packs with share-safe masking.", help_text="Use the 3-step flow: configure, preview evidence/redaction, then generate and validate."))
 
+        start_btn = PrimaryButton("Run Quick Check")
+        start_btn.clicked.connect(lambda: self.run_quick_check("Quick Check"))
+        self.rep_empty_state = EmptyState(
+            "Run a goal first",
+            "Start from Home to generate a session, then return here to configure and export.",
+            cta=start_btn,
+            icon="!",
+        )
+        l.addWidget(self.rep_empty_state)
+
         self.rep_steps = QTabWidget()
         self.rep_steps.setDocumentMode(True)
 
@@ -1097,7 +1207,11 @@ class MainWindow(QMainWindow):
         self.rep_safe = QCheckBox("Share-safe masking enabled"); self.rep_safe.setChecked(self.settings_state.share_safe_default); self.rep_safe.stateChanged.connect(self._update_context_labels)
         self.rep_ip = QCheckBox("Mask IP addresses"); self.rep_ip.setChecked(self.settings_state.mask_ip_default); self.rep_ip.stateChanged.connect(self._update_redaction_preview)
         self.rep_logs = QCheckBox("Include evidence logs"); self.rep_logs.setChecked(False)
-        s1.addWidget(Card("Step 1: Choose Preset", "Pick export policy and masking defaults.", right_widget=self.rep_preset))
+        self.rep_preset_hint = QLabel("Basic mode is locked to Home Share preset.")
+        self.rep_preset_hint.setObjectName("SubTitle")
+        self.rep_preset_hint.setWordWrap(True)
+        s1.addWidget(Card("Step 1: Configure", "Pick export policy and masking defaults.", right_widget=self.rep_preset))
+        s1.addWidget(self.rep_preset_hint)
         s1.addWidget(self.rep_safe)
         s1.addWidget(self.rep_ip)
         s1.addWidget(self.rep_logs)
@@ -1151,6 +1265,7 @@ class MainWindow(QMainWindow):
         self.rep_steps.addTab(step2, "2. Preview")
         self.rep_steps.addTab(step3, "3. Generate")
         l.addWidget(self.rep_steps, 1)
+        self._sync_reports_empty_state()
         return _scroll(p)
 
     def _build_history(self) -> QWidget:
@@ -1199,6 +1314,26 @@ class MainWindow(QMainWindow):
             )
         )
 
+        self.pb_basic_container = QWidget()
+        basic_l = QVBoxLayout(self.pb_basic_container)
+        basic_l.setContentsMargins(0, 0, 0, 0)
+        basic_l.setSpacing(10)
+        basic_intro = Card(
+            "Guided Goals",
+            "Pick a goal, run the guided path, and review results in ToolRunner.",
+        )
+        basic_l.addWidget(basic_intro)
+        self.pb_basic_goal_grid = QGridLayout()
+        self.pb_basic_goal_grid.setContentsMargins(0, 0, 0, 0)
+        self.pb_basic_goal_grid.setSpacing(10)
+        basic_l.addLayout(self.pb_basic_goal_grid, 1)
+        l.addWidget(self.pb_basic_container, 1)
+
+        self.pb_pro_console = QWidget()
+        pro_l = QVBoxLayout(self.pb_pro_console)
+        pro_l.setContentsMargins(0, 0, 0, 0)
+        pro_l.setSpacing(10)
+
         controls_shell = QWidget()
         controls_outer = QVBoxLayout(controls_shell)
         controls_outer.setContentsMargins(0, 0, 0, 0)
@@ -1224,7 +1359,7 @@ class MainWindow(QMainWindow):
         controls_row2.addWidget(self.pb_advanced_toggle, 0)
         controls_outer.addLayout(controls_row1)
         controls_outer.addLayout(controls_row2)
-        l.addWidget(controls_shell)
+        pro_l.addWidget(controls_shell)
 
         self.pb_stack = QStackedWidget()
 
@@ -1269,8 +1404,8 @@ class MainWindow(QMainWindow):
         rl = QVBoxLayout(right)
         rl.setContentsMargins(0, 0, 0, 0)
         rl.setSpacing(10)
-        self.pb_tool_detail = Card("Tool Detail", "Choose -> review -> run.")
-        self.pb_tool_detail_text = QLabel("Select a tool from the directory.")
+        self.pb_tool_detail = Card("Tool Detail", "Select a tool to see details and run it.")
+        self.pb_tool_detail_text = QLabel("Select a tool to see details and run it.")
         self.pb_tool_detail_text.setWordWrap(True)
         self.pb_tool_detail.body_layout().addWidget(self.pb_tool_detail_text)
         self.pb_detail_steps = DrawerCard("What it runs")
@@ -1384,22 +1519,27 @@ class MainWindow(QMainWindow):
 
         self.pb_stack.addWidget(tools_view)
         self.pb_stack.addWidget(runbooks_view)
-        l.addWidget(self.pb_stack, 1)
+        pro_l.addWidget(self.pb_stack, 1)
+        l.addWidget(self.pb_pro_console, 1)
+        self._refresh_basic_playbooks_cards()
         self._switch_playbooks_segment()
         return _scroll(p)
 
     def _switch_playbooks_segment(self) -> None:
         segment = self.pb_segment.currentText().strip().lower() if hasattr(self, "pb_segment") else "tools"
-        self.pb_stack.setCurrentIndex(1 if segment == "runbooks" else 0)
+        if self.layout_policy_state.show_playbooks_pro_console:
+            self.pb_stack.setCurrentIndex(1 if segment == "runbooks" else 0)
+        else:
+            self.pb_stack.setCurrentIndex(1)
         if hasattr(self, "pb_advanced_toggle"):
-            tools_mode = segment != "runbooks"
-            self.pb_advanced_toggle.setVisible(tools_mode)
+            tools_mode = self.pb_stack.currentIndex() == 0
+            self.pb_advanced_toggle.setVisible(self.layout_policy_state.show_script_tasks and tools_mode)
         self._apply_playbooks_mode_visibility()
         self._refresh_toolbox()
         self._update_concierge()
 
     def _toggle_advanced_script_tasks(self) -> None:
-        if self.settings_state.ui_mode == "basic":
+        if not self.layout_policy_state.show_script_tasks:
             self.toasts.show_toast("Switch to Pro mode to view advanced script tasks.")
             return
         if not hasattr(self, "task_card"):
@@ -1408,6 +1548,48 @@ class MainWindow(QMainWindow):
         self.task_card.setVisible(visible)
         if hasattr(self, "pb_advanced_toggle"):
             self.pb_advanced_toggle.setText("Hide advanced script tasks" if visible else "Show advanced script tasks")
+
+    def _refresh_basic_playbooks_cards(self) -> None:
+        if not hasattr(self, "pb_basic_goal_grid"):
+            return
+        while self.pb_basic_goal_grid.count():
+            item = self.pb_basic_goal_grid.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+        goals: list[tuple[str, str, str, list[str]]] = [
+            ("wifi", "Fix Wi-Fi", "Collect network evidence and run guided recovery checks.", ["Wi-Fi report + DNS/proxy checks", "Network evidence pack", "Ping verification"]),
+            ("space", "Free Up Space", "Find the largest storage offenders before cleanup.", ["Storage radar", "Large file radar", "Downloads cleanup preview"]),
+            ("speed", "Speed Up PC", "Check pressure, startup load, and reboot signals.", ["Performance sample window", "Startup/autostart pack", "Pending reboot sources"]),
+            ("printer", "Printer Issues", "Capture printer health and spooler status.", ["Printer status snapshot", "Queue + service checks", "PrintService evidence"]),
+            ("browser", "Browser Problems", "Run browser + network checks together.", ["Browser rescue helper", "DNS timing test", "Hosts/proxy checks"]),
+            ("crashes", "App Crashes", "Collect crash-focused evidence for triage.", ["Crash helper", "Reliability snapshot", "Application/System event context"]),
+        ]
+        for idx, (goal_id, title, desc, runs) in enumerate(goals):
+            run_btn = PrimaryButton("Start")
+            run_btn.clicked.connect(lambda _checked=False, gid=goal_id: self._launch_basic_goal(gid))
+            card = Card(title, desc, right_widget=run_btn)
+            card.body_layout().addWidget(QLabel("Runs:"))
+            for line in runs:
+                card.body_layout().addWidget(QLabel(f"- {line}"))
+            row = idx // 2
+            col = idx % 2
+            self.pb_basic_goal_grid.addWidget(card, row, col)
+
+    def _launch_basic_goal(self, goal_id: str) -> None:
+        mapping_runbook = {
+            "wifi": "home_fix_wifi_safe",
+            "space": "home_free_up_space_safe",
+            "speed": "home_speed_up_pc_safe",
+            "printer": "home_printer_rescue",
+            "browser": "home_browser_problems",
+        }
+        if goal_id in mapping_runbook:
+            self._select_runbook(mapping_runbook[goal_id])
+            self.run_selected_runbook(True)
+            return
+        if goal_id == "crashes":
+            self.run_quick_check("Crashes")
 
     def _set_selected_tool(self, tid: str) -> None:
         if not tid:
@@ -1537,12 +1719,13 @@ class MainWindow(QMainWindow):
         self.s_safe = QCheckBox("Safe-only mode")
         self.s_admin = QCheckBox("Enable Admin Tools")
         self.s_admin_hint = self._setting_hint("Enable admin tools only when you need elevated actions.")
+        self.s_safe_hint = self._setting_hint("Default safety guardrail. Shows only low-risk actions.")
         self.s_adv = QCheckBox("Show advanced tools")
         self.s_diag = QCheckBox("Diagnostic mode")
         for x in (self.s_safe, self.s_admin, self.s_adv, self.s_diag):
             x.stateChanged.connect(self.save_settings_from_ui)
         c_safe.body_layout().addWidget(self.s_safe)
-        c_safe.body_layout().addWidget(self._setting_hint("Default safety guardrail. Shows only low-risk actions."))
+        c_safe.body_layout().addWidget(self.s_safe_hint)
         c_safe.body_layout().addWidget(self.s_admin)
         c_safe.body_layout().addWidget(self.s_admin_hint)
         c_safe.body_layout().addWidget(self.s_adv)
@@ -1592,7 +1775,8 @@ class MainWindow(QMainWindow):
         self.s_ui_mode.addItems(["basic", "pro"])
         self.s_ui_mode.currentTextChanged.connect(self.set_ui_mode)
         c_look.body_layout().addWidget(self.s_panel)
-        c_look.body_layout().addWidget(self._setting_hint("Keeps the right concierge panel expanded when window width allows."))
+        self.s_panel_hint = self._setting_hint("Keeps the right concierge panel expanded when window width allows.")
+        c_look.body_layout().addWidget(self.s_panel_hint)
         c_look.body_layout().addWidget(self.s_weekly)
         c_look.body_layout().addWidget(self._setting_hint("Shows a weekly reminder card on Home."))
         c_look.body_layout().addWidget(QLabel("UI Mode"))
@@ -1667,6 +1851,9 @@ class MainWindow(QMainWindow):
         c_about.body_layout().addWidget(about_header)
         c_about.body_layout().addWidget(QLabel("Runs locally. No cloud uploads by default."))
         c_about.body_layout().addWidget(QLabel("Plain English: this app runs diagnostics, fixes, runbooks, and exports locally."))
+        c_about.body_layout().addWidget(QLabel("Privacy summary: session data, evidence, and logs stay on this device unless you export/share manually."))
+        c_about.body_layout().addWidget(QLabel("Safety summary: Safe = low-risk checks, Admin = elevated actions, Advanced = expert workflows."))
+        c_about.body_layout().addWidget(QLabel("Optional online actions are explicitly labeled (for example, Microsoft Get Help)."))
         c_about.body_layout().addWidget(QLabel(f"Build date: {_now_local().split(' ')[0]}"))
         c_about.body_layout().addWidget(QLabel(f"Data folder: {ensure_dirs()['base']}"))
         c_about.body_layout().addWidget(QLabel(f"Logs folder: {logs_dir()}"))
@@ -1908,6 +2095,8 @@ class MainWindow(QMainWindow):
                 f"{fx.plain}\n\nRisk: {fx.risk}\nRollback: {fx.rollback}\n\nWhat changes:\n{fx.description}",
             )
         if page == "Playbooks":
+            if self.layout_policy_state.show_playbooks_guided_basic and not any([getattr(self, "selected_tool_id", ""), getattr(self, "selected_task_id", ""), self.rb_selected_id]):
+                return ("Guided Goals", "Choose a basic goal card to run the safest guided workflow.")
             selected_tool = getattr(self, "selected_tool_id", "")
             tool = next((row for row in TOOL_DIRECTORY if row.id == selected_tool), None)
             if tool is not None:
@@ -1945,6 +2134,8 @@ class MainWindow(QMainWindow):
                 return ("Run Selected Fix", lambda: self.run_fix_action(selected))
             return ("Open Fixes", lambda: self.nav.setCurrentRow(self.NAV_ITEMS.index("Fixes")))
         if page == "Playbooks":
+            if self.layout_policy_state.show_playbooks_guided_basic and not any([getattr(self, "selected_tool_id", ""), getattr(self, "selected_task_id", ""), self.rb_selected_id]):
+                return ("Run Quick Check", lambda: self.run_quick_check("Quick Check"))
             selected_tool = getattr(self, "selected_tool_id", "")
             if selected_tool:
                 return ("Run Selected Tool", lambda: self._launch_tool_payload(selected_tool))
@@ -2062,6 +2253,7 @@ class MainWindow(QMainWindow):
         self.active_run_started = time.monotonic()
         self._last_run_status = "Running"
         self._last_run_line = "Starting..."
+        self._subscribe_run_status_events(resolved_run_id)
         self._set_run_status(f"Running: {name}", "Starting... | 0s")
         self.tool_runner = ToolRunnerWindow(
             name,
@@ -2102,7 +2294,6 @@ class MainWindow(QMainWindow):
         return resolved_run_id
 
     def _on_run_progress(self, run_id: str, name: str, pct: int, text: str) -> None:
-        self.toasts.show_toast(f"{name}: {pct}% {text}", timeout_ms=900)
         if text:
             self._last_run_line = str(text).strip()
         self.run_event_bus.publish(
@@ -2217,7 +2408,15 @@ class MainWindow(QMainWindow):
         self.active_run_name = ""
         self.active_run_started = 0.0
         self.btn_cancel_task.setEnabled(False)
+        self._unsubscribe_run_status_events()
         self._update_run_status_indicator()
+
+    def closeEvent(self, event: Any) -> None:  # type: ignore[override]
+        self._unsubscribe_run_status_events()
+        if self.tool_runner is not None:
+            self.tool_runner.close()
+            self.tool_runner = None
+        super().closeEvent(event)
 
     def _on_tool_runner_output_saved(self, path: str) -> None:
         self._merge_files_into_session_evidence([path], "runner", "tool_runner_output")
@@ -2303,7 +2502,9 @@ class MainWindow(QMainWindow):
             filtered.append(row)
         self._clear_layout(self.diag_feed_layout)
         if not filtered:
-            self.diag_feed_layout.addWidget(EmptyState("No Findings", "Run a scan to populate this view.", icon="!"))
+            run_cta = PrimaryButton("Run Quick Check")
+            run_cta.clicked.connect(lambda: self.run_quick_check("Quick Check"))
+            self.diag_feed_layout.addWidget(EmptyState("No Findings", "Run a scan to populate this view.", cta=run_cta, icon="!"))
             return
         grouped: dict[str, list[dict[str, Any]]] = {}
         for row in filtered:
@@ -2352,10 +2553,24 @@ class MainWindow(QMainWindow):
         if not isinstance(finding, dict):
             finding = {}
         self.selected_finding = finding
+        action_label, _action_cb = self._diagnose_action()
+        if hasattr(self, "diag_next"):
+            if finding:
+                self.diag_next.title.setText("Next Best Action")
+                self.diag_next.sub.setText(self._deterministic_next_action(finding))
+            else:
+                self.diag_next.title.setText("Next Best Action")
+                self.diag_next.sub.setText("Run Quick Check to generate findings.")
+        if hasattr(self, "diag_next_btn"):
+            self.diag_next_btn.setText(action_label)
         if not finding:
             self._update_concierge()
             return
         self._update_concierge()
+
+    def _run_next_best_action(self) -> None:
+        _label, callback = self._diagnose_action()
+        callback()
 
     def _deterministic_next_action(self, finding: dict[str, Any]) -> str:
         title = str(finding.get("title", "")).lower()
@@ -2459,7 +2674,10 @@ class MainWindow(QMainWindow):
                 f"{fx.plain}\n\nRisk: {fx.risk}\nWhat changes: {fx.description}\nRollback: {fx.rollback}"
             )
         if hasattr(self, "fix_commands"):
-            self.fix_commands.set_text("\n".join(fx.commands))
+            commands = "\n".join(fx.commands).strip()
+            if not commands:
+                commands = "This action opens Windows Settings only."
+            self.fix_commands.set_text(commands)
         self._update_concierge()
 
     def _preview_selected_fix(self) -> None:
@@ -2528,8 +2746,29 @@ class MainWindow(QMainWindow):
 
     def _refresh_fixes(self) -> None:
         self.safety_policy = policy_from_settings(self.settings_state)
+        policy = self.layout_policy_state
         scope = self.fix_scope.currentText() if hasattr(self, "fix_scope") else "Recommended"
-        allowed_risks = self._active_fix_risks()
+        if hasattr(self, "fix_scope"):
+            self.fix_scope.setVisible(policy.show_fixes_scope_controls)
+            self.fix_scope.setEnabled(policy.show_fixes_scope_controls)
+        if policy.force_fixes_recommended_only:
+            scope = "Recommended"
+            if hasattr(self, "fix_scope"):
+                self.fix_scope.blockSignals(True)
+                self.fix_scope.setCurrentText("Recommended")
+                self.fix_scope.blockSignals(False)
+        if policy.mode == "basic":
+            allowed_risks = {"Safe", "Admin"} if policy.allow_admin_tools_in_basic else {"Safe"}
+        else:
+            allowed_risks = self._active_fix_risks()
+        if hasattr(self, "fix_chip_safe"):
+            self.fix_chip_safe.setVisible(policy.show_fixes_risk_filters)
+        if hasattr(self, "fix_chip_admin"):
+            self.fix_chip_admin.setVisible(policy.show_fixes_risk_filters)
+        if hasattr(self, "fix_chip_adv"):
+            self.fix_chip_adv.setVisible(policy.show_fixes_risk_filters)
+        if hasattr(self, "fix_rollback"):
+            self.fix_rollback.setVisible(policy.show_run_center)
         visible_fix_ids = self._visible_ids_for_prefix("fix_action.")
         adapters: list[FeedItemAdapter] = []
         for fx in list_fixes(self.safety_policy):
@@ -2632,7 +2871,9 @@ class MainWindow(QMainWindow):
             return
 
         def task(progress_cb: Any, partial_cb: Any, log_cb: Any, cancel_event: Any, timeout_s: int) -> dict[str, Any]:
-            del partial_cb, cancel_event, timeout_s
+            del partial_cb, timeout_s
+            if cancel_event.is_set():
+                return {"cancelled": True, "code": 130, "user_message": "Export cancelled before start."}
             progress_cb(20, "Preparing export")
             log_cb(f"Generating preset: {self.rep_preset.currentText()}")
             res = export_session(
@@ -2643,6 +2884,8 @@ class MainWindow(QMainWindow):
                 include_logs=self.rep_logs.isChecked(),
                 allow_validator_override=allow_validator_override,
             )
+            if cancel_event.is_set():
+                return {"cancelled": True, "code": 130, "user_message": "Export cancelled."}
             progress_cb(100, "Done")
             log_cb(f"Export complete: {res.zip_path}")
             return {"zip": str(res.zip_path), "folder": str(res.folder_path), "short": res.ticket_summary_short, "detail": res.ticket_summary_detailed, "ok": res.validation_passed, "warn": res.validation_warnings}
@@ -2659,6 +2902,9 @@ class MainWindow(QMainWindow):
         )
 
     def _on_export(self, payload: dict[str, Any]) -> None:
+        if payload.get("cancelled"):
+            self.toasts.show_toast("Export cancelled.")
+            return
         self.last_export = payload
         if self.current_session:
             update_meta_export_path(self.current_session.get("session_id", ""), payload.get("zip", ""))
@@ -2667,10 +2913,22 @@ class MainWindow(QMainWindow):
             self.rep_steps.setCurrentIndex(2)
         self._refresh_history(); self._refresh_home_history(); self._refresh_run_center(); self._refresh_evidence_items(); self._update_concierge(); self.toasts.show_toast("Export complete.")
 
+    def _sync_reports_empty_state(self) -> None:
+        has_session = bool(self.current_session and self.current_session.get("session_id"))
+        if hasattr(self, "rep_empty_state"):
+            self.rep_empty_state.setVisible(not has_session)
+        if hasattr(self, "rep_steps"):
+            self.rep_steps.setVisible(has_session)
+        if hasattr(self, "rep_generate"):
+            self.rep_generate.setEnabled(has_session)
+        if hasattr(self, "rep_generate_override"):
+            self.rep_generate_override.setEnabled(has_session)
+
     def _rebuild_report_tree(self) -> None:
         self.rep_tree.clear()
         if not self.current_session:
             self.rep_tree.addTopLevelItem(QTreeWidgetItem(["No session", "Run Quick Check"]))
+            self._sync_reports_empty_state()
             return
         r = QTreeWidgetItem(["Session", self.current_session.get("session_id", "")])
         r.addChild(QTreeWidgetItem(["Symptom", self.current_session.get("symptom", "")]))
@@ -2678,6 +2936,7 @@ class MainWindow(QMainWindow):
         r.addChild(QTreeWidgetItem(["Actions", str(len(self.current_session.get("actions", [])))]))
         r.addChild(QTreeWidgetItem(["Preset", self.rep_preset.currentText()]))
         self.rep_tree.addTopLevelItem(r); self.rep_tree.expandAll()
+        self._sync_reports_empty_state()
 
     def _refresh_evidence_items(self) -> None:
         if not hasattr(self, "rep_evidence"):
@@ -2849,11 +3108,23 @@ class MainWindow(QMainWindow):
         findings = s.get("findings", [])
         actions = s.get("actions", [])
         evidence = s.get("evidence", {}).get("files", []) if isinstance(s.get("evidence", {}), dict) else []
-        top = ", ".join([str(row.get("title", "")) for row in findings[:3]]) or "none"
+        top_rows = [str(row.get("title", "")).strip() for row in findings[:3] if str(row.get("title", "")).strip()]
         exports = "yes" if any(meta.session_id == sid and meta.last_export_path for meta in load_index()) else "no"
-        self.hist_detail.sub.setText(
-            f"Goals run: {goals}\nTop findings: {top}\nActions taken: {len(actions)}\nExports generated: {exports}\nEvidence collected: {len(evidence)}"
-        )
+        lines = [
+            f"Session ID: {sid}",
+            f"Goal: {goals}",
+            f"Actions taken: {len(actions)}",
+            f"Evidence collected: {len(evidence)}",
+            f"Export generated: {exports}",
+            "Top findings:",
+        ]
+        if top_rows:
+            lines.extend([f"- {row}" for row in top_rows])
+        else:
+            lines.append("- none")
+        self.hist_detail.sub.setText("\n".join(lines))
+        if hasattr(self, "hist_compare"):
+            self.hist_compare.set_text("\n".join(lines))
         self._update_concierge()
 
     def reopen_selected_session(self) -> None:
@@ -2889,9 +3160,9 @@ class MainWindow(QMainWindow):
             f"Pending reboot delta: {'changed' if current_reboot != other_reboot else 'no change'}",
             f"Action count delta: {len(self.current_session.get('actions', [])) - len(other.get('actions', [])):+d}",
         ]
-        self.hist_detail.sub.setText("Compare with active:\n" + "\n".join(lines))
+        self.hist_detail.sub.setText("Compare with active session:\n" + "\n".join([f"- {line}" for line in lines]))
         if hasattr(self, "hist_compare"):
-            self.hist_compare.set_text("\n".join(lines))
+            self.hist_compare.set_text("\n".join([f"- {line}" for line in lines]))
 
     def _load_session(self, sid: str) -> None:
         try:
@@ -3026,6 +3297,7 @@ class MainWindow(QMainWindow):
         show_context_menu(self, lw, pos, actions)
 
     def _refresh_toolbox(self) -> None:
+        guided_basic = self.layout_policy_state.show_playbooks_guided_basic
         q = self.tb_search.text().strip() if hasattr(self, "tb_search") else ""
         selected = self.tb_filter.currentText().strip().lower() if hasattr(self, "tb_filter") else "all categories"
         category_filter = "" if selected == "all categories" else selected
@@ -3055,14 +3327,17 @@ class MainWindow(QMainWindow):
             self.tb_favorites.set_items(fav_adapters)
             if not fav_adapters:
                 self.tb_favorites.show_empty("star", "No favorite tools available in this mode.")
-        if all_adapters:
+        if all_adapters and not guided_basic:
             valid_ids = {row.key for row in all_adapters}
             selected_id = self.selected_tool_id if self.selected_tool_id in valid_ids else all_adapters[0].key
             self._set_selected_tool(selected_id)
-        elif hasattr(self, "pb_tool_detail") and hasattr(self, "pb_tool_detail_text"):
+        elif (not guided_basic) and hasattr(self, "pb_tool_detail") and hasattr(self, "pb_tool_detail_text"):
             self.selected_tool_id = ""
             self.pb_tool_detail.title.setText("Tool Detail")
             self.pb_tool_detail_text.setText("No tools available for this mode and filter set. Switch to Pro for full directory.")
+        if guided_basic:
+            self.selected_tool_id = ""
+            self.selected_task_id = ""
         self._refresh_script_tasks()
         self._refresh_runbooks()
 
@@ -3099,6 +3374,7 @@ class MainWindow(QMainWindow):
             self.selected_task_id = adapters[0].key
 
     def _refresh_runbooks(self) -> None:
+        guided_basic = self.layout_policy_state.show_playbooks_guided_basic
         visible_runbook_ids = self._visible_ids_for_prefix("runbook.")
         q = self.tb_search.text().strip().lower() if hasattr(self, "tb_search") else ""
         audience = self.rb_audience.currentText().strip().lower() if hasattr(self, "rb_audience") else "all audiences"
@@ -3137,10 +3413,12 @@ class MainWindow(QMainWindow):
         valid_ids = {row.key for row in adapters}
         if self.rb_selected_id and self.rb_selected_id not in valid_ids:
             self.rb_selected_id = adapters[0].key if adapters else ""
-        if (not self.rb_selected_id) and adapters:
+        if (not self.rb_selected_id) and adapters and not guided_basic:
             self.rb_selected_id = adapters[0].key
-        if self.rb_selected_id:
+        if self.rb_selected_id and not guided_basic:
             self._set_runbook_selection(self.rb_selected_id)
+        if guided_basic and adapters:
+            self.rb_selected_id = ""
 
     def _set_runbook_selection(self, rid: str) -> None:
         if not rid:
@@ -3165,9 +3443,17 @@ class MainWindow(QMainWindow):
         if t is None:
             return
         sid = self._ensure_active_session(f"Tool: {t.title}")
+        run_id = self.run_event_bus.create_run(
+            name=f"Tool: {t.title}",
+            risk="Safe",
+            session_id=sid,
+            metadata={"tool_id": t.id},
+        )
 
         def task(progress_cb: Any, partial_cb: Any, log_cb: Any, cancel_event: Any, timeout_s: int) -> dict[str, Any]:
-            del partial_cb, cancel_event
+            del partial_cb
+            if cancel_event.is_set():
+                return {"code": 130, "cancelled": True, "user_message": "Launch cancelled."}
             progress_cb(15, "Launching tool")
             log_cb(f"[tool] {t.id} -> {t.command}")
             if t.command.startswith("ms-"):
@@ -3180,7 +3466,14 @@ class MainWindow(QMainWindow):
                     code, out = 1, str(exc)
             else:
                 parts = t.command.split()
-                result = run_command(parts, timeout_s=max(8, timeout_s), on_stdout_line=log_cb, on_stderr_line=lambda line: log_cb(f"[stderr] {line}"))
+                result = run_command(
+                    parts,
+                    timeout_s=max(8, timeout_s),
+                    on_stdout_line=log_cb,
+                    on_stderr_line=lambda line: log_cb(f"[stderr] {line}"),
+                    event_bus=self.run_event_bus,
+                    run_id=run_id,
+                )
                 code, out = result.code, result.combined
             out_dir = ensure_dirs()["state"] / "tool_runs" / sid
             out_dir.mkdir(parents=True, exist_ok=True)
@@ -3236,9 +3529,13 @@ class MainWindow(QMainWindow):
             next_steps="Use script tasks for deeper evidence capture and export.",
             rerun_cb=lambda: self._launch_tool_payload(t.id),
             evidence_root=str(ensure_dirs()["state"] / "tool_runs" / sid),
+            run_id=run_id,
         )
 
     def _on_tool_launch_result(self, payload: dict[str, Any]) -> None:
+        if payload.get("cancelled"):
+            self.toasts.show_toast("Tool launch cancelled.")
+            return
         code = int(payload.get("code", 1))
         self._append_action(
             {
@@ -4040,6 +4337,7 @@ class MainWindow(QMainWindow):
         self._rebuild_diagnose_sections([])
         self._update_diagnose_context({})
         self._refresh_evidence_items()
+        self._rebuild_report_tree()
         self._refresh_run_center()
         self._refresh_home_changes()
         self._update_context_labels()
@@ -4131,6 +4429,7 @@ class MainWindow(QMainWindow):
         self.settings_state.theme_palette = palette_key_from_label(self.s_palette.currentText()); self.settings_state.theme_mode = self.s_mode.currentText(); self.settings_state.density = self.s_density.currentText()
         if hasattr(self, "s_ui_mode"):
             self.settings_state.ui_mode = "pro" if self.s_ui_mode.currentText().strip().lower() == "pro" else "basic"
+        self.layout_policy_state = layout_policy(self.settings_state)
         if self.settings_state.ui_mode == "basic":
             if self.settings_state.show_admin_tools and self.settings_state.safe_only_mode:
                 self.settings_state.safe_only_mode = False
@@ -4154,8 +4453,9 @@ class MainWindow(QMainWindow):
         self._refresh_home_favorites()
         self._apply_mode_visibility()
         self._apply_theme()
-        if self.concierge.collapsed == self.s_panel.isChecked():
-            self._set_concierge_collapsed(not self.s_panel.isChecked(), persist=False)
+        desired_open = self.s_panel.isChecked() and self.layout_policy_state.right_panel_default_open
+        if self.concierge.collapsed == desired_open:
+            self._set_concierge_collapsed(not desired_open, persist=False)
         self._update_weekly_status()
         self._update_context_labels()
         self.toasts.show_toast("Settings saved.")

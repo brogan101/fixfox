@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import signal
 import subprocess
 import threading
 import time
@@ -56,6 +58,8 @@ def _pump_stream(
     stream_type: str = RunEventType.STDOUT,
 ) -> None:
     try:
+        if stream is None:
+            return
         while True:
             line = stream.readline()
             if line == "":
@@ -88,6 +92,8 @@ def run_command(
     popen_kwargs: dict[str, Any] = {}
     if subprocess.os.name == "nt":
         popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+    else:
+        popen_kwargs["start_new_session"] = True
     try:
         if event_bus is not None and run_id:
             event_bus.publish(run_id, RunEventType.START, message="Process started.", data={"cmd": list(cmd)})
@@ -134,6 +140,7 @@ def run_command(
     err_thread.start()
 
     try:
+        last_heartbeat = start
         while process.poll() is None:
             if cancel_event and cancel_event.is_set():
                 cancelled = True
@@ -143,6 +150,16 @@ def run_command(
                 timed_out = True
                 _terminate_process_tree(process)
                 break
+            now = time.monotonic()
+            if event_bus is not None and run_id and now - last_heartbeat >= 1.0:
+                elapsed = int(max(0.0, now - start))
+                event_bus.publish(
+                    run_id,
+                    RunEventType.PROGRESS,
+                    message=f"Running... {elapsed}s elapsed.",
+                    data={"elapsed_s": elapsed},
+                )
+                last_heartbeat = now
             time.sleep(0.05)
     finally:
         try:
@@ -169,13 +186,13 @@ def run_command(
         stderr_lines.append("Timed out.")
         _emit(on_stderr_line, "Timed out.")
         if event_bus is not None and run_id:
-            event_bus.publish(run_id, RunEventType.WARNING, message="Command timed out.")
+            event_bus.publish(run_id, RunEventType.WARNING, message="Command timed out.", data={"code": 124})
         code = 124
     elif cancelled or (cancel_event and cancel_event.is_set()):
         stderr_lines.append("Cancelled.")
         _emit(on_stderr_line, "Cancelled.")
         if event_bus is not None and run_id:
-            event_bus.publish(run_id, RunEventType.WARNING, message="Command cancelled.")
+            event_bus.publish(run_id, RunEventType.WARNING, message="Command cancelled.", data={"code": 130})
         code = 130
     if event_bus is not None and run_id:
         level = RunEventType.END if code == 0 else RunEventType.ERROR
@@ -204,6 +221,14 @@ def _terminate_process_tree(process: subprocess.Popen[str]) -> None:
                 check=False,
                 timeout=3,
             )
+            return
+        except Exception:
+            ...
+    else:
+        try:
+            pgid = os.getpgid(process.pid)
+            os.killpg(pgid, signal.SIGTERM)
+            process.wait(timeout=1.5)
             return
         except Exception:
             ...

@@ -158,6 +158,10 @@ QToolButton#KebabMenuButton:pressed,
 QToolButton#MoreButton:pressed {{
   background: {_alpha(tokens.accent_pressed, 0.34)};
 }}
+QPushButton#SoftButton:checked {{
+  background: {_alpha(tokens.accent, 0.22)};
+  border-color: {outline};
+}}
 QPushButton#PrimaryButton:focus,
 QPushButton#SoftButton:focus,
 QToolButton#IconButton:focus,
@@ -206,6 +210,9 @@ QLineEdit#SearchInput, QComboBox, QTextEdit, QTreeWidget {{
   border: 1px solid {subtle_line};
   border-radius: {d.corner_radius}px;
 }}
+QAbstractScrollArea {{
+  background: {_alpha(tokens.panel2, 0.84)};
+}}
 QLineEdit#SearchInput {{
   min-height: {d.input_height}px;
   padding: 0 10px;
@@ -246,6 +253,9 @@ QScrollBar::handle:vertical {{
 QScrollBar::handle:vertical:hover {{
   background: {_alpha(tokens.accent, 0.78)};
 }}
+QScrollBar::handle:vertical:pressed {{
+  background: {_alpha(tokens.accent_pressed, 0.88)};
+}}
 QScrollBar:horizontal {{
   background: {_alpha(tokens.panel2, 0.74)};
   height: {scroll_size}px;
@@ -260,6 +270,9 @@ QScrollBar::handle:horizontal {{
 }}
 QScrollBar::handle:horizontal:hover {{
   background: {_alpha(tokens.accent, 0.78)};
+}}
+QScrollBar::handle:horizontal:pressed {{
+  background: {_alpha(tokens.accent_pressed, 0.88)};
 }}
 QScrollBar::add-line:vertical,
 QScrollBar::sub-line:vertical,
@@ -324,6 +337,9 @@ QSplitter::handle:horizontal {{
 QSplitter::handle:horizontal:hover {{
   background: {_alpha(tokens.accent, 0.48)};
 }}
+QSplitter::handle:horizontal:pressed {{
+  background: {_alpha(tokens.accent_pressed, 0.56)};
+}}
 QSplitter::handle:vertical {{
   height: {splitter_size}px;
   margin: 0 4px;
@@ -332,6 +348,9 @@ QSplitter::handle:vertical {{
 }}
 QSplitter::handle:vertical:hover {{
   background: {_alpha(tokens.accent, 0.48)};
+}}
+QSplitter::handle:vertical:pressed {{
+  background: {_alpha(tokens.accent_pressed, 0.56)};
 }}
 QFrame#AccordionHeader {{
   background: {_alpha(tokens.panel2, 0.92)};

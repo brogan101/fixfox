@@ -1,88 +1,71 @@
-# Fix Fox UI Style Guide
+# UI STYLE GUIDE
 
-Date: 2026-03-03  
-Scope: Release polish baseline for all PySide6 surfaces
-
-## 1) Design Tokens
+## Design system source
+- Theme tokens: `src/ui/theme.py`
+- Global styling: `src/ui/app_qss.py`
+- Layout/density guardrails: `src/ui/layout_guardrails.py`
 
 ## Typography
-- Base font family: `Segoe UI` stack (`"Segoe UI", "Segoe UI Variable", Arial, sans-serif`)
-- Scale:
-  - Title: 22px
-  - Section: 14px
-  - Body: 13px (comfortable) / 12px (compact)
-  - Caption: 12px / 11px equivalent in compact surfaces
+- Font family: `Segoe UI` (with system fallbacks)
+- Title/H1: `22px`
+- Section/H2: `14px`
+- Body: `13px` (comfortable), `12px` (compact)
+- Caption/Subtext: `12px`
+- Monospace only for live command/log output: `Consolas`
 
-## Spacing
-- Use token scale only:
-  - `xs=6`
-  - `sm=10`
-  - `md=14`
-  - `lg=18`
-  - `xl=22`
-- Card spacing/padding is density-driven from `DensityTokens`.
+## Spacing scale
+Use only this scale for margins/padding/gaps:
+- `6`, `10`, `14`, `18`, `22`
 
-## Radius
-- Small radius: `12`
+## Corner radius + borders
+- Small radius: `12` (comfortable), `10` (compact)
 - Medium radius: `16`
-- Controls and cards must use tokenized corner radius values, not ad-hoc values.
+- Border thickness: `1px` (default), `2px` only for explicit focus/error emphasis
 
-## Density
-- Supported densities:
-  - `comfortable`
-  - `compact`
-- Density governs:
-  - nav row height
-  - list row height
-  - button/input height
-  - icon size
-  - card padding
+## Density tokens
+From `DensityTokens`:
+- Comfortable:
+  - `nav_item_height: 40`
+  - `list_row_height: 66`
+  - `button_height: 36`
+  - `input_height: 34`
+- Compact:
+  - `nav_item_height: 34`
+  - `list_row_height: 56`
+  - `button_height: 32`
+  - `input_height: 30`
 
-## 2) Color and Theme Rules
+## Color/palette rules
+- Single source: `ThemeTokens` only.
+- Supported palettes: Graphite, Slate, Indigo, Mono.
+- Accent color is CTA-focused; avoid using accent as default background everywhere.
+- No ad-hoc page-level hardcoded UI colors in app shell widgets.
 
-- Theme tokens are the source of truth for in-app colors.
-- Semantic tones (`ok/warn/crit/info`) are contextual accents only.
-- Accent color usage:
-  - primary CTAs
-  - focused/selected affordances
-  - not for full-page fills
-- Scrollbars and splitters must inherit theme token colors.
+## Scrollbar spec
+Themed in `app_qss.py` for both axes.
+- Thickness:
+  - Comfortable: `12px`
+  - Compact: `10px`
+- States:
+  - Track
+  - Handle
+  - Hover
+  - Pressed
+  - Add/sub line hidden
+- Background and border always theme-token driven.
 
-## 3) Component Rules
+## Splitter spec
+Themed in `app_qss.py`.
+- Handle thickness:
+  - Comfortable: `8px`
+  - Compact: `6px`
+- States:
+  - Base
+  - Hover
+  - Pressed
+- Subtle contrast, no bright separators.
 
-- `Card` is the default container for page sections.
-- `BaseRow` derivatives are the only row pattern in list directories.
-- `DrawerCard` is the standard expandable details shell.
-- `ToolRunnerWindow` is the only execution/output monitor for tools, fixes, and runbooks.
-- Page headers follow one structure:
-  - title
-  - short subtitle
-  - optional primary CTA
-  - help icon
-
-## 4) Navigation and Settings
-
-- Main nav and settings nav use the same row-widget pattern (icon + label + shared sizing).
-- Nav row height and icon size must follow density tokens.
-- Settings search is always available at top of settings tools area.
-
-## 5) Scroll and Layout Policy
-
-- Any page with growable vertical content must be wrapped in themed scroll containers.
-- Default Qt scrollbar visuals are not allowed.
-- Splitter handles must be themed and have hover feedback.
-- Minimum window size guardrail must be enforced and right panel auto-collapse respected.
-
-## 6) Interaction States
-
-- All interactive controls must have:
-  - hover state
-  - focus state
-  - pressed/active state
-- Focus outlines use accent-derived token styling.
-
-## 7) Prohibited Patterns
-
-- No widget-level random styling outside tokenized QSS.
-- No embedded raw execution output widgets in page bodies.
-- No button soup: use directories/search/context actions.
+## Consistency rules
+- Shared row widgets (`ToolRow`, `FixRow`, `FindingRow`, `SessionRow`) define row behavior and alignment.
+- Shared cards (`Card`, `DrawerCard`, `EmptyState`) define page section styling.
+- Avoid page-specific inline QSS overrides.

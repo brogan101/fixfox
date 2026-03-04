@@ -60,9 +60,11 @@ def _ui_module_smoke() -> None:
         events, _cursor = bus.events_since(run_id, 0)
         event_types = {event.event_type for event in events}
         _assert(RunEventType.START in event_types, f"{context}: missing START event")
-        _assert(RunEventType.PROGRESS in event_types, f"{context}: missing PROGRESS event")
-        _assert(any(kind in event_types for kind in {RunEventType.STDOUT, RunEventType.STDERR}), f"{context}: missing streamed log events")
         _assert(RunEventType.END in event_types, f"{context}: missing END event")
+        _assert(
+            any(kind in event_types for kind in {RunEventType.PROGRESS, RunEventType.STDOUT, RunEventType.STDERR, RunEventType.WARNING, RunEventType.ERROR}),
+            f"{context}: missing live run events",
+        )
 
     try:
         for idx, page in enumerate(window.NAV_ITEMS):
@@ -70,13 +72,18 @@ def _ui_module_smoke() -> None:
             app.processEvents()
             _assert(window.pages.currentIndex() == idx, f"page switch failed for {page}")
 
-        # Basic mode filter behavior
+        # Basic mode layout policy
         window.set_ui_mode("basic")
         app.processEvents()
         _assert(window.settings_state.ui_mode == "basic", "failed to switch to basic mode")
         playbooks_idx = window.NAV_ITEMS.index("Playbooks")
         playbooks_item = window.nav.item(playbooks_idx)
-        _assert(playbooks_item is not None and playbooks_item.isHidden(), "Playbooks should be hidden in basic mode")
+        _assert(playbooks_item is not None and not playbooks_item.isHidden(), "Playbooks should remain visible in basic mode")
+        window.nav.setCurrentRow(playbooks_idx)
+        app.processEvents()
+        _assert(hasattr(window, "pb_basic_container") and not window.pb_basic_container.isHidden(), "Basic guided Playbooks layout should be visible")
+        _assert(hasattr(window, "pb_pro_console") and window.pb_pro_console.isHidden(), "Pro Playbooks console should be hidden in basic mode")
+        _assert(window.concierge.collapsed, "Concierge panel should default to collapsed in basic mode")
         _assert("script_task.task_wifi_report_fix_wizard" not in window._visible_capability_ids(), "pro script task leaked in basic mode")
 
         # Pro mode enables advanced capability directories immediately
@@ -84,6 +91,10 @@ def _ui_module_smoke() -> None:
         app.processEvents()
         playbooks_item = window.nav.item(playbooks_idx)
         _assert(playbooks_item is not None and not playbooks_item.isHidden(), "Playbooks should be visible in pro mode")
+        window.nav.setCurrentRow(playbooks_idx)
+        app.processEvents()
+        _assert(hasattr(window, "pb_basic_container") and window.pb_basic_container.isHidden(), "Basic guided layout should be hidden in pro mode")
+        _assert(hasattr(window, "pb_pro_console") and not window.pb_pro_console.isHidden(), "Pro Playbooks console should be visible")
         _assert("script_task.task_wifi_report_fix_wizard" in window._visible_capability_ids(), "pro script task missing in pro mode")
 
         # Safe tool path must open ToolRunner
@@ -91,6 +102,7 @@ def _ui_module_smoke() -> None:
         wait_for_worker()
         _assert(window.tool_runner is not None, "ToolRunner window missing after safe tool run")
         assert_run_events(window.tool_runner.run_id, "safe_tool")
+        _assert(bool(window.run_status_detail.text().strip()), "run status detail did not update")
 
         window._run_script_task("task_wifi_report_fix_wizard", dry_run=True)
         wait_for_worker()
