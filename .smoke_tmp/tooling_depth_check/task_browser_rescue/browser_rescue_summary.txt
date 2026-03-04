@@ -1,0 +1,35 @@
+Browser Rescue Summary
+
+What we checked:
+- Detected default browser association.
+- Collected browser profile paths only (no content).
+- Collected WinHTTP proxy output and DNS adapter lines.
+- Collected browser version information (best effort).
+- Enumerated extension folder counts (best effort).
+
+What we found:
+- Default browser ProgId: MSEdgeHTM
+- Profile paths found: 1
+- Proxy summary: Current WinHTTP proxy settings:
+
+    Direct access (no proxy server).
+- DNS lines captured: 1
+- Edge: 145.0.3800.82
+- C:\Users\<user>\AppData\Local\Microsoft\Edge\User Data\Default\Extensions: 2 extension folders (best effort)
+
+What we changed:
+- No browser settings were changed automatically.
+- Use guided links to clear cache, disable extensions, or reset settings manually.
+
+Next steps:
+- Chrome settings: chrome://settings/reset
+- Edge settings: edge://settings/reset
+- Open Network Status if pages still fail after browser checks.
+
+Technical appendix:
+- default_browser=MSEdgeHTM
+- profile_paths_file=.smoke_tmp\tooling_depth_check\task_browser_rescue\browser_profile_paths.txt
+- context_json=.smoke_tmp\tooling_depth_check\task_browser_rescue\browser_context.json
+- proxy_code=0
+- dns_code=0
+- versions_code=0

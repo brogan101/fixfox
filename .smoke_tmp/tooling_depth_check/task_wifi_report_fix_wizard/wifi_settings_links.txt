@@ -1,0 +1,3 @@
+ms-settings:network-status
+ms-settings:network-wifi
+ms-settings:network-proxy

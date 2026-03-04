@@ -1,0 +1,13 @@
+{
+  "task_id": "task_proxy_show",
+  "title": "WinHTTP Proxy",
+  "command": [
+    "netsh",
+    "winhttp",
+    "show",
+    "proxy"
+  ],
+  "code": 0,
+  "stdout": "\nCurrent WinHTTP proxy settings:\n\n    Direct access (no proxy server).\n",
+  "stderr": ""
+}

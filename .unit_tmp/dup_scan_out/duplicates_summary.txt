@@ -1,0 +1,21 @@
+Duplicate Finder Summary
+
+What we checked:
+- Scanned candidate files and grouped exact hash matches.
+
+What we found:
+- duplicate_groups=1
+- rows=2
+- root=C:\Users\<user>\Desktop\IT Core\.unit_tmp\dup_scan_fixture
+
+What we changed:
+- No files were deleted. Preview-only duplicate report generated.
+
+Next steps:
+- Validate duplicate groups before deleting anything.
+- If deleting, use Recycle Bin only.
+- Export the report for peer review in IT workflows.
+
+Technical appendix:
+- csv=C:\Users\<user>\Desktop\IT Core\.unit_tmp\dup_scan_out\duplicates_report.csv
+- json=C:\Users\<user>\Desktop\IT Core\.unit_tmp\dup_scan_out\duplicates_summary.txt

@@ -1,0 +1,1 @@
+Fix Fox helps users diagnose common Windows issues, apply safe fixes, and generate share-safe support packs locally.

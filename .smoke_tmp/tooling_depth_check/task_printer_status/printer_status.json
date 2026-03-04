@@ -1,0 +1,27 @@
+{
+    "spooler":  {
+                    "Name":  "Spooler",
+                    "Status":  4,
+                    "StartType":  2
+                },
+    "printers":  [
+                     {
+                         "Name":  "OneNote (Desktop)",
+                         "DriverName":  "Send to Microsoft OneNote 16 Driver",
+                         "PortName":  "nul:",
+                         "PrinterStatus":  0
+                     },
+                     {
+                         "Name":  "Microsoft XPS Document Writer",
+                         "DriverName":  "Microsoft XPS Document Writer v4",
+                         "PortName":  "PORTPROMPT:",
+                         "PrinterStatus":  0
+                     },
+                     {
+                         "Name":  "Microsoft Print to PDF",
+                         "DriverName":  "Microsoft Print To PDF",
+                         "PortName":  "PORTPROMPT:",
+                         "PrinterStatus":  0
+                     }
+                 ]
+}

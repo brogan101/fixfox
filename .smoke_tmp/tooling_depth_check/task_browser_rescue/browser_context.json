@@ -1,0 +1,14 @@
+{
+  "default_browser": "MSEdgeHTM",
+  "versions": [
+    "Edge: 145.0.3800.82"
+  ],
+  "profiles_found": [
+    "C:\\Users\\btheobald\\AppData\\Local\\Microsoft\\Edge\\User Data"
+  ],
+  "proxy_code": 0,
+  "dns_code": 0,
+  "dns_lines": [
+    "DNS Servers . . . . . . . . . . . : <ip>"
+  ]
+}

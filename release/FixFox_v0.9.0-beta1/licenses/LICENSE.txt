@@ -1,0 +1,12 @@
+Fix Fox License
+
+Copyright (c) 2026 Fix Fox
+
+Permission is granted to use this software for personal or business support workflows,
+subject to applicable law and local policy.
+
+You may not redistribute altered binaries under the same product identity without
+clear attribution and version differentiation.
+
+This product bundles third-party components that retain their own licenses.
+See dependency metadata for details.

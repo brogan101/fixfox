@@ -1,0 +1,39 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class ToolItem:
+    id: str
+    title: str
+    desc: str
+    category: str
+    command: str
+    plain: str
+
+
+TOOL_DIRECTORY: tuple[ToolItem, ...] = (
+    ToolItem("tool_storage", "Storage Settings", "Open storage settings.", "evidence", "ms-settings:storagesense", "Open built-in storage cleanup settings."),
+    ToolItem("tool_network", "Network Status", "Open network status page.", "network", "ms-settings:network-status", "Open network diagnostics entry points."),
+    ToolItem("tool_windows_update", "Windows Update", "Open update settings.", "updates", "ms-settings:windowsupdate", "Open update settings and status."),
+    ToolItem("tool_apps", "Installed Apps", "Open apps list.", "evidence", "ms-settings:appsfeatures", "Review installed applications."),
+    ToolItem("tool_device_manager", "Device Manager", "Open Device Manager.", "integrity", "devmgmt.msc", "Inspect driver and hardware errors."),
+    ToolItem("tool_event_viewer", "Event Viewer", "Open Event Viewer.", "evidence", "eventvwr.msc", "Inspect system and application logs."),
+    ToolItem("tool_services", "Services", "Open Services MMC.", "printer", "services.msc", "Inspect and restart services."),
+    ToolItem("tool_reliability", "Reliability Monitor", "Open reliability monitor.", "integrity", "perfmon /rel", "Review stability timeline."),
+    ToolItem("tool_get_help", "Get Help", "Open Microsoft Get Help.", "network", "ms-contact-support:", "Launch guided troubleshooting."),
+    ToolItem("tool_feedback", "Feedback Hub", "Open Feedback Hub.", "evidence", "feedback-hub:", "Open Windows feedback tool."),
+    ToolItem("tool_print_mgmt", "Print Management", "Open print management.", "printer", "printmanagement.msc", "Inspect printers and queues."),
+    ToolItem("tool_cmd_admin", "Terminal (Admin Prompt)", "Open elevated terminal prompt manually.", "integrity", "powershell", "Run advanced commands with admin consent."),
+)
+
+
+TOP_TOOLS: tuple[ToolItem, ...] = TOOL_DIRECTORY[:10]
+
+
+def search_tools(query: str) -> list[ToolItem]:
+    q = query.strip().lower()
+    if not q:
+        return list(TOOL_DIRECTORY)
+    return [tool for tool in TOOL_DIRECTORY if q in tool.title.lower() or q in tool.desc.lower() or q in tool.category.lower()]

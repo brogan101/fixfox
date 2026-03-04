@@ -1,0 +1,27 @@
+Printer Rescue Summary
+
+What we checked:
+- Collected spooler service state and printer inventory.
+- Collected print queue snapshot (best effort).
+- Attempted PrintService operational event log export (.evtx).
+
+What we found:
+- spooler_status_code=0
+- queue_code=1
+- printservice_evtx_code=0
+- Optional admin restart not requested.
+
+What we changed:
+- No printer settings were changed by default.
+- Optional admin spooler restart can be enabled when needed.
+
+Next steps:
+- If jobs are stuck, run Restart Print Spooler (admin).
+- If issue persists, run Home: Printer Rescue runbook and export Ticket Pack.
+- Share printer summary plus EVTX evidence with IT.
+
+Technical appendix:
+- status_json=.smoke_tmp\tooling_depth_check\task_printer_status\printer_status.json
+- queue_json=.smoke_tmp\tooling_depth_check\task_printer_status\printer_queue.json
+- evtx_path=.smoke_tmp\tooling_depth_check\task_printer_status\printservice_operational.evtx
+- restart_code=-1

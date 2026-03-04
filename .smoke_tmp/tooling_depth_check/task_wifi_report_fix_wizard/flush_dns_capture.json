@@ -1,0 +1,11 @@
+{
+  "task_id": "task_dns_flush",
+  "title": "Flush DNS",
+  "command": [
+    "ipconfig",
+    "/flushdns"
+  ],
+  "code": 0,
+  "stdout": "\nWindows IP Configuration\n\nSuccessfully flushed the DNS Resolver Cache.",
+  "stderr": ""
+}

@@ -1,0 +1,5 @@
+PySide6>=6.7.0
+psutil>=5.9.8
+pillow>=10.4.0
+# Dev/build dependency (not required for normal app runtime)
+pyinstaller>=6.0.0
