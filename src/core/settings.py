@@ -23,8 +23,8 @@ class AppSettings:
     weekly_reminder_day: int = 0
     last_weekly_check_utc: str = ""
     pinned_actions: list[str] | None = None
-    theme_palette: str = "fixfox_graphite"
-    theme_mode: str = "dark"
+    theme_palette: str = "fixfox_m3"
+    theme_mode: str = "light"
     density: str = "comfortable"
     ui_mode: str = "basic"
     favorites_fixes: list[str] | None = None

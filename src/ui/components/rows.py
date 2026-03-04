@@ -102,6 +102,11 @@ class BaseRow(QFrame):
         shell = QHBoxLayout(self)
         shell.setSpacing(spacing("sm"))
 
+        self.icon_slot = QLabel()
+        self.icon_slot.setObjectName("RowIconSlot")
+        self.icon_slot.setFixedSize(24, 24)
+        self.icon_slot.setAlignment(Qt.AlignCenter)
+
         left = QVBoxLayout()
         left.setContentsMargins(0, 0, 0, 0)
         left.setSpacing(3)
@@ -118,6 +123,7 @@ class BaseRow(QFrame):
         self.right_container.setContentsMargins(0, 0, 0, 0)
         self.right_container.setSpacing(spacing("xs"))
 
+        shell.addWidget(self.icon_slot, 0, Qt.AlignTop)
         shell.addLayout(left, 1)
         shell.addLayout(self.right_container, 0)
         self.set_density(density)
@@ -139,6 +145,16 @@ class BaseRow(QFrame):
     def set_subtitle(self, text: str) -> None:
         self.subtitle.setText(text)
         self.subtitle.setToolTip(text)
+
+    def set_leading_icon(self, icon_name: str) -> None:
+        if not icon_name:
+            self.icon_slot.clear()
+            return
+        icon = get_icon(icon_name, self)
+        if icon.isNull():
+            self.icon_slot.clear()
+            return
+        self.icon_slot.setPixmap(icon.pixmap(20, 20))
 
     def set_selected(self, selected: bool) -> None:
         self._selected = selected
@@ -208,6 +224,7 @@ class FindingRow(BaseRow):
         actions: list[QAction] | None = None,
     ) -> None:
         super().__init__(payload, density=density)
+        self.set_leading_icon("diagnose")
         self.set_title(title)
         self.set_subtitle(subtitle)
         self.status = Badge(status_badge, kind=status_badge)
@@ -237,6 +254,7 @@ class FixRow(BaseRow):
         density: str = "comfortable",
     ) -> None:
         super().__init__(payload, density=density)
+        self.set_leading_icon("fixes")
         self.set_title(title)
         self.set_subtitle(subtitle)
         self.risk = Badge(risk_badge, kind=risk_badge, risk=True)
@@ -261,6 +279,7 @@ class SessionRow(BaseRow):
         density: str = "comfortable",
     ) -> None:
         super().__init__(payload, density=density)
+        self.set_leading_icon("history")
         self.set_title(f"{symptom}  [{session_id}]")
         self.set_subtitle(summary)
         stamp = QLabel(timestamp or "n/a")
@@ -283,6 +302,7 @@ class ToolRow(BaseRow):
         density: str = "comfortable",
     ) -> None:
         super().__init__(payload, density=density)
+        self.set_leading_icon("toolbox")
         self.set_title(title)
         self.set_subtitle(subtitle)
         self.category = Badge(category_chip, "INFO")

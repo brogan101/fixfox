@@ -87,7 +87,9 @@ class ToolRunnerWindow(QDialog):
         self.lbl_risk = QLabel(f"Risk: {risk}")
         self.lbl_session = QLabel(f"Session: {session_id or 'n/a'}")
         self.lbl_elapsed = QLabel("Elapsed: 0s")
-        self.lbl_status = QLabel("Status: Running")
+        self.lbl_status = QLabel("Running")
+        self.lbl_status.setObjectName("RunnerStatusChip")
+        self._set_status_chip("Running")
         row.addWidget(self.lbl_risk)
         row.addWidget(self.lbl_session)
         row.addWidget(self.lbl_elapsed)
@@ -140,7 +142,7 @@ class ToolRunnerWindow(QDialog):
 
         controls = QHBoxLayout()
         self.btn_cancel = SoftButton("Cancel")
-        self.btn_copy_summary = SoftButton("Copy Simple Summary")
+        self.btn_copy_summary = SoftButton("Copy Summary")
         self.btn_export = PrimaryButton("Export Pack")
         self.btn_more = QToolButton()
         self.btn_more.setObjectName("MoreButton")
@@ -179,8 +181,34 @@ class ToolRunnerWindow(QDialog):
         if self._last_status == "Running" and not self._received_output:
             self._spinner_index = (self._spinner_index + 1) % len(self._spinner_frames)
             spinner = self._spinner_frames[self._spinner_index]
-            self.lbl_status.setText(f"Status: Running {spinner}")
+            self.lbl_status.setText(f"Running {spinner}")
             self.txt_output.setPlaceholderText(f"{self._running_hint} Elapsed: {elapsed}s")
+
+    def _set_status_chip(self, status: str) -> None:
+        text = str(status or "").strip() or "Running"
+        key = text.lower()
+        if key.startswith("run"):
+            kind = "info"
+            label = "Running"
+        elif key.startswith("complete"):
+            kind = "ok"
+            label = "Completed"
+        elif key.startswith("partial"):
+            kind = "warn"
+            label = "Partial"
+        elif key.startswith("cancel"):
+            kind = "warn"
+            label = "Cancelled"
+        elif key.startswith("fail"):
+            kind = "crit"
+            label = "Failed"
+        else:
+            kind = "info"
+            label = text
+        self.lbl_status.setProperty("kind", kind)
+        self.lbl_status.setText(label)
+        self.lbl_status.style().unpolish(self.lbl_status)
+        self.lbl_status.style().polish(self.lbl_status)
 
     def attach_event_bus(self, event_bus: RunEventBus | None, run_id: str) -> None:
         self._unsubscribe_event_bus()
@@ -209,12 +237,12 @@ class ToolRunnerWindow(QDialog):
         message = str(event.message or "").strip()
         if kind == RunEventType.START:
             self._last_status = "Running"
-            self.lbl_status.setText("Status: Running")
+            self._set_status_chip("Running")
             if message:
                 self._queue_output_line(f"[start] {message}", "status")
             return
         if kind == RunEventType.STATUS:
-            self.lbl_status.setText("Status: Running")
+            self._set_status_chip("Running")
             if message:
                 self._queue_output_line(f"[status] {message}", "status")
             return
@@ -222,7 +250,7 @@ class ToolRunnerWindow(QDialog):
             pct = int(event.progress if event.progress is not None else 0)
             self.progress.setRange(0, 100)
             self.progress.setValue(max(0, min(100, pct)))
-            self.lbl_status.setText(f"Status: Running ({pct}%)")
+            self.lbl_status.setText(f"Running ({pct}%)")
             if message:
                 self._queue_output_line(f"[progress] {pct}% {message}", "progress")
             return
@@ -258,7 +286,7 @@ class ToolRunnerWindow(QDialog):
                     self._last_status = "Completed"
                 else:
                     self._last_status = "Failed"
-                self.lbl_status.setText(f"Status: {self._last_status}")
+                self._set_status_chip(self._last_status)
             if message:
                 self._queue_output_line(f"[end] {message}", "status")
 
@@ -306,7 +334,7 @@ class ToolRunnerWindow(QDialog):
         )
 
     def on_progress(self, pct: int, text: str) -> None:
-        self.lbl_status.setText(f"Status: Running ({pct}%)")
+        self.lbl_status.setText(f"Running ({pct}%)")
         self.progress.setRange(0, 100)
         self.progress.setValue(max(0, min(100, pct)))
         if text:
@@ -316,7 +344,7 @@ class ToolRunnerWindow(QDialog):
         self._queue_output_line(line, "stdout")
 
     def on_partial(self, payload: Any) -> None:
-        self.lbl_status.setText("Status: Partial update")
+        self._set_status_chip("Partial")
         if isinstance(payload, dict):
             self._queue_output_line("[partial] " + json.dumps(payload, ensure_ascii=False)[:1400], "status")
 
@@ -346,7 +374,7 @@ class ToolRunnerWindow(QDialog):
             self._last_status = "Failed"
         else:
             self._last_status = "Completed"
-        self.lbl_status.setText(f"Status: {self._last_status}")
+        self._set_status_chip(self._last_status)
         self.progress.setRange(0, 100)
         self.progress.setValue(100)
         self.btn_cancel.setEnabled(False)
@@ -373,7 +401,7 @@ class ToolRunnerWindow(QDialog):
     def on_error(self, message: str) -> None:
         self._drain_event_bus()
         self._last_status = "Failed"
-        self.lbl_status.setText("Status: Failed")
+        self._set_status_chip("Failed")
         self.btn_cancel.setEnabled(False)
         reason = self._parse_reason(message)
         self._queue_output_line("[error] " + reason, "error")
@@ -398,7 +426,7 @@ class ToolRunnerWindow(QDialog):
     def on_cancelled(self) -> None:
         self._drain_event_bus()
         self._last_status = "Cancelled"
-        self.lbl_status.setText("Status: Cancelled")
+        self._set_status_chip("Cancelled")
         self.btn_cancel.setEnabled(False)
         self._queue_output_line("[cancelled] Cancellation requested.", "status")
         self._drain_event_bus()

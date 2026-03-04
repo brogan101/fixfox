@@ -17,10 +17,19 @@ from .theme import resolve_density_tokens
 
 
 class Card(QFrame):
-    def __init__(self, title: str, subtitle: str = "", right_widget: QWidget | None = None, object_name: str = "Card", density: str = "comfortable"):
+    def __init__(
+        self,
+        title: str,
+        subtitle: str = "",
+        right_widget: QWidget | None = None,
+        object_name: str = "Card",
+        density: str = "comfortable",
+        elevation: int = 1,
+    ):
         super().__init__()
         self._density = density
         self.setObjectName(object_name)
+        self.setProperty("elevation", max(0, min(2, int(elevation))))
         self.setFrameShape(QFrame.NoFrame)
         self.layout_main = QVBoxLayout(self)
         self.layout_main.setContentsMargins(14, 12, 14, 12)
@@ -60,6 +69,28 @@ class Pill(QLabel):
         self.setMinimumHeight(24)
 
 
+class Chip(QLabel):
+    def __init__(self, text: str, selected: bool = False):
+        super().__init__(text)
+        self.setObjectName("Chip")
+        self.setAlignment(Qt.AlignCenter)
+        self.set_selected(selected)
+        self.setMinimumHeight(24)
+
+    def set_selected(self, selected: bool) -> None:
+        self.setProperty("state", "selected" if selected else "normal")
+        self.style().unpolish(self)
+        self.style().polish(self)
+
+
+class Badge(QLabel):
+    def __init__(self, text: str):
+        super().__init__(text)
+        self.setObjectName("Badge")
+        self.setAlignment(Qt.AlignCenter)
+        self.setMinimumHeight(20)
+
+
 class PrimaryButton(QPushButton):
     def __init__(self, text: str):
         super().__init__(text)
@@ -74,6 +105,22 @@ class SoftButton(QPushButton):
     def __init__(self, text: str):
         super().__init__(text)
         self.setObjectName("SoftButton")
+        self.setMinimumHeight(control_height("comfortable") - 2)
+
+    def set_density(self, density: str) -> None:
+        self.setMinimumHeight(resolve_density_tokens(density).button_height - 2)
+
+
+class SecondaryButton(SoftButton):
+    def __init__(self, text: str):
+        super().__init__(text)
+        self.setObjectName("SecondaryButton")
+
+
+class TextButton(QPushButton):
+    def __init__(self, text: str):
+        super().__init__(text)
+        self.setObjectName("TextButton")
         self.setMinimumHeight(control_height("comfortable") - 2)
 
     def set_density(self, density: str) -> None:
@@ -167,3 +214,8 @@ class EmptyState(Card):
         badge.setObjectName("CardTitle")
         badge.setAlignment(Qt.AlignHCenter)
         self.layout_main.insertWidget(0, badge)
+
+
+class DrawerPanel(Card):
+    def __init__(self, title: str, subtitle: str = "", density: str = "comfortable"):
+        super().__init__(title, subtitle, object_name="Drawer", density=density, elevation=2)
