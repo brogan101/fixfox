@@ -108,7 +108,7 @@ class FeedRenderer(QWidget):
         self.list_widget.setSelectionMode(QListWidget.SingleSelection)
         self.list_widget.setContextMenuPolicy(Qt.CustomContextMenu)
         self.list_widget.customContextMenuRequested.connect(self._on_list_context)
-        self.list_widget.itemDoubleClicked.connect(lambda it: self.item_activated.emit(it.data(Qt.UserRole)))
+        self.list_widget.itemDoubleClicked.connect(self._on_item_double_clicked)
         self.list_widget.currentItemChanged.connect(self._sync_row_states)
         layout.addWidget(self.list_widget)
 
@@ -193,6 +193,13 @@ class FeedRenderer(QWidget):
 
     def _on_list_context(self, pos: object) -> None:
         self.context_requested.emit(self.list_widget, pos)
+
+    def _on_item_double_clicked(self, item: QListWidgetItem) -> None:
+        # BaseRow handles activation itself on double-click; avoid duplicate emits.
+        row = self.list_widget.itemWidget(item)
+        if isinstance(row, BaseRow):
+            return
+        self.item_activated.emit(item.data(Qt.UserRole))
 
     def _sync_row_states(self, *_args: object) -> None:
         current = self.list_widget.currentItem()

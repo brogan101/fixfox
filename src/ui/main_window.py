@@ -583,7 +583,7 @@ class MainWindow(QMainWindow):
         self.run_status_icon = QLabel()
         icon_pix = QPixmap(resource_path(ICON_PNG))
         if not icon_pix.isNull():
-            self.run_status_icon.setPixmap(icon_pix.scaled(30, 30, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            self.run_status_icon.setPixmap(icon_pix.scaled(28, 28, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         status_text = QVBoxLayout()
         status_text.setContentsMargins(0, 0, 0, 0)
         status_text.setSpacing(2)
@@ -1413,7 +1413,26 @@ class MainWindow(QMainWindow):
         ll.setContentsMargins(0, 0, 0, 0)
         ll.setSpacing(10)
         self.tb_filter = QComboBox()
-        self.tb_filter.addItems(["All Categories", "Evidence", "Network", "Updates", "Printer", "Integrity", "Browser", "Audio", "Privacy", "Cloud", "Devices", "Office", "Services", "Security", "WMI"])
+        self.tb_filter.addItems(
+            [
+                "All Categories",
+                "Windows Links",
+                "Evidence",
+                "Network",
+                "Updates",
+                "Printer",
+                "Integrity",
+                "Browser",
+                "Audio",
+                "Privacy",
+                "Cloud",
+                "Devices",
+                "Office",
+                "Services",
+                "Security",
+                "WMI",
+            ]
+        )
         self.tb_filter.currentTextChanged.connect(self._refresh_toolbox)
         self.tb_top = FeedRenderer(self._make_tool_row, density=self.settings_state.density, empty_icon="tool", empty_message="No top tools.")
         self.tb_top.item_activated.connect(lambda tid: self._launch_tool_payload(str(tid)))
@@ -1782,9 +1801,10 @@ class MainWindow(QMainWindow):
         if tool is None:
             return
         if hasattr(self, "pb_tool_detail_text"):
+            category_label = self._tool_category_label(tool.category)
             self.pb_tool_detail.title.setText(tool.title)
             self.pb_tool_detail_text.setText(
-                f"{tool.plain}\n\nWhen to use:\n{tool.desc}\n\nCollects/changes:\nLaunches {tool.command}\nSafety: Safe"
+                f"{tool.plain}\n\nWhen to use:\n{tool.desc}\n\nCategory:\n{category_label}\n\nCollects/changes:\nLaunches {tool.command}\nSafety: Safe"
             )
         if hasattr(self, "pb_detail_steps"):
             self.pb_detail_steps.set_text(tool.command)
@@ -3647,17 +3667,32 @@ class MainWindow(QMainWindow):
         guided_basic = self.layout_policy_state.show_playbooks_guided_basic
         q = self.tb_search.text().strip() if hasattr(self, "tb_search") else ""
         selected = self.tb_filter.currentText().strip().lower() if hasattr(self, "tb_filter") else "all categories"
-        category_filter = "" if selected == "all categories" else selected
+        category_filter = "" if selected == "all categories" else self._tool_category_key(selected)
         visible_tool_ids = self._visible_ids_for_prefix("tool.")
         top_adapters = [
-            FeedItemAdapter(key=t.id, title=t.title, subtitle=t.plain, payload=t.id, category=t.category)
+            FeedItemAdapter(
+                key=t.id,
+                title=t.title,
+                subtitle=t.plain,
+                payload=t.id,
+                category=self._tool_category_label(t.category),
+            )
             for t in TOP_TOOLS
             if t.id in visible_tool_ids
         ]
         rows = [tool for tool in search_tools(q) if tool.id in visible_tool_ids]
         if category_filter:
-            rows = [t for t in rows if category_filter in t.category.lower()]
-        all_adapters = [FeedItemAdapter(key=t.id, title=t.title, subtitle=t.desc, payload=t.id, category=t.category) for t in rows]
+            rows = [t for t in rows if category_filter in self._tool_category_key(t.category)]
+        all_adapters = [
+            FeedItemAdapter(
+                key=t.id,
+                title=t.title,
+                subtitle=t.desc,
+                payload=t.id,
+                category=self._tool_category_label(t.category),
+            )
+            for t in rows
+        ]
         self.tb_top.set_items(top_adapters)
         if not top_adapters:
             self.tb_top.show_empty("tool", "No pinned safe tools. Switch to Pro for full tool catalog.")
@@ -3666,7 +3701,13 @@ class MainWindow(QMainWindow):
             self.tb_all.show_empty("tool", "No tools match current filters. Switch to Pro to see more.")
         favorite_tool_ids = set(self.settings_state.favorites_tools or [])
         fav_adapters = [
-            FeedItemAdapter(key=t.id, title=t.title, subtitle=t.desc, payload=t.id, category=t.category)
+            FeedItemAdapter(
+                key=t.id,
+                title=t.title,
+                subtitle=t.desc,
+                payload=t.id,
+                category=self._tool_category_label(t.category),
+            )
             for t in TOOL_DIRECTORY
             if t.id in favorite_tool_ids and t.id in visible_tool_ids
         ]
@@ -3719,6 +3760,17 @@ class MainWindow(QMainWindow):
             self.selected_task_id = ""
         if adapters and self.selected_task_id not in {row.key for row in adapters}:
             self.selected_task_id = adapters[0].key
+
+    @staticmethod
+    def _tool_category_key(value: str) -> str:
+        return str(value or "").strip().lower().replace(" ", "_")
+
+    @classmethod
+    def _tool_category_label(cls, value: str) -> str:
+        key = cls._tool_category_key(value)
+        if key == "windows_links":
+            return "Windows Links"
+        return key.replace("_", " ").title() if key else "General"
 
     def _refresh_runbooks(self) -> None:
         guided_basic = self.layout_policy_state.show_playbooks_guided_basic
@@ -3815,7 +3867,7 @@ class MainWindow(QMainWindow):
                         [
                             f"Tool ID: {t.id}",
                             f"Title: {t.title}",
-                            f"Category: {t.category}",
+                            f"Category: {self._tool_category_label(t.category)}",
                             f"Command: {t.command}",
                             f"Exit code: {code}",
                             "",
@@ -3856,7 +3908,7 @@ class MainWindow(QMainWindow):
             timeout_s=40,
             risk="Safe",
             plain_summary=t.plain,
-            details_text=f"Tool ID: {t.id}\nCommand: {t.command}\nCategory: {t.category}",
+            details_text=f"Tool ID: {t.id}\nCommand: {t.command}\nCategory: {self._tool_category_label(t.category)}",
             next_steps="Use script tasks for deeper evidence capture and export.",
             rerun_cb=lambda: self._launch_tool_payload(t.id),
             evidence_root=str(ensure_dirs()["state"] / "tool_runs" / sid),

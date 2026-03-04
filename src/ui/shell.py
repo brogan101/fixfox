@@ -1,13 +1,28 @@
 from __future__ import annotations
 
+from typing import Any
+
 from .main_window import MainWindow
 
 
 class AppShell(MainWindow):
-    """Incremental shell entrypoint.
+    """Concrete app shell host.
 
-    MainWindow remains the execution host while page composition is split into
-    `src/ui/pages/*` modules.
+    This class is the stable shell entrypoint used by `src.app` while
+    `MainWindow` continues to provide execution-safe behavior and worker wiring.
     """
+
+    SHELL_ID = "fixfox_app_shell"
+
     def __init__(self) -> None:
         super().__init__()
+        self.setObjectName("AppShellWindow")
+        self.setProperty("shell_id", self.SHELL_ID)
+
+    def shell_regions(self) -> dict[str, Any]:
+        return {
+            "nav": getattr(self, "nav", None),
+            "top_bar": getattr(self, "run_status_panel", None),
+            "content": getattr(self, "pages", None),
+            "right_pane": getattr(self, "concierge", None),
+        }

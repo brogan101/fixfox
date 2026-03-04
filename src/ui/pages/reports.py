@@ -4,4 +4,7 @@ from typing import Any
 
 
 def build_reports_page(window: Any):
-    return window._build_reports()
+    page = window._build_reports()
+    page.setObjectName("PageReports")
+    page.setProperty("page_id", "reports")
+    return page

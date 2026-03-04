@@ -4,4 +4,7 @@ from typing import Any
 
 
 def build_diagnose_page(window: Any):
-    return window._build_diagnose()
+    page = window._build_diagnose()
+    page.setObjectName("PageDiagnose")
+    page.setProperty("page_id", "diagnose")
+    return page

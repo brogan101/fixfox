@@ -5,46 +5,51 @@
   - Result: **pass**.
 - `.\\.venv\\Scripts\\python.exe scripts/capability_audit.py`
   - Result: **pass** (`140 ok / 0 failing`).
-- Offscreen UI launch check (`AppShell` + timed quit)
+- Offscreen startup check (`AppShell` for ~0.9s)
   - Result: **pass** (`UI_STARTUP_OK`).
 
-## Required checks
+## Interaction-model regression checks
 
-### Min window size
-- Baseline min size (`MIN_WINDOW_SIZE`) respected.
-- No blocked controls found in smoke navigation traversal.
-- Right panel responsive collapse still works.
+### Single-click safety (critical)
+- Playbooks tool rows:
+  - single-click selects row only.
+  - no worker starts, no ToolRunner opens.
+- Execution requires explicit action:
+  - row `Open` button, Enter/Return, or double-click.
 
-### 1080p window
-- Top bar run status card remains readable with larger icon + two-line status.
-- Home/Playbooks/Diagnose/Fixes/Reports/History/Settings are navigable without control overlap.
+### Run status and ToolRunner handoff
+- Safe tool run opens ToolRunner.
+- Top-bar run-status card click opens/focuses ToolRunner.
+- Run-status line 2 streams last log line + elapsed while running.
 
-### Basic/Pro layout behavior
+## Layout and mode checks
+
+### Window sizing
+- Minimum window size: no clipped critical controls in tested flows.
+- 1080p windowed: shell regions remain crisp and aligned.
+
+### Basic vs Pro layout behavior
 - Basic:
-  - Playbooks guided container visible.
+  - Playbooks guided goals visible.
   - Pro console hidden.
-  - concierge default collapsed.
+  - right detail pane default collapsed.
 - Pro:
   - Playbooks pro console visible.
-  - script tasks visible.
+  - script tasks exposed behind Advanced toggle.
 
-### ToolRunner and run status
-- Starting safe tool creates ToolRunner.
-- Run events include at least `START`, `STATUS`, `END`.
-- Top bar status detail updates during runs.
-- Clicking top status card opens/focuses ToolRunner.
+## Theme and component checks
+- Global theme tokens drive shell/page surfaces.
+- Scrollbars are themed in both axes; no default Qt scrollbar look observed.
+- Splitter handles follow theme with hover/pressed states.
+- Typography remains point-based (`pt`), no `QFont::setPointSize(-1)` warning observed in startup/tests.
 
-### Scrollbar/theme consistency
-- Scrollbars themed via global QSS (no default Qt bars observed in tested flows).
-- Splitter handle styling active with hover/pressed states.
-- Tree/list/tab/header styles consistent with token-driven theme.
+## Toolbox behavior checks
+- Added `Windows Links` tool category and routing.
+- `Storage Settings` no longer appears as first default Top Tool.
+- Top Tools now prioritize non-annoying diagnostic/evidence-first ordering.
 
-### QFont warning check
-- `QFont::setPointSize: Point size <= 0 (-1)` warnings observed during launch/tests: **0**.
+## Residual risk
+- `src/ui/main_window.py` is still large; page modules are now shell/page entrypoints but full extraction remains future technical debt.
 
-## Known residual risks
-- `src/ui/main_window.py` remains large; extraction is in-progress via `src/ui/pages/*` wrappers and `AppShell` entrypoint.
-- Full per-page method migration to dedicated page modules is still technical debt, not a release blocker for current behavior.
-
-## Release gate verdict
-- **Pass** for current polish scope (UI consistency, run-status/log reliability, capability wiring integrity, smoke coverage).
+## Release verdict
+- **Pass** for this UI remake pass: explicit execution model, mode differentiation, themed shell consistency, and regression coverage all validated.

@@ -170,8 +170,14 @@ class BaseRow(QFrame):
         if self.list_widget is not None and self.list_item is not None:
             self.list_widget.setCurrentItem(self.list_item)
         self.setFocus(Qt.MouseFocusReason)
-        self.activated.emit(self.payload)
         super().mousePressEvent(event)
+
+    def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
+        if self.list_widget is not None and self.list_item is not None:
+            self.list_widget.setCurrentItem(self.list_item)
+        self.setFocus(Qt.MouseFocusReason)
+        self.activated.emit(self.payload)
+        super().mouseDoubleClickEvent(event)
 
     def contextMenuEvent(self, event: QContextMenuEvent) -> None:
         if self.list_widget is not None and self.list_item is not None:
@@ -180,7 +186,7 @@ class BaseRow(QFrame):
         event.accept()
 
     def keyPressEvent(self, event: QKeyEvent) -> None:
-        if event.key() in {Qt.Key_Return, Qt.Key_Enter, Qt.Key_Space}:
+        if event.key() in {Qt.Key_Return, Qt.Key_Enter}:
             self.activated.emit(self.payload)
             event.accept()
             return

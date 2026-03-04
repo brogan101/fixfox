@@ -4,4 +4,7 @@ from typing import Any
 
 
 def build_home_page(window: Any):
-    return window._build_home()
+    page = window._build_home()
+    page.setObjectName("PageHome")
+    page.setProperty("page_id", "home")
+    return page

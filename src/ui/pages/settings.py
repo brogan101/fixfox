@@ -4,4 +4,7 @@ from typing import Any
 
 
 def build_settings_page(window: Any):
-    return window._build_settings()
+    page = window._build_settings()
+    page.setObjectName("PageSettings")
+    page.setProperty("page_id", "settings")
+    return page

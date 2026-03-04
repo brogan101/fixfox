@@ -4,4 +4,7 @@ from typing import Any
 
 
 def build_fixes_page(window: Any):
-    return window._build_fixes()
+    page = window._build_fixes()
+    page.setObjectName("PageFixes")
+    page.setProperty("page_id", "fixes")
+    return page

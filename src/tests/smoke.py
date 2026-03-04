@@ -51,8 +51,11 @@ def _merge_evidence(session: dict, files: list[str], category: str, task_id: str
 def _ui_module_smoke() -> None:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     os.environ["FIXFOX_SKIP_ONBOARDING"] = "1"
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
     from PySide6.QtWidgets import QApplication
     from src.ui.main_window import MainWindow
+    from src.ui.components.rows import ToolRow
 
     app = QApplication.instance() or QApplication([])
     window = MainWindow()
@@ -79,6 +82,23 @@ def _ui_module_smoke() -> None:
         run_row = get_run(run_id)
         _assert(run_row is not None, f"{context}: run row missing in sqlite index")
         _assert(str(run_row.get("status", "")).strip() != "", f"{context}: run status missing in sqlite index")
+
+    def find_tool_row(tool_id: str) -> ToolRow:
+        for feed_name in ("tb_top", "tb_all", "tb_favorites"):
+            feed = getattr(window, feed_name, None)
+            if feed is None:
+                continue
+            lw = getattr(feed, "list_widget", None)
+            if lw is None:
+                continue
+            for i in range(lw.count()):
+                item = lw.item(i)
+                if str(item.data(Qt.UserRole) or "") != tool_id:
+                    continue
+                row = lw.itemWidget(item)
+                if isinstance(row, ToolRow):
+                    return row
+        raise AssertionError(f"tool row not found in feeds: {tool_id}")
 
     try:
         for idx, page in enumerate(window.NAV_ITEMS):
@@ -111,8 +131,17 @@ def _ui_module_smoke() -> None:
         _assert(hasattr(window, "pb_pro_console") and not window.pb_pro_console.isHidden(), "Pro Playbooks console should be visible")
         _assert("script_task.task_wifi_report_fix_wizard" in window._visible_capability_ids(), "pro script task missing in pro mode")
 
-        # Safe tool path must open ToolRunner
-        window._launch_tool_payload("tool_storage")
+        # Single-click must not launch any action.
+        tool_row = find_tool_row("tool_storage")
+        QTest.mouseClick(tool_row, Qt.LeftButton, Qt.NoModifier, tool_row.rect().center())
+        app.processEvents()
+        time.sleep(0.05)
+        app.processEvents()
+        _assert(window.active_worker is None, "single-click on tool row unexpectedly started a worker")
+        _assert(window.tool_runner is None, "single-click on tool row unexpectedly opened ToolRunner")
+
+        # Explicit action must launch and open ToolRunner.
+        tool_row.open_btn.click()
         wait_for_worker()
         _assert(window.tool_runner is not None, "ToolRunner window missing after safe tool run")
         window.tool_runner.hide()

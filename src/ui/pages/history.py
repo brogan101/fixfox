@@ -4,4 +4,7 @@ from typing import Any
 
 
 def build_history_page(window: Any):
-    return window._build_history()
+    page = window._build_history()
+    page.setObjectName("PageHistory")
+    page.setProperty("page_id", "history")
+    return page

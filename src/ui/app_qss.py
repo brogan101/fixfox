@@ -37,8 +37,14 @@ QWidget {{
 QMainWindow {{
   background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 {tokens.bg0}, stop:1 {tokens.bg1});
 }}
+QMainWindow#AppShellWindow {{
+  background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 {tokens.bg0}, stop:1 {tokens.bg1});
+}}
 QFrame#Shell {{
   background: {_alpha(tokens.bg0, 0.76)};
+}}
+QWidget[page_id] {{
+  background: transparent;
 }}
 QFrame#TopBar {{
   background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {panel_soft}, stop:1 {_alpha(tokens.panel, 0.86)});
