@@ -1,19 +1,37 @@
 from __future__ import annotations
+from pathlib import Path
 import sys
 
 INSTALL_CMD = "py -m pip install -r requirements.txt"
 MISSING_DEPS = {"PySide6", "psutil"}
 
 
+def _ensure_repo_on_sys_path() -> None:
+    # Supports direct script execution: `python src/app.py`.
+    repo_root = str(Path(__file__).resolve().parent.parent)
+    if repo_root not in sys.path:
+        sys.path.insert(0, repo_root)
+
+
 def _show_dependency_error() -> None:
-    from .core.brand import APP_DISPLAY_NAME
+    app_display_name = "Fix Fox"
+    try:
+        from .core.brand import APP_DISPLAY_NAME
+        app_display_name = APP_DISPLAY_NAME
+    except Exception:
+        try:
+            _ensure_repo_on_sys_path()
+            from src.core.brand import APP_DISPLAY_NAME
+            app_display_name = APP_DISPLAY_NAME
+        except Exception:
+            ...
 
     message = (
         "Required dependencies are missing.\n\n"
         "Run this command in the project folder:\n"
         f"{INSTALL_CMD}"
     )
-    title = f"{APP_DISPLAY_NAME} Setup Required"
+    title = f"{app_display_name} Setup Required"
 
     if sys.platform == "win32":
         try:
@@ -48,6 +66,7 @@ def _load_runtime_imports():
         from .ui.theme import resolve_theme_tokens
         from .ui.main_window import MainWindow
     except ImportError:
+        _ensure_repo_on_sys_path()
         from src.core.brand import APP_NAME, ICON_PNG
         from src.core.brand_assets import ensure_logo_on_desktop
         from src.core.logging_setup import configure_logging, install_global_exception_handler
