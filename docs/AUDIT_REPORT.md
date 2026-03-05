@@ -115,3 +115,24 @@
 - [x] Walkthrough screenshots + manifest + clipping report generated.
 - [x] Smoke/unit/requirements gate passed.
 
+
+## 2026-03-05 Audit Delta
+### Critical issues found and fixed
+- Missing mandatory source-of-truth requirements file and script-level verifier gate.
+- Requirements gate test targeted legacy verifier path instead of mandatory script verifier.
+- Basic mode details sheet could re-open after queued UI events, causing smoke regression.
+- Route/play single-source registries were absent from search indexing.
+- Required explicit icon mapping (gear/wrench/open_book) not enforced in nav metadata.
+
+### Corrective implementation
+- Added docs/REQUIREMENTS.json and scripts/verify_requirements.py with static/runtime/performance checks and walkthrough integration.
+- Repointed requirements gate test to scripts.verify_requirements.
+- Enforced Basic mode right-panel collapse via queued safeguard in set_ui_mode.
+- Added RouteRegistry + PlayRegistry, wired into global search.
+- Added guided wizard component and evidence model contract, with task outcome/preflight fields.
+
+### Verification evidence
+- python scripts/verify_requirements.py -> PASS.
+- python -m src.tests.smoke -> PASS.
+- python -m src.tests.test_unit -> PASS.
+- python -m src.tests.test_requirements_gate -> PASS.

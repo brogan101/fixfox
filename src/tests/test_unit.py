@@ -11,6 +11,7 @@ from src.core.errors import classify_exit
 from src.core.exporter import export_session, validate_export_folder
 from src.core.masking import MaskingOptions, mask_text
 from src.core.onboarding import OnboardingState
+from src.core.play_registry import CATEGORY_ICON_MAP, list_play_entries
 from src.core.registry import CAPABILITIES
 from src.core.runbooks import execute_runbook
 from src.core.script_tasks import run_script_task
@@ -135,6 +136,37 @@ class ArtifactTests(unittest.TestCase):
 class RegistryTests(unittest.TestCase):
     def test_registry_minimum_count(self) -> None:
         self.assertGreaterEqual(len(CAPABILITIES), 12)
+
+
+class PlayRegistryContractTests(unittest.TestCase):
+    def test_play_registry_metadata_and_dedupe_contract(self) -> None:
+        rows = list_play_entries()
+        self.assertGreaterEqual(len(rows), 20)
+        seen_ids: set[str] = set()
+        title_to_categories: dict[str, set[str]] = {}
+        for row in rows:
+            self.assertTrue(row.id.strip())
+            self.assertTrue(row.title.strip())
+            self.assertTrue(row.category.strip())
+            self.assertTrue(row.risk_badge.strip())
+            self.assertGreater(row.estimated_minutes, 0)
+            self.assertIn(row.automation_level, {"auto", "guided", "evidence-only"})
+            self.assertTrue(row.entrypoint.strip())
+            self.assertNotIn(row.id, seen_ids, msg=f"duplicate play id: {row.id}")
+            seen_ids.add(row.id)
+            title_to_categories.setdefault(row.title.lower(), set()).add(row.category.lower())
+        dup_titles = [title for title, cats in title_to_categories.items() if len(cats) > 1]
+        self.assertFalse(dup_titles, msg=f"duplicate titles across categories: {dup_titles[:8]}")
+
+    def test_play_category_icon_mapping_exists(self) -> None:
+        icons_root = Path(__file__).resolve().parents[1] / "assets" / "icons"
+        self.assertTrue(icons_root.exists())
+        for category, icon_name in CATEGORY_ICON_MAP.items():
+            self.assertTrue(category.strip())
+            self.assertTrue(icon_name.strip())
+            icon_svg = icons_root / f"{icon_name}.svg"
+            icon_png = icons_root / f"{icon_name}.png"
+            self.assertTrue(icon_svg.exists() or icon_png.exists(), msg=f"missing icon asset for category={category} icon={icon_name}")
 
 
 class OnboardingTests(unittest.TestCase):

@@ -37,3 +37,8 @@ Validation:
   - larger transparent brand mark in status block
   - removed tagline line from status block copy
   - compact-search button now expands with subtle animation
+
+## 2026-03-05 Cleanup Notes
+- No new removals were required for this pass.
+- Added only functional files tied directly to mandatory requirements and verifier enforcement.
+- docs/_tracked_files.txt refreshed after file additions.

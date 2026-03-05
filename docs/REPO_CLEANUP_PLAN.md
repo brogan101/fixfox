@@ -50,3 +50,9 @@ Test-Path docs/screenshots/20260305_143645 -> False
 1. Remove only stale transient walkthrough folder for this run.
 2. Keep archived legacy branding and compatibility shim in place.
 3. Document results in `docs/REPO_CLEANUP_NOTES.md`.
+
+## 2026-03-05 Execution Update
+- Keep: new registry/evidence/wizard modules (src/core/route_registry.py, src/core/play_registry.py, src/core/evidence_model.py, src/ui/components/guided_wizard.py) because they close explicit requirement gaps.
+- Keep: scripts/verify_requirements.py as mandatory gate source.
+- Keep: icon files src/assets/icons/gear.svg, wrench.svg, open_book.svg for required mapping consistency.
+- Archive/Remove: none in this delta; prior archive state remains valid.

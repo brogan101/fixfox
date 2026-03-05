@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from src.tools.verify_requirements import run_verification
+from scripts.verify_requirements import run_verification
 
 
 class RequirementsGateTests(unittest.TestCase):
@@ -14,4 +14,3 @@ class RequirementsGateTests(unittest.TestCase):
 
 if __name__ == "__main__":
     raise SystemExit(unittest.main())
-

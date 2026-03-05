@@ -220,6 +220,19 @@ def _finalize_task_result(task: ScriptTask, result: dict[str, Any], context: Scr
         payload["user_message"] = "The task did not complete successfully."
     if "output_files" not in payload:
         payload["output_files"] = []
+    if "outcome" not in payload:
+        if code == 0 and bool(payload.get("dry_run")):
+            payload["outcome"] = "no_issue_found"
+        elif code == 0:
+            payload["outcome"] = "fixed"
+        elif "administrator privileges are required" in str(payload.get("stderr", "")).strip().lower():
+            payload["outcome"] = "needs_user_action"
+        else:
+            payload["outcome"] = "cannot_fix"
+    payload.setdefault("before_snapshot", "not_applicable")
+    payload.setdefault("after_snapshot", "not_applicable")
+    payload.setdefault("rollback_notice", "not reversible")
+    payload.setdefault("evidence_items", [])
     return payload
 
 
@@ -2857,6 +2870,12 @@ def run_script_task(
         raise KeyError(task_id)
     task = mapping[task_id]
     effective = task if timeout_override_s is None else replace(task, timeout_s=int(max(1, timeout_override_s)))
+    preflight = {
+        "can_run": not (effective.admin_required and (not dry_run) and (not is_admin())),
+        "admin_required": bool(effective.admin_required),
+        "reason": "" if (not effective.admin_required or dry_run or is_admin()) else "Administrator privileges are required.",
+        "os_supported": True,
+    }
     context = ScriptTaskContext(
         output_dir=Path(output_dir) if output_dir is not None else None,
         mask_options=mask_options,
@@ -2877,6 +2896,7 @@ def run_script_task(
     else:
         result = _run_command_task(effective, context, dry_run)
     final = _finalize_task_result(effective, result, context)
+    final.setdefault("preflight", preflight)
     output_files = final.get("output_files", [])
     if isinstance(output_files, list):
         for path in output_files:

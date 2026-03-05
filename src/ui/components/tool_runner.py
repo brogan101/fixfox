@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
 from ..font_utils import safe_copy_font
 from ..style import spacing, tight_spacing
 from ..widgets import Card, PrimaryButton, SoftButton
+from ...core.evidence_model import coerce_evidence_items
 from ...core.run_events import RunEvent, RunEventBus, RunEventType
 
 
@@ -369,6 +370,9 @@ class ToolRunnerWindow(QDialog):
     def on_result(self, payload: dict[str, Any]) -> None:
         self._drain_event_bus()
         self._result_payload = payload or {}
+        evidence_items = coerce_evidence_items(self._result_payload if isinstance(self._result_payload, dict) else {})
+        if isinstance(self._result_payload, dict):
+            self._result_payload["evidence_items"] = [item.to_dict() for item in evidence_items]
         result_root = str(self._result_payload.get("evidence_root", "")).strip() if isinstance(self._result_payload, dict) else ""
         if result_root:
             self._evidence_root = result_root
@@ -401,7 +405,10 @@ class ToolRunnerWindow(QDialog):
             reason = str(self._result_payload.get("stderr", "")).strip() or "One or more steps returned a non-zero code."
         if reason:
             self._queue_output_line(f"[reason] {reason}", "status")
-        findings_count = int(self._result_payload.get("findings_count", 0)) if str(self._result_payload.get("findings_count", "")).isdigit() else failures
+        if str(self._result_payload.get("findings_count", "")).isdigit():
+            findings_count = int(self._result_payload.get("findings_count", 0))
+        else:
+            findings_count = max(failures, len([item for item in evidence_items if item.status.lower() not in {"ok", "info"}]))
         artifacts = len(self._result_payload.get("output_files", [])) + len(self._result_payload.get("evidence_files", []))
         reboot = bool(self._result_payload.get("reboot_likely"))
         risk = str(self.lbl_risk.text().replace("Risk:", "").strip() or "Safe").lower()

@@ -5,7 +5,9 @@ from dataclasses import dataclass
 from .db import list_recent_runs, list_sessions, search_index as search_db_index
 from .fixes import FIX_CATALOG
 from .kb import KB_CARDS
+from .play_registry import list_play_entries
 from .registry import CAPABILITIES
+from .route_registry import list_routes
 from .runbooks import RUNBOOKS
 from .script_tasks import list_script_tasks
 from .toolbox import TOOL_DIRECTORY
@@ -21,6 +23,14 @@ class SearchItem:
 
 def build_search_index(allowed_capability_ids: set[str] | None = None) -> list[SearchItem]:
     rows: list[SearchItem] = []
+    for route in list_routes():
+        rows.append(SearchItem("route", route.id, route.title, route.description))
+    for play in list_play_entries():
+        subtitle = (
+            f"{play.kind} | {play.category} | risk={play.risk_badge} | "
+            f"~{play.estimated_minutes}m | {play.automation_level}"
+        )
+        rows.append(SearchItem("play", play.id, play.title, subtitle))
     for cap in CAPABILITIES:
         if allowed_capability_ids is not None and cap.id not in allowed_capability_ids:
             continue

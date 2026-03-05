@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..components.feed_renderer import FeedRenderer
+from ..components.guided_wizard import GuidedFixWizard, GuidedStep
 from ..style import spacing
 from ..widgets import Card, DrawerCard, InlineCallout, PrimaryButton, SoftButton
 from .common import PageScroll, build_page_header
@@ -50,6 +51,37 @@ class PlaybooksPage(PageScroll):
         basic_layout.setSpacing(spacing("md"))
         basic_intro = Card("Guided Goals", "Pick a goal, run the guided path, and review results in ToolRunner.")
         basic_layout.addWidget(basic_intro)
+        w.pb_guided_wizard = GuidedFixWizard("Guided Fix Wizard")
+        w.pb_guided_wizard.set_steps(
+            [
+                GuidedStep(
+                    id="step_quick_check",
+                    title="Run Quick Check",
+                    action_label="Run Quick Check",
+                    details="Collect baseline diagnostics to identify current risk and bottlenecks.",
+                ),
+                GuidedStep(
+                    id="step_open_diagnose",
+                    title="Review Findings",
+                    action_label="Open Diagnose",
+                    details="Open Diagnose and review findings with risk labels before changing anything.",
+                ),
+                GuidedStep(
+                    id="step_apply_fix",
+                    title="Apply One Safe Fix",
+                    action_label="Open Fixes",
+                    details="Run one safe fix and capture outcome evidence in ToolRunner.",
+                ),
+            ],
+            callbacks={
+                "step_quick_check": lambda: w.run_quick_check("Quick Check"),
+                "step_open_diagnose": lambda: w.nav.setCurrentRow(w.NAV_ITEMS.index("Diagnose")),
+                "step_apply_fix": lambda: w.nav.setCurrentRow(w.NAV_ITEMS.index("Fixes")),
+            },
+        )
+        w.pb_guided_wizard.btn_generate_pack.clicked.connect(lambda: w.nav.setCurrentRow(w.NAV_ITEMS.index("Reports")))
+        w.pb_guided_wizard.btn_copy_summary.clicked.connect(w.copy_session_summary)
+        basic_layout.addWidget(w.pb_guided_wizard, 0)
         w.pb_basic_goal_grid = QGridLayout()
         w.pb_basic_goal_grid.setContentsMargins(0, 0, 0, 0)
         w.pb_basic_goal_grid.setSpacing(spacing("md"))

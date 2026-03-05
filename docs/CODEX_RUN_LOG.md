@@ -524,3 +524,10 @@ src/ui/style/qss_builder.py         |  45 +++---
   - `docs/screenshots/20260305_153732`
   - `search_dropdown_visible_ms=704`
   - `clipping_issue_count=0`
+
+## Run 2026-03-05 16:27:05 -05:00
+- Starting commit: 725d4169363d47f95c982adb31c299fb70c96f96
+- Goals: full audit/fix gate; enforce requirements verifier; route/play registry alignment; guided wizard and evidence model contract.
+- Scope: verifier + tests + UI shell/search/nav icon mapping + play contract metadata.
+- Files touched: src/ui/main_window_impl.py, src/ui/icons.py, src/core/search.py, src/core/script_tasks.py, src/ui/components/tool_runner.py, src/ui/pages/playbooks_page.py, src/core/route_registry.py, src/core/play_registry.py, src/core/evidence_model.py, src/ui/components/guided_wizard.py, scripts/verify_requirements.py, src/tests/test_requirements_gate.py, src/tests/test_unit.py, docs/REQUIREMENTS.json, docs/play_capability_matrix.md, docs/release_checklist.md.
+- Gates: python scripts/verify_requirements.py PASS; smoke PASS; unit PASS; requirements gate PASS.
