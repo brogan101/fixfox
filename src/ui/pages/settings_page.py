@@ -4,7 +4,6 @@ import os
 from typing import Any
 
 from PySide6.QtCore import Qt, QSize
-from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -21,12 +20,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ...core.brand import APP_DISPLAY_NAME, APP_TAGLINE, ICON_PNG
+from ...core.brand import APP_DISPLAY_NAME
 from ...core.brand_assets import ensure_logo_on_desktop
 from ...core.paths import ensure_dirs
 from ...core.registry import CAPABILITIES
 from ...core.runbooks import RUNBOOKS
-from ...core.utils import resource_path
 from ...core.version import APP_VERSION
 from ...core.logging_setup import log_path, logs_dir
 from ..style import spacing
@@ -91,15 +89,14 @@ class SettingsPage(PageScroll):
         shell.setSpacing(spacing("md"))
         w.settings_nav = QListWidget()
         w.settings_nav.setObjectName("SettingsNav")
-        w.settings_nav.setMinimumWidth(220)
-        w.settings_nav.setMaximumWidth(300)
+        w.settings_nav.setMinimumWidth(240)
+        w.settings_nav.setMaximumWidth(320)
         settings_row_height = resolve_density_tokens(w.settings_state.density).nav_item_height
         settings_sections = (
             ("Safety", "shield"),
             ("Privacy", "privacy"),
             ("Appearance", "settings"),
             ("Advanced", "fixes"),
-            ("About", "info"),
             ("Feedback", "help"),
         )
         for name, icon_name in settings_sections:
@@ -276,50 +273,12 @@ class SettingsPage(PageScroll):
         c_adv.body_layout().addWidget(b_logo_recreate)
         c_adv.body_layout().addWidget(w.b_reset_onboarding)
         c_adv.body_layout().addWidget(w._setting_hint("Pro only: clears onboarding_completed so onboarding appears on next launch."))
+        c_adv.body_layout().addWidget(QLabel("App summary"))
+        c_adv.body_layout().addWidget(w._setting_hint(f"{APP_DISPLAY_NAME} v{APP_VERSION}"))
+        c_adv.body_layout().addWidget(w._setting_hint("Local-only design. No telemetry and no automatic cloud transfer."))
+        c_adv.body_layout().addWidget(w._setting_hint(f"Capabilities: {len(CAPABILITIES)} | Runbooks: {len(RUNBOOKS)}"))
         pdl.addWidget(c_adv)
         pdl.addStretch(1)
-
-        p_about = QWidget()
-        pol = QVBoxLayout(p_about)
-        pol.setContentsMargins(0, 0, 0, 0)
-        pol.setSpacing(10)
-        c_about = Card("About", f"Version {APP_VERSION}")
-        about_header = QWidget()
-        about_header_l = QHBoxLayout(about_header)
-        about_header_l.setContentsMargins(0, 0, 0, 0)
-        about_header_l.setSpacing(10)
-        icon = QLabel()
-        pix = QPixmap(resource_path(ICON_PNG))
-        if not pix.isNull():
-            icon.setPixmap(pix.scaled(40, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-        title_block = QVBoxLayout()
-        title_block.setContentsMargins(0, 0, 0, 0)
-        title_block.setSpacing(2)
-        title_block.addWidget(QLabel(APP_DISPLAY_NAME))
-        title_block.addWidget(w._setting_hint(APP_TAGLINE))
-        about_header_l.addWidget(icon)
-        about_header_l.addLayout(title_block, 1)
-        c_about.body_layout().addWidget(about_header)
-        c_about.body_layout().addWidget(QLabel("Runs locally. No cloud uploads or telemetry."))
-        c_about.body_layout().addWidget(QLabel("Plain English: this app runs diagnostics, fixes, runbooks, and exports locally."))
-        c_about.body_layout().addWidget(QLabel("Privacy summary: session data, evidence, and logs stay on this device unless you export/share manually."))
-        c_about.body_layout().addWidget(QLabel("Safety summary: Safe = low-risk checks, Admin = elevated actions, Advanced = expert workflows."))
-        c_about.body_layout().addWidget(QLabel("Optional online actions are explicitly labeled (for example, Microsoft Get Help)."))
-        c_about.body_layout().addWidget(QLabel(f"Data folder: {ensure_dirs()['base']}"))
-        c_about.body_layout().addWidget(QLabel(f"Logs folder: {logs_dir()}"))
-        c_about.body_layout().addWidget(QLabel(f"Capabilities: {len(CAPABILITIES)}"))
-        c_about.body_layout().addWidget(QLabel(f"Runbooks: {len(RUNBOOKS)}"))
-        about_privacy = SoftButton("Open Privacy Page")
-        about_privacy.clicked.connect(lambda: w._open_settings_section("Privacy"))
-        about_safety = SoftButton("Open Safety Page")
-        about_safety.clicked.connect(lambda: w._open_settings_section("Safety"))
-        c_about.body_layout().addWidget(about_privacy)
-        c_about.body_layout().addWidget(about_safety)
-        about_logo = SoftButton("Create Desktop Logo")
-        about_logo.clicked.connect(lambda: ensure_logo_on_desktop(overwrite=False))
-        c_about.body_layout().addWidget(about_logo)
-        pol.addWidget(c_about)
-        pol.addStretch(1)
 
         p_feedback = QWidget()
         pfl = QVBoxLayout(p_feedback)
@@ -345,7 +304,7 @@ class SettingsPage(PageScroll):
         pfl.addWidget(c_fb)
         pfl.addStretch(1)
 
-        for page in (p_safety, p_privacy, p_appearance, p_advanced, p_about, p_feedback):
+        for page in (p_safety, p_privacy, p_appearance, p_advanced, p_feedback):
             w.settings_stack.addWidget(page)
         shell.addWidget(w.settings_stack, 1)
         layout.addLayout(shell, 1)

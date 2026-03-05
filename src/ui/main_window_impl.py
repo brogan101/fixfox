@@ -3,16 +3,18 @@
 import json
 import logging
 import os
+import re
 import subprocess
 import time
 import traceback
+import html
 from pathlib import Path
 from datetime import datetime
 from functools import partial
 from typing import Any, Callable
 
 from PySide6.QtCore import QEvent, QPoint, QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QAction, QFontMetrics, QIcon, QKeySequence, QPixmap, QShortcut
+from PySide6.QtGui import QAction, QFontMetrics, QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -34,7 +36,6 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QSlider,
     QSpinBox,
-    QSplitter,
     QStackedWidget,
     QTabWidget,
     QTextEdit,
@@ -99,12 +100,12 @@ from .app_qss import build_qss
 from .components.accordion import AccordionSection
 from .components.context_menu import ContextAction, show_context_menu
 from .components.feed_renderer import FeedItemAdapter, FeedRenderer, SkeletonLoader
-from .components.rows import BaseRow, FindingRow, FixRow, IconButton, SessionRow, ToolRow, row_height_for_density
+from .components.rows import BaseRow, FindingRow, FixRow, SessionRow, ToolRow, row_height_for_density
 from .components.tool_runner import ToolRunnerWindow
 from .components.global_search import GlobalSearchPopup
 from .components.app_shell import AppShellFrame
 from .components.onboarding import OnboardingFlow
-from .icons import get_icon
+from .icons import clear_icon_cache, get_icon
 from .layout_guardrails import (
     MIN_NAV_WIDTH,
     MIN_RIGHT_PANEL_WIDTH,
@@ -141,6 +142,11 @@ from .widgets import Card, DrawerCard, EmptyState, Pill, PrimaryButton, SoftButt
 
 LOGGER = logging.getLogger("fixfox.ui")
 
+try:
+    from rapidfuzz import fuzz as _fuzz
+except Exception:  # pragma: no cover - optional fallback
+    _fuzz = None
+
 
 def _now_local() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -159,6 +165,7 @@ def _scroll(widget: QWidget) -> QScrollArea:
 class CommandPaletteDialog(QDialog):
     def __init__(self, parent: QWidget | None = None, allowed_capability_ids: set[str] | None = None) -> None:
         super().__init__(parent)
+        self.setObjectName("CommandPaletteDialog")
         self.setWindowTitle("Command Palette")
         self.resize(760, 520)
         self.selected_key = ""
@@ -345,7 +352,7 @@ class MainWindow(QMainWindow):
     NAV_ITEMS = ("Home", "Playbooks", "Diagnose", "Fixes", "Reports", "History", "Settings")
     NAV_ICONS = {
         "Home": "home",
-        "Playbooks": "toolbox",
+        "Playbooks": "playbooks",
         "Diagnose": "diagnose",
         "Fixes": "fixes",
         "Reports": "reports",
@@ -418,11 +425,10 @@ class MainWindow(QMainWindow):
 
         self.app_shell = AppShellFrame()
         self.setCentralWidget(self.app_shell)
-        self.split = self.app_shell.splitter
         self.nav_shell = self.app_shell.nav_shell
         self.nav = self.nav_shell
         self.nav.currentRowChanged.connect(self._on_nav)
-        self.nav_shell.help_requested.connect(lambda: self._open_settings_section("About"))
+        self.nav_shell.help_requested.connect(lambda: self._open_settings_section("Feedback"))
 
         self.run_status_panel = self.app_shell.toolbar.run_status_panel
         self.app_identity = self.app_shell.toolbar.app_identity
@@ -453,10 +459,10 @@ class MainWindow(QMainWindow):
         self.btn_quick_check.setShortcut("Ctrl+Shift+R")
         self.btn_open_runner.clicked.connect(self.open_tool_runner)
         self.btn_export.clicked.connect(lambda: self.nav.setCurrentRow(self.NAV_ITEMS.index("Reports")))
+        self.app_shell.toolbar.details_toggled.connect(lambda checked: self._set_concierge_collapsed(not checked, persist=True))
         self.btn_overflow.clicked.connect(self._open_header_overflow_menu)
         self.mode_basic_btn.setVisible(False)
         self.mode_pro_btn.setVisible(False)
-        self.btn_panel_toggle.setVisible(False)
 
         self.context = self._build_context_bar()
         self.app_shell.center_layout.addWidget(self.context)
@@ -475,17 +481,21 @@ class MainWindow(QMainWindow):
         self.shell_mode_label = self.app_shell.bottom_status.mode_label
         self.shell_safety_label = self.app_shell.bottom_status.safety_label
 
-        self.split.setSizes([72, 1040, 0])
+        details_width = int((self.settings_state.splitter_sizes or [0, 0, 340])[2])
+        self.app_shell.set_details_width(max(MIN_RIGHT_PANEL_WIDTH, details_width))
         self._build_nav()
         self._build_pages()
 
         self.concierge.collapsed_changed.connect(self._on_concierge)
         self.btn_cancel_task.clicked.connect(self._cancel_task)
-        self.btn_panel_toggle.clicked.connect(self._toggle_concierge)
-        QShortcut(QKeySequence("Ctrl+K"), self, self.open_command_palette)
+        QShortcut(QKeySequence("Ctrl+K"), self, self._focus_top_search)
+        QShortcut(QKeySequence("Ctrl+Shift+K"), self, self.open_command_palette)
         QShortcut(QKeySequence("Ctrl+Shift+R"), self, lambda: self.run_quick_check("Quick Check"))
         QShortcut(QKeySequence("Ctrl+Alt+L"), self, self._toggle_layout_debug_overlay)
         QShortcut(QKeySequence("Ctrl+Alt+T"), self, self._run_ui_self_check)
+        app = QApplication.instance()
+        if app is not None:
+            app.installEventFilter(self)
 
         self._sync_settings_ui()
         self._restore_layout_state()
@@ -515,6 +525,7 @@ class MainWindow(QMainWindow):
         super().resizeEvent(event)
         self._apply_responsive_concierge()
         self._apply_responsive_header()
+        self._search_popup.sync_anchor()
         self._clamp_concierge_card_widths()
         if hasattr(self, "run_status_title") and hasattr(self, "run_status_detail"):
             self._set_run_status(self.run_status_title.text(), self._run_status_detail_raw)
@@ -527,25 +538,10 @@ class MainWindow(QMainWindow):
             list(self.NAV_ITEMS),
             lambda label: self.NAV_ICONS.get(label, str(label).strip().lower()),
             nav_height,
-            self._nav_item_widget,
+            None,
         )
         if hasattr(self.nav_shell, "refresh_icons"):
             self.nav_shell.refresh_icons()
-
-    def _nav_item_widget(self, label: str) -> QWidget:
-        return self._rail_row_widget(label, self.NAV_ICONS.get(label, "menu"))
-
-    def _rail_row_widget(self, label: str, icon_name: str) -> QWidget:
-        del icon_name
-        row = QWidget()
-        row.setAttribute(Qt.WA_TransparentForMouseEvents, True)
-        lay = QHBoxLayout(row)
-        lay.setContentsMargins(0, 0, 0, 0)
-        lay.setSpacing(0)
-        text = QLabel(label)
-        text.setAttribute(Qt.WA_TransparentForMouseEvents, True)
-        lay.addWidget(text, 1)
-        return row
     def _build_context_bar(self) -> QWidget:
         f = QFrame(); f.setObjectName("SessionContext")
         l = QVBoxLayout(f); l.setContentsMargins(10, 8, 10, 8); l.setSpacing(4)
@@ -572,27 +568,43 @@ class MainWindow(QMainWindow):
         return f
 
     def eventFilter(self, watched: Any, event: Any) -> bool:  # type: ignore[override]
-        if watched is self.top_search and self._search_popup.isVisible():
-            if event.type() == QEvent.KeyPress:
-                key = event.key()
-                if key == Qt.Key_Down:
-                    self._search_popup.move_selection(1)
-                    return True
-                if key == Qt.Key_Up:
-                    self._search_popup.move_selection(-1)
-                    return True
-                if key in {Qt.Key_Return, Qt.Key_Enter} and self._search_popup.activate_current():
-                    return True
-                if key == Qt.Key_Escape:
-                    self._search_popup.hide_popup()
-                    return True
-            if event.type() == QEvent.FocusOut:
-                QTimer.singleShot(120, self._search_popup.hide_popup)
+        if watched is self.top_search and event.type() == QEvent.KeyPress:
+            key = event.key()
+            if key == Qt.Key_Down:
+                self._search_popup.move_selection(1)
+                return True
+            if key == Qt.Key_Up:
+                self._search_popup.move_selection(-1)
+                return True
+            if key in {Qt.Key_Return, Qt.Key_Enter} and self._search_popup.activate_current():
+                return True
+            if key == Qt.Key_Escape:
+                self._search_popup.hide_popup()
+                return True
+        if (
+            self._search_popup.isVisible()
+            and event.type() == QEvent.MouseButtonPress
+            and isinstance(watched, QWidget)
+            and os.environ.get("QT_QPA_PLATFORM", "").strip().lower() != "offscreen"
+        ):
+            in_popup = watched is self._search_popup or self._search_popup.isAncestorOf(watched)
+            in_search = watched is self.top_search or self.top_search.isAncestorOf(watched)
+            in_compact = watched is self.compact_search_btn or self.compact_search_btn.isAncestorOf(watched)
+            if not any((in_popup, in_search, in_compact)):
+                self._search_popup.hide_popup()
         return super().eventFilter(watched, event)
+
+    def _focus_top_search(self) -> None:
+        if hasattr(self, "top_search_stack"):
+            self.top_search_stack.setCurrentIndex(0)
+        self.top_search.setFocus(Qt.ShortcutFocusReason)
+        self.top_search.selectAll()
+        if self.top_search.text().strip():
+            self._schedule_global_search()
 
     def keyPressEvent(self, event: Any) -> None:  # type: ignore[override]
         if event.key() == Qt.Key_Escape and hasattr(self, "concierge"):
-            if (not self.concierge.collapsed) and (not bool(getattr(self.concierge, "pinned", False))):
+            if not self.concierge.collapsed:
                 self._set_concierge_collapsed(True, persist=True)
                 event.accept()
                 return
@@ -603,23 +615,26 @@ class MainWindow(QMainWindow):
         if not query:
             self._search_popup.hide_popup()
             return
+        if os.environ.get("QT_QPA_PLATFORM", "").strip().lower() == "offscreen":
+            self._refresh_global_search_results()
+            return
         self._search_debounce_timer.start()
 
     def _handle_compact_search(self) -> None:
         if hasattr(self, "top_search_stack") and self.top_search_stack.currentIndex() == 1:
-            self.open_command_palette()
+            self._focus_top_search()
             return
-        self.top_search.setFocus(Qt.ShortcutFocusReason)
-        self.top_search.selectAll()
-        self._schedule_global_search()
+        self._focus_top_search()
 
     def _refresh_global_search_results(self) -> None:
+        started = time.perf_counter()
         query = self.top_search.text().strip() if hasattr(self, "top_search") else ""
         if not query:
             self._search_popup.hide_popup()
             return
         visible = self._visible_capability_ids()
-        rows = query_index(query, limit=80, allowed_capability_ids=visible)
+        rows = query_index(query, limit=120, allowed_capability_ids=visible)
+        ranked_rows = self._rank_search_rows(query, rows)
         basic = self.layout_policy_state.mode == "basic"
         groups: dict[str, list[dict[str, str]]] = {
             "Goals": [],
@@ -628,20 +643,69 @@ class MainWindow(QMainWindow):
             "Fixes": [],
             "Sessions": [],
         }
-        for row in rows:
+        for row in ranked_rows:
             group = self._search_group_for_item(row, basic=basic)
             payload = {
                 "kind": row.kind,
                 "key": row.key,
                 "title": row.title,
                 "subtitle": row.subtitle,
+                "title_html": self._highlight_search_match(row.title, query),
+                "subtitle_html": self._highlight_search_match(row.subtitle, query),
             }
             bucket = groups.get(group, groups["Tools"])
-            if len(bucket) < 6:
+            if len(bucket) < 10:
                 bucket.append(payload)
         order = ("Goals", "Fixes", "Runbooks", "Tools", "Sessions") if basic else ("Goals", "Tools", "Runbooks", "Fixes", "Sessions")
         grouped_rows = [(name, groups[name]) for name in order]
         self._search_popup.show_results(self.top_search, grouped_rows, query)
+        elapsed_ms = (time.perf_counter() - started) * 1000.0
+        LOGGER.debug("global_search_refresh_ms=%.2f query=%s rows=%d", elapsed_ms, query, len(ranked_rows))
+
+    def _rank_search_rows(self, query: str, rows: list[SearchItem]) -> list[SearchItem]:
+        q = str(query or "").strip().lower()
+        if not q:
+            return rows
+        ranked: list[tuple[float, SearchItem]] = []
+        for row in rows:
+            title = str(row.title or "")
+            subtitle = str(row.subtitle or "")
+            key = str(row.key or "")
+            haystack = f"{title} {subtitle} {key}".strip()
+            if not haystack:
+                continue
+            if _fuzz is not None:
+                score = max(
+                    float(_fuzz.WRatio(q, title.lower())),
+                    float(_fuzz.partial_ratio(q, haystack.lower())),
+                )
+            else:
+                score = 100.0 if q in haystack.lower() else 0.0
+                if title.lower().startswith(q):
+                    score += 30.0
+                if key.lower().startswith(q):
+                    score += 20.0
+            ranked.append((score, row))
+        ranked.sort(key=lambda item: item[0], reverse=True)
+        return [row for score, row in ranked if score > 0][:80]
+
+    def _highlight_search_match(self, text: str, query: str) -> str:
+        raw = str(text or "")
+        tokens = [token for token in re.split(r"\s+", str(query or "").strip()) if token]
+        if not raw or not tokens:
+            return html.escape(raw)
+        pattern = re.compile("|".join(re.escape(token) for token in tokens), re.IGNORECASE)
+        parts: list[str] = []
+        last = 0
+        for match in pattern.finditer(raw):
+            start, end = match.span()
+            if start < last:
+                continue
+            parts.append(html.escape(raw[last:start]))
+            parts.append(f"<span style='font-weight:700'>{html.escape(raw[start:end])}</span>")
+            last = end
+        parts.append(html.escape(raw[last:]))
+        return "".join(parts)
 
     def _search_group_for_item(self, row: SearchItem, *, basic: bool) -> str:
         kind = str(row.kind or "").strip().lower()
@@ -684,6 +748,7 @@ class MainWindow(QMainWindow):
             return
         self._search_popup.hide_popup()
         self._dispatch_search_selection(kind, key)
+        self._set_concierge_collapsed(False, persist=True)
 
     def open_tool_runner(self) -> None:
         if self.tool_runner is None:
@@ -974,21 +1039,6 @@ class MainWindow(QMainWindow):
         if message:
             self._last_run_line = message
 
-    def _header(self, title: str, subtitle: str, cta: QWidget | None = None, help_text: str = "") -> QWidget:
-        w = QWidget(); l = QVBoxLayout(w); l.setContentsMargins(0, 0, 0, 0); l.setSpacing(8)
-        top = QHBoxLayout(); labels = QVBoxLayout()
-        t = QLabel(title); t.setObjectName("Title")
-        s = QLabel(subtitle); s.setObjectName("SubTitle")
-        labels.addWidget(t); labels.addWidget(s)
-        top.addLayout(labels, 1)
-        help_btn = IconButton("help", w, f"{title} help")
-        help_btn.clicked.connect(lambda: self._show_page_help(title, help_text or subtitle))
-        top.addWidget(help_btn, 0, Qt.AlignTop)
-        if cta:
-            top.addWidget(cta, 0, Qt.AlignRight | Qt.AlignTop)
-        l.addLayout(top)
-        return w
-
     def _show_page_help(self, title: str, text: str) -> None:
         dialog = HelpCenterDialog(f"{title} Help", text, self)
         dialog.exec()
@@ -1046,9 +1096,9 @@ class MainWindow(QMainWindow):
             "privacy": "sessions evidence logs local-only masking share-safe not collected storage path",
             "appearance": "theme density palette right panel scale ui drawer pin",
             "advanced": "logs diagnostics data folder evidence",
-            "about": "version help start here privacy safety",
             "feedback": "bug ui feature message",
         }
+        first_visible = -1
         for index in range(self.settings_nav.count()):
             item = self.settings_nav.item(index)
             label = str(item.data(Qt.UserRole) or item.text()).lower()
@@ -1057,6 +1107,10 @@ class MainWindow(QMainWindow):
             if basic and label == "advanced":
                 hide = True
             item.setHidden(hide)
+            if (not hide) and first_visible < 0:
+                first_visible = index
+        if first_visible >= 0 and self.settings_nav.currentRow() != first_visible:
+            self.settings_nav.setCurrentRow(first_visible)
 
     def _reset_settings_defaults(self) -> None:
         self.settings_state = AppSettings().normalized()
@@ -1198,6 +1252,7 @@ class MainWindow(QMainWindow):
             self.toasts.show_toast(f"Clear file index failed: {exc}")
 
     def _apply_theme(self) -> None:
+        started = time.perf_counter()
         palette = normalize_palette(self.settings_state.theme_palette)
         mode = normalize_mode(self.settings_state.theme_mode)
         density = normalize_density(self.settings_state.density)
@@ -1211,6 +1266,7 @@ class MainWindow(QMainWindow):
         app = QApplication.instance()
         if app is not None:
             app.setStyleSheet(build_qss(resolve_theme_tokens(palette, mode), mode, density))
+        clear_icon_cache()
         if hasattr(self.app_shell, "toolbar") and hasattr(self.app_shell.toolbar, "refresh_icons"):
             self.app_shell.toolbar.refresh_icons()
         if hasattr(self, "side_sheet") and hasattr(self.side_sheet, "refresh_icons"):
@@ -1219,6 +1275,7 @@ class MainWindow(QMainWindow):
             self.nav_shell.refresh_icons()
         self._apply_density()
         self._sync_panel_toggle_icon()
+        LOGGER.debug("theme_apply_ms=%.2f palette=%s mode=%s density=%s scale=%s", (time.perf_counter() - started) * 1000.0, palette, mode, density, scale_pct)
 
     def _on_ui_scale_value_changed(self, value: int) -> None:
         pct = clamp_ui_scale(value)
@@ -1244,6 +1301,7 @@ class MainWindow(QMainWindow):
         self.toasts.show_toast(f"UI scale set to {self.settings_state.ui_scale_pct}%.")
 
     def _apply_density(self) -> None:
+        started = time.perf_counter()
         density = self.settings_state.density
         current_nav = self.nav.currentRow()
         for widget in self.findChildren(QWidget):
@@ -1262,6 +1320,7 @@ class MainWindow(QMainWindow):
             self.nav.setCurrentRow(min(current_nav, len(self.NAV_ITEMS) - 1))
         self._apply_mode_visibility()
         self._refresh_home_history(); self._refresh_history(); self._refresh_run_center(); self._refresh_fixes(); self._refresh_toolbox(); self._refresh_runbooks(); self._refresh_home_favorites(); self._rebuild_diagnose_sections(self.current_session.get("findings", []))
+        LOGGER.debug("density_apply_ms=%.2f density=%s", (time.perf_counter() - started) * 1000.0, density)
 
     def _open_help_menu(self) -> None:
         menu = QMenu(self)
@@ -1547,8 +1606,8 @@ class MainWindow(QMainWindow):
         if s.window_x >= 0 and s.window_y >= 0:
             self.move(s.window_x, s.window_y)
         sizes = list(s.splitter_sizes or [])
-        if len(sizes) == 3:
-            self.split.setSizes([72, max(640, sizes[1]), max(0, sizes[2])])
+        if len(sizes) >= 3:
+            self.app_shell.set_details_width(max(MIN_RIGHT_PANEL_WIDTH, sizes[2]))
         self.settings_state.nav_collapsed = True
         page = s.last_page if s.last_page in self.NAV_ITEMS else "Home"
         self.nav.setCurrentRow(self.NAV_ITEMS.index(page))
@@ -1567,7 +1626,8 @@ class MainWindow(QMainWindow):
         self.settings_state.window_y = int(geo.y())
         self.settings_state.window_width = int(max(1080, geo.width()))
         self.settings_state.window_height = int(max(720, geo.height()))
-        self.settings_state.splitter_sizes = [int(v) for v in self.split.sizes()]
+        details_width = int(getattr(self.app_shell, "details_width", lambda: MIN_RIGHT_PANEL_WIDTH)())
+        self.settings_state.splitter_sizes = [72, int(max(640, geo.width() - details_width - 72)), details_width]
         self.settings_state.nav_collapsed = True
         nav_idx = self.nav.currentRow()
         if 0 <= nav_idx < len(self.NAV_ITEMS):
@@ -1584,13 +1644,7 @@ class MainWindow(QMainWindow):
 
     def _set_concierge_collapsed(self, collapsed: bool, persist: bool) -> None:
         self._persist_concierge_events = persist
-        self.concierge.set_collapsed(collapsed)
-        if hasattr(self, "details_drawer"):
-            self.details_drawer.setVisible(not collapsed)
-        if (not collapsed) and self.split.count() == 3:
-            sizes = self.split.sizes()
-            if len(sizes) == 3 and sizes[2] < MIN_RIGHT_PANEL_WIDTH:
-                self.split.setSizes([72, max(680, sizes[1]), MIN_RIGHT_PANEL_WIDTH])
+        self.app_shell.set_details_open(not collapsed)
         self._persist_concierge_events = True
         self._sync_panel_toggle_icon()
 
@@ -1641,10 +1695,6 @@ class MainWindow(QMainWindow):
         elif not narrow and self._auto_concierge_collapse:
             self._auto_concierge_collapse = False
             self._set_concierge_collapsed(not self.settings_state.right_panel_open, persist=False)
-        if self.split.count() == 3:
-            sizes = self.split.sizes()
-            if len(sizes) == 3 and (not self.concierge.collapsed) and sizes[2] < MIN_RIGHT_PANEL_WIDTH:
-                self.split.setSizes([72, max(680, sizes[1]), MIN_RIGHT_PANEL_WIDTH])
 
     def _apply_responsive_header(self) -> None:
         if not hasattr(self, "top_search_stack"):
@@ -1723,8 +1773,7 @@ class MainWindow(QMainWindow):
 
     def _sync_panel_toggle_icon(self) -> None:
         if hasattr(self, "btn_panel_toggle"):
-            self.btn_panel_toggle.setText("DP")
-            self.btn_panel_toggle.setToolTip("Open details panel" if self.concierge.collapsed else "Close details panel")
+            self.app_shell.toolbar.set_details_open(not self.concierge.collapsed)
 
     def _on_concierge(self, collapsed: bool) -> None:
         if self._persist_concierge_events:
@@ -2134,6 +2183,9 @@ class MainWindow(QMainWindow):
         if self._run_status_subscription_id > 0:
             self.run_event_bus.unsubscribe(self._run_status_subscription_id)
             self._run_status_subscription_id = 0
+        app = QApplication.instance()
+        if app is not None:
+            app.removeEventFilter(self)
         self._persist_layout_state()
         self._search_popup.hide_popup()
         if self.tool_runner is not None:
@@ -2223,6 +2275,7 @@ class MainWindow(QMainWindow):
         q = self.diag_search.text().strip().lower() if hasattr(self, "diag_search") else ""
         severity = self.diag_severity.currentText().strip().upper() if hasattr(self, "diag_severity") else "ANY SEVERITY"
         recommended_only = self.diag_recommended.isChecked() if hasattr(self, "diag_recommended") else False
+        sort_mode = self.diag_sort.currentText().strip().lower() if hasattr(self, "diag_sort") else "sort: severity"
         filtered: list[dict[str, Any]] = []
         for row in rows:
             status = str(row.get("status", "INFO")).upper()
@@ -2234,6 +2287,11 @@ class MainWindow(QMainWindow):
             if q and q not in blob:
                 continue
             filtered.append(row)
+        if "title" in sort_mode:
+            filtered.sort(key=lambda row: str(row.get("title", "")).lower())
+        else:
+            severity_rank = {"CRIT": 0, "WARN": 1, "OK": 2, "INFO": 3}
+            filtered.sort(key=lambda row: (severity_rank.get(str(row.get("status", "INFO")).upper(), 9), str(row.get("title", "")).lower()))
         self._clear_layout(self.diag_feed_layout)
         if not filtered:
             run_cta = PrimaryButton("Run Quick Check")
@@ -2483,6 +2541,7 @@ class MainWindow(QMainWindow):
         self.safety_policy = policy_from_settings(self.settings_state)
         policy = self.layout_policy_state
         scope = self.fix_scope.currentText() if hasattr(self, "fix_scope") else "Recommended"
+        query = self.fix_search.text().strip().lower() if hasattr(self, "fix_search") else ""
         if hasattr(self, "fix_scope"):
             self.fix_scope.setVisible(policy.show_fixes_scope_controls)
             self.fix_scope.setEnabled(policy.show_fixes_scope_controls)
@@ -2513,6 +2572,10 @@ class MainWindow(QMainWindow):
                 continue
             if scope == "Recommended" and fx.risk != "Safe":
                 continue
+            if query:
+                blob = f"{fx.title} {fx.description} {fx.plain} {fx.key}".lower()
+                if query not in blob:
+                    continue
             adapters.append(FeedItemAdapter(key=fx.key, title=fx.title, subtitle=fx.plain, payload=fx.key, category=fx.risk, status=fx.risk))
         self.fix_list.set_items(adapters)
         if not adapters:
@@ -2681,6 +2744,10 @@ class MainWindow(QMainWindow):
     def _on_report_tree_item_selected(self, item: QTreeWidgetItem | None) -> None:
         if item is None:
             return
+        if self.nav.currentRow() != self.NAV_ITEMS.index("Reports"):
+            return
+        if hasattr(self, "rep_tree") and (not self.rep_tree.hasFocus()):
+            return
         self._set_concierge_collapsed(False, persist=True)
         self._update_concierge()
 
@@ -2829,6 +2896,7 @@ class MainWindow(QMainWindow):
 
     def _refresh_history(self) -> None:
         q = self.hist_search.text().strip().lower() if hasattr(self, "hist_search") else ""
+        scope = self.hist_scope.currentText().strip().lower() if hasattr(self, "hist_scope") else "all sessions"
         adapters: list[FeedItemAdapter] = []
         rows: list[Any] = []
         try:
@@ -2842,6 +2910,13 @@ class MainWindow(QMainWindow):
             blob = f"{payload.get('session_id', '')} {payload.get('symptom', '')} {payload.get('summary', '')}".lower()
             if q and q not in blob:
                 continue
+            exported = bool(payload.get("last_export_path"))
+            if scope == "with exports" and not exported:
+                continue
+            if scope == "failures":
+                summary_blob = str(payload.get("summary", "")).lower()
+                if not any(token in summary_blob for token in ("fail", "error", "warn", "crit")):
+                    continue
             adapters.append(
                 FeedItemAdapter(
                     key=str(payload.get("session_id", "")),
@@ -2849,7 +2924,7 @@ class MainWindow(QMainWindow):
                     subtitle=str(payload.get("summary", "")),
                     payload=payload,
                     timestamp=str(payload.get("created_utc", "")),
-                    export_status="Exported" if payload.get("last_export_path") else "New",
+                    export_status="Exported" if exported else "New",
                 )
             )
         self.hist_list.set_items(adapters)
@@ -3106,6 +3181,26 @@ class MainWindow(QMainWindow):
         q = self.tb_search.text().strip() if hasattr(self, "tb_search") else ""
         selected = self.tb_filter.currentText().strip().lower() if hasattr(self, "tb_filter") else "all categories"
         category_filter = "" if selected == "all categories" else self._tool_category_key(selected)
+        allow_safe = not hasattr(self, "pb_chip_safe") or self.pb_chip_safe.isChecked()
+        allow_admin = not hasattr(self, "pb_chip_admin") or self.pb_chip_admin.isChecked()
+        allow_advanced = not hasattr(self, "pb_chip_advanced") or self.pb_chip_advanced.isChecked()
+
+        def _risk_bucket(tool_id: str) -> str:
+            key = str(tool_id or "").strip().lower()
+            if "cmd_admin" in key:
+                return "admin"
+            if any(token in key for token in ("feedback", "get_help")):
+                return "advanced"
+            return "safe"
+
+        def _is_allowed(tool_id: str) -> bool:
+            bucket = _risk_bucket(tool_id)
+            if bucket == "safe":
+                return allow_safe
+            if bucket == "admin":
+                return allow_admin
+            return allow_advanced
+
         visible_tool_ids = self._visible_ids_for_prefix("tool.")
         top_adapters = [
             FeedItemAdapter(
@@ -3116,9 +3211,9 @@ class MainWindow(QMainWindow):
                 category=self._tool_category_label(t.category),
             )
             for t in TOP_TOOLS
-            if t.id in visible_tool_ids
+            if t.id in visible_tool_ids and _is_allowed(t.id)
         ]
-        rows = [tool for tool in search_tools(q) if tool.id in visible_tool_ids]
+        rows = [tool for tool in search_tools(q) if tool.id in visible_tool_ids and _is_allowed(tool.id)]
         if category_filter:
             rows = [t for t in rows if category_filter in self._tool_category_key(t.category)]
         all_adapters = [

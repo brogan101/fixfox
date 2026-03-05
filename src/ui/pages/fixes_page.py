@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from PySide6.QtWidgets import QCheckBox, QComboBox, QHBoxLayout, QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QCheckBox, QComboBox, QHBoxLayout, QLabel, QLineEdit, QVBoxLayout, QWidget
 
 from ..components.feed_renderer import FeedRenderer
 from ..style import spacing
@@ -26,12 +26,15 @@ class FixesPage(PageScroll):
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(spacing("md"))
+        details_btn = SoftButton("Details")
+        details_btn.clicked.connect(lambda: w._set_concierge_collapsed(False, persist=True))
         left_layout.addWidget(
             build_page_header(
                 "Fixes",
                 "Recommended fixes first, with rollback notes.",
                 help_text="Select a fix, review risk and rollback, then run through ToolRunner.",
                 on_help=w._show_page_help,
+                cta=details_btn,
             )
         )
         w.fix_callout = InlineCallout("Fixes", "", level="warn", density=w.settings_state.density)
@@ -39,6 +42,10 @@ class FixesPage(PageScroll):
         w.fix_scope = QComboBox()
         w.fix_scope.addItems(["Recommended", "All"])
         w.fix_scope.currentTextChanged.connect(w._refresh_fixes)
+        w.fix_search = QLineEdit()
+        w.fix_search.setObjectName("SearchInput")
+        w.fix_search.setPlaceholderText("Search fixes")
+        w.fix_search.textChanged.connect(w._refresh_fixes)
         w.fix_chip_safe = QCheckBox("Safe")
         w.fix_chip_admin = QCheckBox("Admin")
         w.fix_chip_adv = QCheckBox("Advanced")
@@ -58,6 +65,7 @@ class FixesPage(PageScroll):
         chip_layout.addWidget(w.fix_chip_adv)
         chip_layout.addStretch(1)
         policy_card.body_layout().addWidget(w.fix_policy_text)
+        policy_card.body_layout().addWidget(w.fix_search)
         policy_card.body_layout().addWidget(chip_row)
         left_layout.addWidget(policy_card)
 

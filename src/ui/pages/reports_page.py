@@ -22,16 +22,25 @@ class ReportsPage(PageScroll):
         layout = QVBoxLayout(self.content)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(spacing("md"))
+        details_btn = SoftButton("Details")
+        details_btn.clicked.connect(lambda: w._set_concierge_collapsed(False, persist=True))
         layout.addWidget(
             build_page_header(
                 "Reports",
                 "Export validated packs with share-safe masking.",
                 help_text="Use the 3-step flow: configure, preview evidence/redaction, then generate and validate.",
                 on_help=w._show_page_help,
+                cta=details_btn,
             )
         )
         w.rep_callout = InlineCallout("Reports", "", level="warn", density=w.settings_state.density)
         layout.addWidget(w.rep_callout)
+
+        export_flow = Card(
+            "Export Flow",
+            "1) Choose session  2) Choose export type  3) Configure masking  4) Generate export",
+        )
+        layout.addWidget(export_flow)
 
         w.rep_empty_state = EmptyState(
             "Run a goal first",
@@ -47,6 +56,10 @@ class ReportsPage(PageScroll):
         step1_layout = QVBoxLayout(step1)
         step1_layout.setContentsMargins(0, 0, 0, 0)
         step1_layout.setSpacing(spacing("md"))
+        step1_layout.addWidget(Card("Step 1: Choose Session", "Open a session from History, then return to Reports."))
+        open_history = SoftButton("Open History")
+        open_history.clicked.connect(lambda: w.nav.setCurrentRow(w.NAV_ITEMS.index("History")))
+        step1_layout.addWidget(open_history)
         w.rep_preset = QComboBox()
         w.rep_preset.addItems(list(PRESETS))
         w.rep_preset.currentTextChanged.connect(w._update_context_labels)
@@ -61,7 +74,7 @@ class ReportsPage(PageScroll):
         w.rep_preset_hint = QLabel("Basic mode is locked to Home Share preset.")
         w.rep_preset_hint.setObjectName("SubTitle")
         w.rep_preset_hint.setWordWrap(True)
-        step1_layout.addWidget(Card("Step 1: Configure", "Pick export policy and masking defaults.", right_widget=w.rep_preset))
+        step1_layout.addWidget(Card("Step 2: Choose Export Type", "Pick export policy and masking defaults.", right_widget=w.rep_preset))
         step1_layout.addWidget(w.rep_preset_hint)
         step1_layout.addWidget(w.rep_safe)
         step1_layout.addWidget(w.rep_ip)
@@ -75,7 +88,7 @@ class ReportsPage(PageScroll):
         w.rep_preview = QTextEdit()
         w.rep_preview.setReadOnly(True)
         w.rep_preview.setMinimumHeight(180)
-        redaction_card = Card("Step 2: Redaction Preview", "Before/after masking preview with token map.")
+        redaction_card = Card("Step 3: Configure Masking", "Before/after masking preview with token map.")
         w.rep_token_map = QLabel("Token map: PC_1 / USER_1 / SSID_1")
         w.rep_token_map.setWordWrap(True)
         redaction_card.body_layout().addWidget(w.rep_preview)
@@ -110,7 +123,7 @@ class ReportsPage(PageScroll):
         w.rep_generate.clicked.connect(w.export_current_session)
         w.rep_generate_override = SoftButton("Generate (Allow Warnings)")
         w.rep_generate_override.clicked.connect(w.export_current_session_allow_warnings)
-        w.rep_status = Card("Step 3: Generate and Validate", "No export yet.")
+        w.rep_status = Card("Step 4: Generate and Validate", "No export yet.")
         w.rep_actions = Card("Post-export Actions", "Available after export.")
         open_folder = SoftButton("Open Report Folder")
         open_folder.clicked.connect(w.open_last_export_folder)
@@ -127,8 +140,8 @@ class ReportsPage(PageScroll):
         step3_layout.addWidget(w.rep_status)
         step3_layout.addWidget(w.rep_actions, 1)
 
-        w.rep_steps.addTab(step1, "1. Configure")
-        w.rep_steps.addTab(step2, "2. Preview")
-        w.rep_steps.addTab(step3, "3. Generate")
+        w.rep_steps.addTab(step1, "1-2. Session + Type")
+        w.rep_steps.addTab(step2, "3. Masking + Preview")
+        w.rep_steps.addTab(step3, "4. Generate")
         layout.addWidget(w.rep_steps, 1)
         w._sync_reports_empty_state()

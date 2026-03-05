@@ -40,15 +40,18 @@ class HomePage(PageScroll):
         hero_actions_layout = QHBoxLayout(hero_actions)
         hero_actions_layout.setContentsMargins(0, 0, 0, 0)
         hero_actions_layout.setSpacing(spacing("sm"))
-        hero_run = PrimaryButton("Run Quick Check")
+        hero_run = PrimaryButton("Quick Check")
         hero_run.clicked.connect(lambda: w.run_quick_check("Quick Check"))
-        hero_settings = SoftButton("Open Settings")
+        hero_export = SoftButton("Export Pack")
+        hero_export.clicked.connect(lambda: w.nav.setCurrentRow(w.NAV_ITEMS.index("Reports")))
+        hero_reports = SoftButton("Open Reports")
+        hero_reports.clicked.connect(lambda: w.nav.setCurrentRow(w.NAV_ITEMS.index("Reports")))
+        hero_settings = SoftButton("Settings")
         hero_settings.clicked.connect(lambda: w.nav.setCurrentRow(w.NAV_ITEMS.index("Settings")))
-        hero_recent = SoftButton("Recent Session")
-        hero_recent.clicked.connect(lambda: w.nav.setCurrentRow(w.NAV_ITEMS.index("History")))
         hero_actions_layout.addWidget(hero_run)
+        hero_actions_layout.addWidget(hero_export)
+        hero_actions_layout.addWidget(hero_reports)
         hero_actions_layout.addWidget(hero_settings)
-        hero_actions_layout.addWidget(hero_recent)
         hero_actions_layout.addStretch(1)
 
         hero = Card("Welcome to Fix Fox", "Run local diagnostics and generate share-safe exports.", right_widget=hero_actions)
@@ -130,6 +133,12 @@ class HomePage(PageScroll):
             "Pending reboot: unknown | Recent updates: n/a | Reliability critical events: n/a",
         )
         layout.addWidget(w.home_changes)
+
+        w.home_recommended = Card(
+            "Recommended Next",
+            "Run Quick Check first, then review top findings in Diagnose and export a share-safe report.",
+        )
+        layout.addWidget(w.home_recommended)
 
         w.weekly_card = Card("Weekly Check Reminder", "Reminder is off.")
         layout.addWidget(w.weekly_card)

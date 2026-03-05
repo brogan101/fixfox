@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from PySide6.QtWidgets import QHBoxLayout, QLineEdit, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLineEdit, QVBoxLayout, QWidget
 
 from ..components.feed_renderer import FeedRenderer
 from ..style import spacing
@@ -26,12 +26,15 @@ class HistoryPage(PageScroll):
         center_layout = QVBoxLayout(center)
         center_layout.setContentsMargins(0, 0, 0, 0)
         center_layout.setSpacing(spacing("md"))
+        details_btn = SoftButton("Details")
+        details_btn.clicked.connect(lambda: w._set_concierge_collapsed(False, persist=True))
         center_layout.addWidget(
             build_page_header(
                 "History",
                 "Timeline of sessions with reopen and re-export.",
                 help_text="Search, reopen prior sessions, compare with active, or re-export without rerunning diagnostics.",
                 on_help=w._show_page_help,
+                cta=details_btn,
             )
         )
         w.hist_callout = InlineCallout("History", "", level="info", density=w.settings_state.density)
@@ -40,11 +43,15 @@ class HistoryPage(PageScroll):
         w.hist_search.setObjectName("SearchInput")
         w.hist_search.setPlaceholderText("Search sessions")
         w.hist_search.textChanged.connect(w._refresh_history)
+        w.hist_scope = QComboBox()
+        w.hist_scope.addItems(["All Sessions", "With Exports", "Failures"])
+        w.hist_scope.currentTextChanged.connect(w._refresh_history)
         w.hist_list = FeedRenderer(w._make_session_row, density=w.settings_state.density, empty_icon="clock", empty_message="No sessions found.")
         w.hist_list.item_activated.connect(lambda payload: w._load_session(str((payload or {}).get("session_id", ""))) if isinstance(payload, dict) else None)
         w.hist_list.context_requested.connect(w._session_menu)
         w.hist_list.item_selected.connect(lambda _: w._update_history_detail())
         center_layout.addWidget(w.hist_search)
+        center_layout.addWidget(w.hist_scope)
         center_layout.addWidget(w.hist_list, 1)
 
         right = QWidget()

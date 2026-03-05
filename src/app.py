@@ -65,6 +65,7 @@ def _load_runtime_imports():
         from .core.settings import load_settings
         from .core.utils import resource_path
         from .ui.app_qss import build_qss
+        from .ui.font_utils import font_asset_candidates
         from .ui.theme import resolve_theme_tokens, set_ui_scale_percent
         from .ui.shell import AppShell
     except ImportError:
@@ -76,6 +77,7 @@ def _load_runtime_imports():
         from src.core.settings import load_settings
         from src.core.utils import resource_path
         from src.ui.app_qss import build_qss
+        from src.ui.font_utils import font_asset_candidates
         from src.ui.theme import resolve_theme_tokens, set_ui_scale_percent
         from src.ui.shell import AppShell
     return (
@@ -91,32 +93,11 @@ def _load_runtime_imports():
         load_settings,
         resource_path,
         build_qss,
+        font_asset_candidates,
         resolve_theme_tokens,
         set_ui_scale_percent,
         AppShell,
     )
-
-
-def _font_candidates(resource_path) -> list[Path]:
-    candidates: list[Path] = []
-    app_root = Path(__file__).resolve().parent
-    candidates.append(app_root / "assets" / "fonts" / "NotoSans-Regular.ttf")
-    meipass = getattr(sys, "_MEIPASS", None)
-    if meipass:
-        candidates.append(Path(meipass) / "assets" / "fonts" / "NotoSans-Regular.ttf")
-    try:
-        candidates.append(Path(resource_path("assets/fonts/NotoSans-Regular.ttf")))
-    except Exception:
-        pass
-    deduped: list[Path] = []
-    seen: set[str] = set()
-    for path in candidates:
-        key = str(path.resolve()) if path.exists() else str(path)
-        if key in seen:
-            continue
-        seen.add(key)
-        deduped.append(path)
-    return deduped
 
 
 def _is_valid_font_blob(blob: bytes) -> bool:
@@ -126,7 +107,7 @@ def _is_valid_font_blob(blob: bytes) -> bool:
     return magic == b"\x00\x01\x00\x00" or magic == b"OTTO"
 
 
-def _load_bundled_font(logger, resource_path) -> str:
+def _load_bundled_font(logger, font_asset_candidates) -> str:
     from PySide6.QtCore import QByteArray
     from PySide6.QtGui import QFont, QFontDatabase
     from PySide6.QtWidgets import QApplication
@@ -135,7 +116,7 @@ def _load_bundled_font(logger, resource_path) -> str:
     if app is None:
         return "Segoe UI"
 
-    for path in _font_candidates(resource_path):
+    for path in font_asset_candidates("NotoSans-Regular.ttf"):
         try:
             if not path.exists():
                 continue
@@ -165,6 +146,26 @@ def _load_bundled_font(logger, resource_path) -> str:
     return fallback
 
 
+def _apply_windows11_corner_hint(widget) -> None:
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+
+        DWMWA_WINDOW_CORNER_PREFERENCE = 33
+        DWMWCP_ROUND = 2
+        value = ctypes.c_int(DWMWCP_ROUND)
+        hwnd = int(widget.winId())
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(  # type: ignore[attr-defined]
+            ctypes.c_void_p(hwnd),
+            ctypes.c_uint(DWMWA_WINDOW_CORNER_PREFERENCE),
+            ctypes.byref(value),
+            ctypes.sizeof(value),
+        )
+    except Exception:
+        return
+
+
 def main():
     try:
         (
@@ -180,6 +181,7 @@ def main():
             load_settings,
             resource_path,
             build_qss,
+            font_asset_candidates,
             resolve_theme_tokens,
             set_ui_scale_percent,
             AppShell,
@@ -198,6 +200,9 @@ def main():
     except Exception as exc:
         logger.warning("DB initialization warning: %s", exc)
 
+    from PySide6.QtCore import QTimer, Qt
+
+    QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
     icon_path = resource_path(ICON_ICO)
@@ -205,7 +210,7 @@ def main():
     if app_icon.isNull():
         app_icon = QIcon(resource_path(ICON_PNG))
     app.setWindowIcon(app_icon)
-    _load_bundled_font(logger, resource_path)
+    _load_bundled_font(logger, font_asset_candidates)
     try:
         ensure_logo_on_desktop(overwrite=False)
     except Exception as exc:
@@ -216,13 +221,12 @@ def main():
     app.setStyleSheet(build_qss(tokens, settings.theme_mode, settings.density))
     w = AppShell()
     w.show()
+    QTimer.singleShot(0, lambda: _apply_windows11_corner_hint(w))
     try:
         auto_exit_ms = int(os.environ.get("FIXFOX_AUTO_EXIT_MS", "0").strip() or "0")
     except Exception:
         auto_exit_ms = 0
     if auto_exit_ms > 0:
-        from PySide6.QtCore import QTimer
-
         QTimer.singleShot(max(200, auto_exit_ms), app.quit)
     return app.exec()
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QScrollArea, QSplitter, QTextEdit, QToolButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QScrollArea, QTextEdit, QToolButton, QVBoxLayout, QWidget
 
 from .nav import NavRail
 from .toolbar import AppToolbar as TopAppBar
@@ -34,6 +34,9 @@ class SideSheet(QFrame):
         self.setObjectName("SideSheet")
         self._pinned = False
         self._collapsed = False
+        self._preferred_width = 340
+        self.setMinimumWidth(300)
+        self.setMaximumWidth(520)
 
         shell = QVBoxLayout(self)
         shell.setContentsMargins(spacing("sm"), spacing("sm"), spacing("sm"), spacing("sm"))
@@ -74,7 +77,7 @@ class SideSheet(QFrame):
         self.log_panel.setObjectName("SideSheetLog")
         self.log_panel.setReadOnly(True)
         self.log_panel.setMinimumHeight(90)
-        self.log_panel.setPlaceholderText("UI diagnostics output appears here.")
+        self.log_panel.setPlaceholderText("Context details and diagnostics output appear here.")
 
         shell.addWidget(header, 0)
         shell.addWidget(self.scroll, 1)
@@ -92,6 +95,15 @@ class SideSheet(QFrame):
     def collapsed(self) -> bool:
         return self._collapsed
 
+    @property
+    def preferred_width(self) -> int:
+        return self._preferred_width
+
+    def set_preferred_width(self, width: int) -> None:
+        target = max(self.minimumWidth(), min(self.maximumWidth(), int(width)))
+        self._preferred_width = target
+        self.setFixedWidth(target)
+
     def clear_widgets(self) -> None:
         while self.content_layout.count():
             item = self.content_layout.takeAt(0)
@@ -104,9 +116,8 @@ class SideSheet(QFrame):
 
     def append_log(self, line: str) -> None:
         text = str(line or "").strip()
-        if not text:
-            return
-        self.log_panel.append(text)
+        if text:
+            self.log_panel.append(text)
 
     def set_collapsed(self, collapsed: bool) -> None:
         next_state = bool(collapsed)
@@ -148,18 +159,22 @@ class AppShellFrame(QFrame):
         self.toolbar = TopAppBar()
         root.addWidget(self.toolbar, 0)
 
-        self.splitter = QSplitter(Qt.Horizontal)
-        self.splitter.setChildrenCollapsible(False)
-        root.addWidget(self.splitter, 1)
+        self.content_row = QWidget()
+        self.content_row.setObjectName("ShellContentRow")
+        row_layout = QHBoxLayout(self.content_row)
+        row_layout.setContentsMargins(0, 0, 0, 0)
+        row_layout.setSpacing(spacing("md"))
+        root.addWidget(self.content_row, 1)
 
         self.nav_rail = NavRail()
-        self.splitter.addWidget(self.nav_rail)
+        row_layout.addWidget(self.nav_rail, 0)
 
         self.page_host = PageHost()
-        self.splitter.addWidget(self.page_host)
+        row_layout.addWidget(self.page_host, 1)
 
         self.side_sheet = SideSheet()
-        self.splitter.addWidget(self.side_sheet)
+        self.side_sheet.set_preferred_width(340)
+        row_layout.addWidget(self.side_sheet, 0)
 
         self.bottom_status = StatusBar()
         root.addWidget(self.bottom_status, 0)
@@ -169,3 +184,16 @@ class AppShellFrame(QFrame):
         self.details_drawer = self.side_sheet
         self.details_layout = self.side_sheet.content_layout
         self.nav_shell = self.nav_rail
+
+    def details_open(self) -> bool:
+        return not self.side_sheet.collapsed
+
+    def set_details_open(self, opened: bool) -> None:
+        self.side_sheet.set_collapsed(not bool(opened))
+        self.toolbar.set_details_open(bool(opened))
+
+    def set_details_width(self, width: int) -> None:
+        self.side_sheet.set_preferred_width(width)
+
+    def details_width(self) -> int:
+        return self.side_sheet.preferred_width

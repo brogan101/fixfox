@@ -55,6 +55,7 @@ class ToolRunnerWindow(QDialog):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
+        self.setObjectName("ToolRunnerWindow")
         self.setWindowTitle(f"Tool Runner - {tool_name}")
         self.resize(900, 680)
         self._tool_name = tool_name
@@ -77,6 +78,7 @@ class ToolRunnerWindow(QDialog):
         self._spinner_frames = ("|", "/", "-", "\\")
         self._spinner_index = 0
         self._running_hint = "Running... waiting for live output."
+        self._pending_output_lines: list[str] = []
 
         root = QVBoxLayout(self)
         root.setContentsMargins(spacing("sm"), spacing("sm"), spacing("sm"), spacing("sm"))
@@ -104,6 +106,7 @@ class ToolRunnerWindow(QDialog):
         root.addWidget(header)
 
         self.tabs = QTabWidget()
+        self.tabs.setDocumentMode(True)
         self.txt_overview = QTextEdit()
         self.txt_overview.setReadOnly(True)
         self.txt_overview.setPlainText(self._running_overview())
@@ -173,6 +176,9 @@ class ToolRunnerWindow(QDialog):
         self._tick_timer = QTimer(self)
         self._tick_timer.timeout.connect(self._tick_elapsed)
         self._tick_timer.start(1000)
+        self._flush_timer = QTimer(self)
+        self._flush_timer.setInterval(40)
+        self._flush_timer.timeout.connect(self._flush_output_lines)
         self.attach_event_bus(event_bus, self._run_id)
 
     def _tick_elapsed(self) -> None:
@@ -301,12 +307,24 @@ class ToolRunnerWindow(QDialog):
         if self._paused:
             self._paused_buffer.append(line)
             return
+        self._pending_output_lines.append(line)
+        if not self._flush_timer.isActive():
+            self._flush_timer.start()
+
+    def _flush_output_lines(self) -> None:
+        if not self._pending_output_lines:
+            self._flush_timer.stop()
+            return
         bar = self.txt_output.verticalScrollBar()
         at_bottom = bar.value() >= max(0, bar.maximum() - 2)
-        self.txt_output.appendPlainText(line)
+        chunk = self._pending_output_lines[:120]
+        self._pending_output_lines = self._pending_output_lines[120:]
+        self.txt_output.appendPlainText("\n".join(chunk))
         follow = self._auto_scroll_forced if self._auto_scroll_forced is not None else self._auto_scroll
         if follow and at_bottom:
             bar.setValue(bar.maximum())
+        if not self._pending_output_lines:
+            self._flush_timer.stop()
 
     def _on_output_scroll(self, value: int) -> None:
         if self._auto_scroll_forced is not None:
@@ -685,4 +703,6 @@ class ToolRunnerWindow(QDialog):
 
     def closeEvent(self, event: Any) -> None:  # type: ignore[override]
         self._unsubscribe_event_bus()
+        if hasattr(self, "_flush_timer"):
+            self._flush_timer.stop()
         super().closeEvent(event)

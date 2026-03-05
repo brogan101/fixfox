@@ -20,7 +20,6 @@ def build_qss(tokens: ThemeTokens, mode: str, density: str) -> str:
     density_key = normalize_density(density)
     d = resolve_density_tokens(density_key)
     scroll_size = 10 if density_key == "compact" else 12
-    splitter_size = 6 if density_key == "compact" else 8
 
     focus_ring = _alpha(tokens.accent, 0.34)
     accent_tint = _alpha(tokens.accent, 0.15)
@@ -68,6 +67,10 @@ QFrame#BrandStatus {{
 QLabel#Wordmark {{
   font-size: {d.font_size + 1}pt;
   font-weight: 700;
+}}
+QLabel#TopBrandSubtitle {{
+  color: {text_soft};
+  font-size: {max(8, d.font_size - 1)}pt;
 }}
 QLabel#BrandMark {{
   background: transparent;
@@ -403,6 +406,10 @@ QFrame#ResultRow {{
   border: 1px solid {border_soft};
   border-radius: {d.corner_radius}px;
 }}
+QLabel#SearchResultLabel {{
+  background: transparent;
+  color: {tokens.text};
+}}
 QLabel#ResultTitle {{
   font-weight: 650;
 }}
@@ -652,30 +659,22 @@ QFrame#Skeleton {{
   border: 1px solid {border_subtle};
   border-radius: {max(8, d.corner_radius - 2)}px;
 }}
-
-QSplitter::handle:horizontal {{
-  width: {splitter_size}px;
-  margin: 4px 0;
-  border-radius: {max(3, splitter_size // 2)}px;
-  background: {_alpha(tokens.border, 0.38)};
+QDialog#CommandPaletteDialog,
+QDialog#ToolRunnerWindow {{
+  background: {tokens.bg0};
+  border: 1px solid {border_soft};
+  border-radius: {d.corner_radius + 4}px;
 }}
-QSplitter::handle:horizontal:hover {{
-  background: {_alpha(tokens.accent, 0.34)};
+QProgressBar {{
+  background: {tokens.panel2};
+  border: 1px solid {border_soft};
+  border-radius: {max(5, d.corner_radius - 5)}px;
+  min-height: 10px;
+  text-align: center;
 }}
-QSplitter::handle:horizontal:pressed {{
-  background: {_alpha(tokens.accent_pressed, 0.44)};
-}}
-QSplitter::handle:vertical {{
-  height: {splitter_size}px;
-  margin: 0 4px;
-  border-radius: {max(3, splitter_size // 2)}px;
-  background: {_alpha(tokens.border, 0.38)};
-}}
-QSplitter::handle:vertical:hover {{
-  background: {_alpha(tokens.accent, 0.34)};
-}}
-QSplitter::handle:vertical:pressed {{
-  background: {_alpha(tokens.accent_pressed, 0.44)};
+QProgressBar::chunk {{
+  background: {tokens.accent};
+  border-radius: {max(5, d.corner_radius - 5)}px;
 }}
 
 QDialog#OnboardingFlow {{

@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QByteArray, Qt
 from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap
+from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QApplication, QStyle, QWidget
 
 from ..core.utils import resource_path
-
 
 _ICON_DIR = Path(resource_path("assets/icons"))
 _ICON_CACHE: dict[tuple[str, str, int], QIcon] = {}
@@ -15,7 +15,7 @@ _ICON_CACHE: dict[tuple[str, str, int], QIcon] = {}
 _ICON_ALIASES: dict[str, str] = {
     "home": "home",
     "playbooks": "playbooks",
-    "toolbox": "toolbox",
+    "toolbox": "playbooks",
     "diagnose": "diagnose",
     "fixes": "fixes",
     "reports": "reports",
@@ -24,11 +24,12 @@ _ICON_ALIASES: dict[str, str] = {
     "help": "help",
     "search": "search",
     "run": "run",
-    "play": "run",
+    "play": "play",
     "stop": "stop",
-    "cancel": "cancel",
+    "cancel": "stop",
     "export": "export",
-    "panel": "panel",
+    "download": "export",
+    "panel": "panel_open",
     "panel_open": "panel_open",
     "panel_closed": "panel_closed",
     "menu": "menu",
@@ -47,8 +48,7 @@ _FALLBACK_STYLE: dict[str, QStyle.StandardPixmap] = {
     "fixes": QStyle.SP_BrowserReload,
     "reports": QStyle.SP_DialogSaveButton,
     "history": QStyle.SP_FileDialogListView,
-    "toolbox": QStyle.SP_ComputerIcon,
-    "settings": QStyle.SP_FileDialogInfoView,
+    "settings": QStyle.SP_ComputerIcon,
     "search": QStyle.SP_FileDialogContentsView,
     "export": QStyle.SP_DialogSaveButton,
     "help": QStyle.SP_DialogHelpButton,
@@ -56,6 +56,7 @@ _FALLBACK_STYLE: dict[str, QStyle.StandardPixmap] = {
     "panel_open": QStyle.SP_TitleBarShadeButton,
     "panel_closed": QStyle.SP_TitleBarUnshadeButton,
     "run": QStyle.SP_MediaPlay,
+    "play": QStyle.SP_MediaPlay,
     "preview": QStyle.SP_FileDialogInfoView,
     "close": QStyle.SP_TitleBarCloseButton,
 }
@@ -72,54 +73,95 @@ def _icon_color(widget: QWidget | None) -> QColor:
 
 def _asset_path(icon_name: str) -> Path | None:
     slug = _ICON_ALIASES.get(icon_name, icon_name)
-    svg = _ICON_DIR / f"{slug}.svg"
-    if svg.exists():
-        return svg
-    png = _ICON_DIR / f"{slug}.png"
-    if png.exists():
-        return png
+    for suffix in (".svg", ".png"):
+        path = _ICON_DIR / f"{slug}{suffix}"
+        if path.exists():
+            return path
     return None
 
 
-def _tinted_icon(path: Path, color: QColor, size: int) -> QIcon:
+def render_svg(path: str | Path, size: int) -> QPixmap:
+    target = max(14, int(size))
+    pixmap = QPixmap(target, target)
+    pixmap.fill(Qt.transparent)
+    renderer = QSvgRenderer(str(path))
+    if not renderer.isValid():
+        return QPixmap()
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing, True)
+    painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+    renderer.render(painter)
+    painter.end()
+    return pixmap
+
+
+def render_svg_from_bytes(svg_data: bytes, size: int) -> QPixmap:
+    target = max(14, int(size))
+    pixmap = QPixmap(target, target)
+    pixmap.fill(Qt.transparent)
+    renderer = QSvgRenderer(QByteArray(svg_data))
+    if not renderer.isValid():
+        return QPixmap()
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing, True)
+    painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+    renderer.render(painter)
+    painter.end()
+    return pixmap
+
+
+def _rasterize_asset(path: Path, size: int) -> QPixmap:
+    if path.suffix.lower() == ".svg":
+        return render_svg(path, size)
     base = QPixmap(str(path))
     if base.isNull():
-        return QIcon()
-    scaled = base.scaled(size, size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-    tinted = QPixmap(scaled.size())
+        return QPixmap()
+    return base.scaled(size, size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+
+
+def _tint_pixmap(base: QPixmap, color: QColor) -> QPixmap:
+    if base.isNull():
+        return QPixmap()
+    tinted = QPixmap(base.size())
     tinted.fill(Qt.transparent)
     painter = QPainter(tinted)
     painter.setRenderHint(QPainter.Antialiasing, True)
-    painter.drawPixmap(0, 0, scaled)
+    painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+    painter.drawPixmap(0, 0, base)
     painter.setCompositionMode(QPainter.CompositionMode_SourceIn)
     painter.fillRect(tinted.rect(), color)
     painter.end()
-    return QIcon(tinted)
+    return tinted
 
 
 def get_icon(name: str, widget: QWidget | None = None, size: int = 20) -> QIcon:
-    icon_name = str(name or "").strip().lower()
-    if not icon_name:
-        icon_name = "menu"
+    icon_name = str(name or "").strip().lower() or "menu"
     color = _icon_color(widget)
     color_key = color.name(QColor.HexArgb)
-    cache_key = (icon_name, color_key, int(size))
+    target_size = max(14, int(size))
+    cache_key = (icon_name, color_key, target_size)
     cached = _ICON_CACHE.get(cache_key)
     if cached is not None:
         return cached
 
     path = _asset_path(icon_name)
     if path is not None:
-        icon = _tinted_icon(path, color, max(14, int(size)))
-        if not icon.isNull():
-            _ICON_CACHE[cache_key] = icon
-            return icon
+        pixmap = _rasterize_asset(path, target_size)
+        if not pixmap.isNull():
+            icon = QIcon(_tint_pixmap(pixmap, color))
+            if not icon.isNull():
+                _ICON_CACHE[cache_key] = icon
+                return icon
 
     style_key = _FALLBACK_STYLE.get(icon_name, QStyle.SP_FileIcon)
     if widget is not None:
-        return widget.style().standardIcon(style_key)
-    app = QApplication.instance()
-    if app is not None:
-        return app.style().standardIcon(style_key)
-    return QIcon()
+        icon = widget.style().standardIcon(style_key)
+    else:
+        app = QApplication.instance()
+        icon = app.style().standardIcon(style_key) if app is not None else QIcon()
+    _ICON_CACHE[cache_key] = icon
+    return icon
 
+
+def clear_icon_cache() -> None:
+    _ICON_CACHE.clear()

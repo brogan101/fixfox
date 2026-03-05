@@ -71,7 +71,7 @@ class AppSettings:
             self.window_x = -1
             self.window_y = -1
         if self.splitter_sizes is None:
-            self.splitter_sizes = [224, 860, 300]
+            self.splitter_sizes = [72, 860, 340]
         else:
             cleaned: list[int] = []
             for value in self.splitter_sizes:
@@ -79,7 +79,7 @@ class AppSettings:
                     cleaned.append(max(80, int(value)))
                 except Exception:
                     continue
-            self.splitter_sizes = cleaned[:3] if cleaned else [224, 860, 300]
+            self.splitter_sizes = cleaned[:3] if cleaned else [72, 860, 340]
         if self.pinned_actions is None:
             self.pinned_actions = []
         if self.favorites_fixes is None:

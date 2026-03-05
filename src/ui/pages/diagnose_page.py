@@ -6,7 +6,7 @@ from PySide6.QtWidgets import QCheckBox, QComboBox, QHBoxLayout, QLineEdit, QVBo
 
 from ..components.feed_renderer import SkeletonLoader
 from ..style import spacing
-from ..widgets import Card, EmptyState, InlineCallout, PrimaryButton
+from ..widgets import Card, EmptyState, InlineCallout, PrimaryButton, SoftButton
 from .common import PageScroll, build_page_header
 
 
@@ -63,12 +63,19 @@ class DiagnosePage(PageScroll):
         w.diag_severity = QComboBox()
         w.diag_severity.addItems(["Any Severity", "CRIT", "WARN", "OK", "INFO"])
         w.diag_recommended = QCheckBox("Recommended only")
+        w.diag_sort = QComboBox()
+        w.diag_sort.addItems(["Sort: Severity", "Sort: Title"])
         w.diag_search.textChanged.connect(w._apply_diagnose_filters)
         w.diag_severity.currentTextChanged.connect(w._apply_diagnose_filters)
         w.diag_recommended.stateChanged.connect(w._apply_diagnose_filters)
+        w.diag_sort.currentTextChanged.connect(w._apply_diagnose_filters)
+        details_btn = SoftButton("Details")
+        details_btn.clicked.connect(lambda: w._set_concierge_collapsed(False, persist=True))
         toolbar_row_layout.addWidget(w.diag_search, 1)
         toolbar_row_layout.addWidget(w.diag_severity, 0)
         toolbar_row_layout.addWidget(w.diag_recommended, 0)
+        toolbar_row_layout.addWidget(w.diag_sort, 0)
+        toolbar_row_layout.addWidget(details_btn, 0)
         toolbar.body_layout().addWidget(toolbar_row)
         center_layout.addWidget(toolbar)
         w.diag_loading = SkeletonLoader(rows=5, density=w.settings_state.density)

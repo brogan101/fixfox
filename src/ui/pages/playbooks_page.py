@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QGridLayout,
     QHBoxLayout,
@@ -77,10 +78,21 @@ class PlaybooksPage(PageScroll):
         w.pb_segment = QComboBox()
         w.pb_segment.addItems(["Tools", "Runbooks"])
         w.pb_segment.currentTextChanged.connect(lambda _: w._switch_playbooks_segment())
+        w.pb_chip_safe = QCheckBox("Safe")
+        w.pb_chip_safe.setChecked(True)
+        w.pb_chip_admin = QCheckBox("Admin")
+        w.pb_chip_admin.setChecked(True)
+        w.pb_chip_advanced = QCheckBox("Advanced")
+        w.pb_chip_advanced.setChecked(True)
+        for chip in (w.pb_chip_safe, w.pb_chip_admin, w.pb_chip_advanced):
+            chip.stateChanged.connect(w._refresh_toolbox)
         w.pb_advanced_toggle = SoftButton("Show advanced script tasks")
         w.pb_advanced_toggle.clicked.connect(w._toggle_advanced_script_tasks)
         controls_row1.addWidget(w.tb_search, 1)
         controls_row1.addWidget(w.pb_segment, 0)
+        controls_row2.addWidget(w.pb_chip_safe, 0)
+        controls_row2.addWidget(w.pb_chip_admin, 0)
+        controls_row2.addWidget(w.pb_chip_advanced, 0)
         controls_row2.addStretch(1)
         controls_row2.addWidget(w.pb_advanced_toggle, 0)
         controls_outer.addLayout(controls_row1)

@@ -239,3 +239,99 @@ Smoke test passed.
   - scripts/ui_smoke_check.py
   - docs/UI_AUDIT.md
   - docs/UI_ACCEPTANCE.md
+
+---
+
+## Run Start (2026-03-05 UI/UX Rebuild)
+- Start timestamp: 2026-03-05T12:38:17.7543012-05:00
+- Starting commit hash: `3b7ebf0601c5df01278d1af803c4b8a8a7007997`
+- Branch: `main`
+- Goals for this run:
+  - Full UI/UX rebuild to rail-only navigation + top app bar + optional right details panel.
+  - Remove primary splitter handles and make responsive layout with robust scaling.
+  - Add real SVG icon assets and replace glyph-based nav icons.
+  - Fix branding mark rendering and top app bar identity.
+  - Rebuild global search/dropdown behavior with stable interaction and fuzzy ranking.
+  - Redesign onboarding flow for readability, theming, and proper first-run UX.
+  - Restyle all core pages (home/diagnose/playbooks/reports/settings/history/fixes).
+  - Restyle tool runner to match theme and remove visual artifacts.
+  - Add UI responsiveness/performance improvements and debug timing logs.
+  - Improve Windows 11 visual fit and high DPI behavior.
+  - Fix font path resolution issues and remove runtime font load errors.
+  - Remove broken placeholders/duplicates/wiring issues.
+  - Do safe repository cleanup with notes.
+  - Add UI audit script and run verification proof.
+  - Commit and push with final proof outputs.
+- Expected files to touch:
+  - `src/ui/components/app_shell.py`
+  - `src/ui/main_window_impl.py`
+  - `src/ui/components/toolbar.py`
+  - `src/ui/components/global_search.py`
+  - `src/ui/icons.py`
+  - `src/ui/components/nav.py`
+  - `src/ui/components/onboarding.py`
+  - `src/ui/components/tool_runner.py`
+  - `src/ui/pages/*.py`
+  - `src/ui/font_utils.py`
+  - `src/assets/icons/*`
+  - `scripts/ui_audit.py`
+  - `docs/UI_REBUILD_CHECKLIST.md`
+  - `docs/REPO_CLEANUP_NOTES.md`
+
+### Baseline File Discovery (2026-03-05)
+- App shell layout (splitter/nav/page/details): `src/ui/components/app_shell.py`
+- Main shell/nav wiring + details + search routing: `src/ui/main_window_impl.py`
+- Nav rail icon handling: `src/ui/components/nav.py`
+- Top app bar identity/logo/actions: `src/ui/components/toolbar.py`
+- Global search dropdown: `src/ui/components/global_search.py`
+- Command palette dialog: `src/ui/main_window_impl.py` (`CommandPaletteDialog`)
+- Onboarding wizard screens: `src/ui/components/onboarding.py`
+- Tool runner window styling: `src/ui/components/tool_runner.py`
+- Settings page/nav+sections: `src/ui/pages/settings_page.py`
+- Reports page duplicate action candidates: `src/ui/pages/reports_page.py` and report navigation actions in `src/ui/main_window_impl.py`
+- Icon loader + fallback handling: `src/ui/icons.py`
+- Theme/QSS styling and splitter handle styling: `src/ui/style/qss_builder.py`
+- Font bootstrap/runtime loading path logic: `src/app.py`, `src/ui/font_utils.py`
+- Page layouts to restyle:
+  - `src/ui/pages/home_page.py`
+  - `src/ui/pages/diagnose_page.py`
+  - `src/ui/pages/playbooks_page.py`
+  - `src/ui/pages/reports_page.py`
+  - `src/ui/pages/settings_page.py`
+  - `src/ui/pages/history_page.py`
+  - `src/ui/pages/fixes_page.py`
+
+### Baseline Runtime
+- `python -m pip install -r requirements.txt` (success)
+- Launch probe for `python -m src.app` (result: `app_started_ok`)
+## Run Progress (2026-03-05 UI Rebuild)
+### Commands Executed
+- `git fetch --all`
+- `git rev-parse HEAD`
+- `.\.venv\Scripts\python -m pip install -r requirements.txt`
+- Launch probe: `python -m src.app` (startup check)
+- `.\.venv\Scripts\python scripts/ui_audit.py`
+- `.\.venv\Scripts\python -m src.tests.smoke`
+- `.\.venv\Scripts\python -m src.tests.test_unit`
+
+### Outcomes
+- Dependency install: success (`rapidfuzz` added and imported).
+- App startup probe: success (`app_started_ok`).
+- UI audit: pass (icons, no `QSplitter`, details open/close, search persistence, clipping checks).
+- Smoke test: pass.
+- Unit tests: pass.
+- Font runtime check: startup output confirms `Noto Sans`; no `qt.qpa.font` errors observed.
+
+### Major Changes
+- Replaced shell splitter architecture with fixed rail + central host + optional details side sheet (`src/ui/components/app_shell.py`).
+- Added visible top app bar details toggle + upgraded branding mark/wordmark/subtitle (`src/ui/components/toolbar.py`).
+- Rebuilt icon system with QtSvg render/tint/cache and real icon aliases (`src/ui/icons.py`, `src/assets/icons/`).
+- Rebuilt global search dropdown behavior to stable non-popup tool window + grouped fuzzy matches + highlighted text (`src/ui/components/global_search.py`, `src/ui/main_window_impl.py`).
+- Reworked onboarding to 4-step flow with clear stepper and first-action cards (`src/ui/components/onboarding.py`).
+- Restyled and rewired core pages (home/diagnose/playbooks/reports/settings/history/fixes).
+- Restyled tool runner window and batched live-output appends for better responsiveness.
+- Added high-DPI and Win11 corner hint plumbing in startup (`src/app.py`).
+- Added UI audit automation script (`scripts/ui_audit.py`) and cleanup notes (`docs/REPO_CLEANUP_NOTES.md`).
+
+### Known Issues
+- None identified in automated UI audit, smoke, or unit test passes.
