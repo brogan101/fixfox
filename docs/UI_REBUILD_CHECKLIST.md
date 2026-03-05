@@ -5,10 +5,10 @@
 - [x] Printed starting commit hash
 - [x] Appended run start data to `docs/CODEX_RUN_LOG.md`
 - [x] Created this checklist with all requirement sections
-- [ ] Printed ending commit hash
-- [ ] Printed `git diff --stat`
-- [ ] Added brief change notes
-- [ ] Confirmed checklist 100% complete or failed loudly
+- [x] Printed ending commit hash
+- [x] Printed `git diff --stat`
+- [x] Added brief change notes
+- [x] Confirmed checklist 100% complete or failed loudly
 
 ## 1) Baseline Run + Real File Discovery
 - [x] Installed dependencies and ran app as repo expects
@@ -135,11 +135,11 @@
 - [x] Added final proof in run log: commands/outcomes/known issues
 
 ## 15) Deliverables
-- [ ] Commit created with UI overhaul message
-- [ ] Pushed to `origin` (active branch)
-- [ ] Printed `git status`
-- [ ] Printed `git diff --stat`
-- [ ] Printed ending `git rev-parse HEAD`
+- [x] Commit created with UI overhaul message
+- [x] Pushed to `origin` (active branch)
+- [x] Printed `git status`
+- [x] Printed `git diff --stat`
+- [x] Printed ending `git rev-parse HEAD`
 
 ## Manual QA Checklist
 - [x] Home/Diagnose/Playbooks/Reports/Settings/History/Fixes consistent and modern

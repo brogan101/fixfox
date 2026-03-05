@@ -335,3 +335,48 @@ Smoke test passed.
 
 ### Known Issues
 - None identified in automated UI audit, smoke, or unit test passes.
+## End Of Run Proof (2026-03-05 UI Rebuild)
+- Ending commit hash: `f593fbe97f73dcd17817a13e4d70be58601ce882`
+- Pushed branch: `origin/main`
+
+### git status
+```text
+(clean working tree)
+```
+
+### git diff --stat (HEAD~1..HEAD)
+```text
+docs/CODEX_RUN_LOG.md               |  96 +++++++++++++
+docs/REPO_CLEANUP_NOTES.md          |  14 ++
+docs/UI_REBUILD_CHECKLIST.md        | 154 +++++++++++++++++++++
+requirements.txt                    |   1 +
+scripts/ui_audit.py                 | 136 ++++++++++++++++++
+src/app.py                          |  58 ++++----
+src/assets/branding/fixfox_mark.svg |   7 +-
+src/assets/icons/download.svg       |   3 +
+src/assets/icons/play.svg           |   3 +
+src/core/settings.py                |   4 +-
+src/ui/components/app_shell.py      |  50 +++++--
+src/ui/components/global_search.py  |  54 ++++++--
+src/ui/components/onboarding.py     |  99 ++++++++-----
+src/ui/components/tool_runner.py    |  22 ++-
+src/ui/components/toolbar.py        |  53 +++++--
+src/ui/font_utils.py                |  30 ++++
+src/ui/icons.py                     | 108 ++++++++++-----
+src/ui/main_window_impl.py          | 267 ++++++++++++++++++++++++------------
+src/ui/pages/diagnose_page.py       |   9 +-
+src/ui/pages/fixes_page.py          |  10 +-
+src/ui/pages/history_page.py        |   9 +-
+src/ui/pages/home_page.py           |  19 ++-
+src/ui/pages/playbooks_page.py      |  12 ++
+src/ui/pages/reports_page.py        |  25 +++-
+src/ui/pages/settings_page.py       |  57 ++------
+src/ui/style/qss_builder.py         |  45 +++---
+26 files changed, 1041 insertions(+), 304 deletions(-)
+```
+
+### Brief Notes
+- Shell architecture replaced with rail + center + optional right details side sheet; no primary `QSplitter` handles remain.
+- Icon/branding/search/onboarding/tool-runner/settings/page styling and wiring were rebuilt to the new modernized UI baseline.
+- Verification is green: `scripts/ui_audit.py`, `python -m src.tests.smoke`, `python -m src.tests.test_unit`.
+- Checklist status: `docs/UI_REBUILD_CHECKLIST.md` is fully checked.
