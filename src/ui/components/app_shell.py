@@ -5,6 +5,7 @@ from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QScrollArea, QSplitte
 
 from .nav import NavRail
 from .toolbar import AppToolbar as TopAppBar
+from ..icons import get_icon
 from ..style import spacing
 
 
@@ -47,11 +48,13 @@ class SideSheet(QFrame):
         self.pin_btn = QToolButton()
         self.pin_btn.setObjectName("AppBarIconButton")
         self.pin_btn.setCheckable(True)
-        self.pin_btn.setText("PIN")
+        self.pin_btn.setText("")
+        self.pin_btn.setIcon(get_icon("pin", self.pin_btn))
         self.pin_btn.setToolTip("Pin details panel")
         self.close_btn = QToolButton()
         self.close_btn.setObjectName("AppBarIconButton")
-        self.close_btn.setText("X")
+        self.close_btn.setText("")
+        self.close_btn.setIcon(get_icon("close", self.close_btn))
         self.close_btn.setToolTip("Close details panel (Esc)")
         header_layout.addWidget(self.title, 1)
         header_layout.addWidget(self.pin_btn, 0)
@@ -119,6 +122,10 @@ class SideSheet(QFrame):
     def _on_pin_toggled(self, checked: bool) -> None:
         self._pinned = bool(checked)
         self.pin_changed.emit(self._pinned)
+
+    def refresh_icons(self) -> None:
+        self.pin_btn.setIcon(get_icon("pin", self.pin_btn))
+        self.close_btn.setIcon(get_icon("close", self.close_btn))
 
 
 class PageHost(QWidget):

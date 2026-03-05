@@ -22,7 +22,7 @@ def build_qss(tokens: ThemeTokens, mode: str, density: str) -> str:
     scroll_size = 10 if density_key == "compact" else 12
     splitter_size = 6 if density_key == "compact" else 8
 
-    focus_ring = _alpha(tokens.accent, 0.48)
+    focus_ring = _alpha(tokens.accent, 0.34)
     accent_tint = _alpha(tokens.accent, 0.15)
     accent_tint_strong = _alpha(tokens.accent, 0.24)
     border_soft = _alpha(tokens.border, 0.78)
@@ -69,6 +69,9 @@ QLabel#Wordmark {{
   font-size: {d.font_size + 1}pt;
   font-weight: 700;
 }}
+QLabel#BrandMark {{
+  background: transparent;
+}}
 QLabel#TopStatusText {{
   color: {tokens.text};
   font-weight: 600;
@@ -94,24 +97,23 @@ QFrame#NavRailDivider {{
 QToolButton#NavRailButton,
 QToolButton#NavRailAuxButton {{
   background: transparent;
-  border: 0;
+  border: 1px solid transparent;
   border-radius: {d.corner_radius + 8}px;
-  font-size: {d.font_size + 2}pt;
+  padding: 0;
+  icon-size: {d.icon_size + 1}px;
 }}
 QToolButton#NavRailButton:checked {{
   background: {accent_tint};
-  border: 1px solid {focus_ring};
+  border-color: {focus_ring};
 }}
 QToolButton#NavRailButton:hover,
 QToolButton#NavRailAuxButton:hover {{
   background: {surface_alt};
+  border-color: {border_soft};
 }}
 QToolButton#NavRailButton:focus,
 QToolButton#NavRailAuxButton:focus {{
-  border: 1px solid {focus_ring};
-}}
-QLabel#NavRailGlyph {{
-  font-weight: 700;
+  border-color: {focus_ring};
 }}
 QLabel#RunnerStatusChip {{
   background: {tokens.panel2};
@@ -173,7 +175,7 @@ QListWidget#SettingsNav {{
   outline: 0;
 }}
 QListWidget#SettingsNav::item {{
-  height: {max(d.nav_item_height, d.input_height + 6)}px;
+  height: {max(d.nav_item_height + 2, d.input_height + 10)}px;
   border-radius: {d.corner_radius}px;
 }}
 QListWidget#SettingsNav::item:selected {{
@@ -185,6 +187,10 @@ QListWidget#SettingsNav::item:hover {{
 }}
 QListWidget#SettingsNav::item:disabled {{
   color: {disabled_text};
+}}
+QLabel#SettingsNavIcon {{
+  color: {tokens.text_muted};
+  min-width: 18px;
 }}
 
 QLabel#Title {{
@@ -362,7 +368,8 @@ QToolButton#AppBarIconButton {{
   border-radius: {max(12, d.corner_radius + 4)}px;
   background: {tokens.panel2};
   border: 1px solid {border_soft};
-  font-size: {d.font_size + 2}pt;
+  font-size: {d.font_size + 1}pt;
+  icon-size: {d.icon_size}px;
   padding: 0;
 }}
 QToolButton#AppBarIconButton:hover {{
@@ -650,25 +657,37 @@ QSplitter::handle:horizontal {{
   width: {splitter_size}px;
   margin: 4px 0;
   border-radius: {max(3, splitter_size // 2)}px;
-  background: {_alpha(tokens.border, 0.56)};
+  background: {_alpha(tokens.border, 0.38)};
 }}
 QSplitter::handle:horizontal:hover {{
-  background: {_alpha(tokens.accent, 0.48)};
+  background: {_alpha(tokens.accent, 0.34)};
 }}
 QSplitter::handle:horizontal:pressed {{
-  background: {_alpha(tokens.accent_pressed, 0.56)};
+  background: {_alpha(tokens.accent_pressed, 0.44)};
 }}
 QSplitter::handle:vertical {{
   height: {splitter_size}px;
   margin: 0 4px;
   border-radius: {max(3, splitter_size // 2)}px;
-  background: {_alpha(tokens.border, 0.56)};
+  background: {_alpha(tokens.border, 0.38)};
 }}
 QSplitter::handle:vertical:hover {{
-  background: {_alpha(tokens.accent, 0.48)};
+  background: {_alpha(tokens.accent, 0.34)};
 }}
 QSplitter::handle:vertical:pressed {{
-  background: {_alpha(tokens.accent_pressed, 0.56)};
+  background: {_alpha(tokens.accent_pressed, 0.44)};
+}}
+
+QDialog#OnboardingFlow {{
+  background: {tokens.bg0};
+}}
+QDialog#OnboardingFlow QFrame#OnboardingCard {{
+  background: {tokens.panel};
+  border: 1px solid {border_soft};
+  border-radius: {d.corner_radius + 4}px;
+}}
+QDialog#OnboardingFlow QStackedWidget#OnboardingStack {{
+  background: transparent;
 }}
 
 QFrame#AccordionHeader {{

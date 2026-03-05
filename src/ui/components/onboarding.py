@@ -4,20 +4,12 @@ from typing import Callable
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import (
-    QComboBox,
-    QDialog,
-    QHBoxLayout,
-    QLabel,
-    QPushButton,
-    QStackedWidget,
-    QVBoxLayout,
-    QWidget,
-)
+from PySide6.QtWidgets import QComboBox, QDialog, QHBoxLayout, QLabel, QStackedWidget, QVBoxLayout, QWidget
 
 from ...core.brand import APP_DISPLAY_NAME
 from ...core.utils import resource_path
 from ..style import spacing
+from ..widgets import Card, PrimaryButton, SoftButton
 
 
 class OnboardingFlow(QDialog):
@@ -34,7 +26,7 @@ class OnboardingFlow(QDialog):
         self.setObjectName("OnboardingFlow")
         self.setWindowTitle(f"Welcome to {APP_DISPLAY_NAME}")
         self.setModal(True)
-        self.resize(760, 460)
+        self.resize(820, 520)
 
         self.apply_preferences = apply_preferences
         self.result_action = "none"
@@ -44,7 +36,14 @@ class OnboardingFlow(QDialog):
         root.setContentsMargins(spacing("lg"), spacing("md"), spacing("lg"), spacing("md"))
         root.setSpacing(spacing("md"))
 
+        header = Card("Welcome", "Set essentials in under a minute.", object_name="OnboardingCard")
+        self.step_indicator = QLabel("Step 1 of 3")
+        self.step_indicator.setObjectName("SubTitle")
+        header.body_layout().addWidget(self.step_indicator)
+        root.addWidget(header, 0)
+
         self.stack = QStackedWidget()
+        self.stack.setObjectName("OnboardingStack")
         root.addWidget(self.stack, 1)
 
         self.step1 = self._build_step1()
@@ -57,10 +56,10 @@ class OnboardingFlow(QDialog):
         controls = QHBoxLayout()
         controls.setContentsMargins(0, 0, 0, 0)
         controls.setSpacing(spacing("sm"))
-        self.back_btn = QPushButton("Back")
-        self.next_btn = QPushButton("Next")
-        self.skip_btn = QPushButton("Skip")
-        self.finish_btn = QPushButton("Finish")
+        self.back_btn = SoftButton("Back")
+        self.next_btn = SoftButton("Next")
+        self.skip_btn = SoftButton("Skip")
+        self.finish_btn = PrimaryButton("Finish")
         self.finish_btn.setEnabled(False)
         controls.addWidget(self.back_btn, 0)
         controls.addWidget(self.next_btn, 0)
@@ -84,25 +83,21 @@ class OnboardingFlow(QDialog):
         layout.setContentsMargins(spacing("md"), spacing("sm"), spacing("md"), spacing("sm"))
         layout.setSpacing(spacing("md"))
 
+        card = Card("Welcome to Fix Fox", "Local-first desktop diagnostics and support workflows.", object_name="OnboardingCard")
         mark = QLabel()
+        mark.setObjectName("BrandMark")
         pix = QPixmap(resource_path("assets/branding/fixfox_mark.svg"))
         if not pix.isNull():
             mark.setPixmap(pix.scaled(54, 54, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-        mark.setAlignment(Qt.AlignLeft)
-
-        title = QLabel("Welcome to Fix Fox")
-        title.setObjectName("Title")
-        copy = QLabel("Runs locally on your machine.\nNo telemetry, no cloud sync.")
-        copy.setWordWrap(True)
+        copy = QLabel("Runs locally on this machine. No telemetry and no cloud sync.")
         copy.setObjectName("SubTitle")
-
-        start = QPushButton("Start")
+        copy.setWordWrap(True)
+        start = PrimaryButton("Start")
         start.clicked.connect(lambda: self.stack.setCurrentIndex(1))
-
-        layout.addWidget(mark, 0)
-        layout.addWidget(title, 0)
-        layout.addWidget(copy, 0)
-        layout.addWidget(start, 0, Qt.AlignLeft)
+        card.body_layout().addWidget(mark, 0, Qt.AlignLeft)
+        card.body_layout().addWidget(copy)
+        card.body_layout().addWidget(start, 0, Qt.AlignLeft)
+        layout.addWidget(card)
         layout.addStretch(1)
         return page
 
@@ -112,12 +107,7 @@ class OnboardingFlow(QDialog):
         layout.setContentsMargins(spacing("md"), spacing("sm"), spacing("md"), spacing("sm"))
         layout.setSpacing(spacing("md"))
 
-        title = QLabel("Preferences")
-        title.setObjectName("Title")
-        subtitle = QLabel("Pick essentials now. You can change these later in Settings.")
-        subtitle.setWordWrap(True)
-        subtitle.setObjectName("SubTitle")
-
+        card = Card("Preferences", "Theme, density, and mode update live.", object_name="OnboardingCard")
         mode_combo = QComboBox()
         mode_combo.addItems(["light", "dark"])
         mode_combo.setCurrentText("dark" if str(theme_mode).lower() == "dark" else "light")
@@ -130,19 +120,18 @@ class OnboardingFlow(QDialog):
         ui_mode_combo.addItems(["basic", "pro"])
         ui_mode_combo.setCurrentText("pro" if str(ui_mode).lower() == "pro" else "basic")
 
-        mode_note = QLabel("Basic is guided; Pro exposes advanced tools in overflow and sections.")
+        mode_note = QLabel("Basic is guided. Pro exposes advanced tools in overflow and expanded sections.")
         mode_note.setWordWrap(True)
         mode_note.setObjectName("SubTitle")
 
-        layout.addWidget(title)
-        layout.addWidget(subtitle)
-        layout.addWidget(QLabel("Theme"))
-        layout.addWidget(mode_combo)
-        layout.addWidget(QLabel("Density"))
-        layout.addWidget(density_combo)
-        layout.addWidget(QLabel("Mode"))
-        layout.addWidget(ui_mode_combo)
-        layout.addWidget(mode_note)
+        card.body_layout().addWidget(QLabel("Theme"))
+        card.body_layout().addWidget(mode_combo)
+        card.body_layout().addWidget(QLabel("Density"))
+        card.body_layout().addWidget(density_combo)
+        card.body_layout().addWidget(QLabel("Mode"))
+        card.body_layout().addWidget(ui_mode_combo)
+        card.body_layout().addWidget(mode_note)
+        layout.addWidget(card)
         layout.addStretch(1)
         return page, mode_combo, density_combo, ui_mode_combo
 
@@ -152,25 +141,20 @@ class OnboardingFlow(QDialog):
         layout.setContentsMargins(spacing("md"), spacing("sm"), spacing("md"), spacing("sm"))
         layout.setSpacing(spacing("md"))
 
-        title = QLabel("First action")
-        title.setObjectName("Title")
-        subtitle = QLabel("Start with a quick check or go to settings.")
-        subtitle.setObjectName("SubTitle")
-
-        quick_btn = QPushButton("Run Quick Check")
-        settings_btn = QPushButton("Open Settings")
-        resume_btn = QPushButton("Import/Resume Session")
+        card = Card("First Action", "Choose where you want to begin.", object_name="OnboardingCard")
+        quick_btn = PrimaryButton("Quick Check")
+        settings_btn = SoftButton("Open Settings")
+        resume_btn = SoftButton("Import/Resume Session")
         resume_btn.setEnabled(can_resume_session)
 
         quick_btn.clicked.connect(lambda: self._complete_with_action("quick_check"))
         settings_btn.clicked.connect(lambda: self._complete_with_action("settings"))
         resume_btn.clicked.connect(lambda: self._complete_with_action("resume"))
 
-        layout.addWidget(title)
-        layout.addWidget(subtitle)
-        layout.addWidget(quick_btn, 0, Qt.AlignLeft)
-        layout.addWidget(settings_btn, 0, Qt.AlignLeft)
-        layout.addWidget(resume_btn, 0, Qt.AlignLeft)
+        card.body_layout().addWidget(quick_btn, 0, Qt.AlignLeft)
+        card.body_layout().addWidget(settings_btn, 0, Qt.AlignLeft)
+        card.body_layout().addWidget(resume_btn, 0, Qt.AlignLeft)
+        layout.addWidget(card)
         layout.addStretch(1)
         return page
 
@@ -202,6 +186,7 @@ class OnboardingFlow(QDialog):
         self.back_btn.setEnabled(index > 0)
         self.next_btn.setEnabled(index < 2)
         self.finish_btn.setEnabled(index == 2)
+        self.step_indicator.setText(f"Step {index + 1} of 3")
 
     def _apply_live_preferences(self) -> None:
         if self.apply_preferences is None:
@@ -215,3 +200,4 @@ class OnboardingFlow(QDialog):
     @property
     def completed(self) -> bool:
         return self._completed
+

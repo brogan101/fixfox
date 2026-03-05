@@ -215,3 +215,27 @@ Smoke test passed.
   - python -m src.tests.test_unit -> PASS
   - python -m src.tests.test_ui_layout_sanity -> PASS
   - python -m src.app (offscreen auto-exit) -> PASS, no font warnings observed
+
+## Codex Run - 2026-03-05 11:49:52 -05:00
+- Start commit: 6310bced0cb45d246a78781a0c5a59cc8cddc013
+- Goals:
+  - Rebuild shell toward rail-only + clean app bar + contextual side panel behavior
+  - Replace placeholder glyphs/QStyle fallbacks with a real custom icon set from src/assets/icons
+  - Improve onboarding readability and settings IA/spacing while preserving app logic
+  - Fix search UX reliability and remove Qt-branding surfacing
+  - Add verification docs + UI smoke script + run proof checks/tests
+- Scope summary:
+  - UI architecture and styling refactor in existing PySide6 codebase, preserving diagnostics/fixes/runbooks/exports/session behavior
+- Initial files expected to change:
+  - src/ui/components/app_shell.py
+  - src/ui/components/nav.py
+  - src/ui/components/toolbar.py
+  - src/ui/icons.py
+  - src/ui/main_window_impl.py
+  - src/ui/style/qss_builder.py
+  - src/ui/components/onboarding.py
+  - src/ui/pages/settings_page.py
+  - src/assets/icons/*
+  - scripts/ui_smoke_check.py
+  - docs/UI_AUDIT.md
+  - docs/UI_ACCEPTANCE.md

@@ -91,16 +91,24 @@ class SettingsPage(PageScroll):
         shell.setSpacing(spacing("md"))
         w.settings_nav = QListWidget()
         w.settings_nav.setObjectName("SettingsNav")
-        w.settings_nav.setMinimumWidth(200)
-        w.settings_nav.setMaximumWidth(280)
+        w.settings_nav.setMinimumWidth(220)
+        w.settings_nav.setMaximumWidth(300)
         settings_row_height = resolve_density_tokens(w.settings_state.density).nav_item_height
-        settings_sections = ("Safety", "Privacy", "Privacy & Safety", "Appearance", "Advanced", "About", "Feedback")
-        for name in settings_sections:
+        settings_sections = (
+            ("Safety", "shield"),
+            ("Privacy", "privacy"),
+            ("Appearance", "settings"),
+            ("Advanced", "fixes"),
+            ("About", "info"),
+            ("Feedback", "help"),
+        )
+        for name, icon_name in settings_sections:
             item = QListWidgetItem(name)
             item.setData(Qt.UserRole, name)
+            item.setData(Qt.UserRole + 1, icon_name)
             item.setSizeHint(QSize(0, settings_row_height))
             w.settings_nav.addItem(item)
-            w.settings_nav.setItemWidget(item, w._settings_nav_item_widget(name))
+            w.settings_nav.setItemWidget(item, w._settings_nav_item_widget(name, icon_name))
         w.settings_stack = QStackedWidget()
         w.settings_nav.currentRowChanged.connect(lambda idx: w.settings_stack.setCurrentIndex(max(idx, 0)))
         w.settings_nav.currentRowChanged.connect(w._on_settings_section_changed)
@@ -157,25 +165,15 @@ class SettingsPage(PageScroll):
         c_priv.body_layout().addWidget(w._setting_hint(r"%LOCALAPPDATA%\\FixFox\\... (app data, sessions, exports, logs)."))
         c_priv.body_layout().addWidget(QLabel("What is not collected"))
         c_priv.body_layout().addWidget(w._setting_hint("Passwords, browser history content, clipboard history, and telemetry data."))
+        local_paths = ensure_dirs()
+        c_priv.body_layout().addWidget(QLabel("Local-only assurance"))
+        c_priv.body_layout().addWidget(w._setting_hint("No telemetry: diagnostics, sessions, and logs stay local unless you explicitly export/share."))
+        c_priv.body_layout().addWidget(w._setting_hint(f"Sessions path: {local_paths['sessions']}"))
+        c_priv.body_layout().addWidget(w._setting_hint(f"Logs path: {local_paths['logs']}"))
+        c_priv.body_layout().addWidget(w._setting_hint(f"Exports path: {local_paths['exports']}"))
         c_priv.body_layout().addWidget(w._setting_details("Masking applies to UI copy actions, Tool Runner copy/save, and export pack generation."))
         ppl.addWidget(c_priv)
         ppl.addStretch(1)
-
-        p_priv_safety = QWidget()
-        pps = QVBoxLayout(p_priv_safety)
-        pps.setContentsMargins(0, 0, 0, 0)
-        pps.setSpacing(10)
-        local_paths = ensure_dirs()
-        c_truth = Card("Privacy & Safety", "Everything in Fix Fox runs locally on this machine.")
-        c_truth.body_layout().addWidget(QLabel("No telemetry: Fix Fox does not send diagnostics, sessions, or logs to external services."))
-        c_truth.body_layout().addWidget(QLabel("Session storage: local JSON and sqlite state for faster history/search."))
-        c_truth.body_layout().addWidget(QLabel("Exports: generated only when you explicitly run Reports -> Generate Export."))
-        c_truth.body_layout().addWidget(QLabel(f"Sessions path: {local_paths['sessions']}"))
-        c_truth.body_layout().addWidget(QLabel(f"Logs path: {local_paths['logs']}"))
-        c_truth.body_layout().addWidget(QLabel(f"Exports path: {local_paths['exports']}"))
-        c_truth.body_layout().addWidget(w._setting_hint("Safe-only limits actions to low-risk defaults. Admin and Advanced show elevated/experts-only actions."))
-        pps.addWidget(c_truth)
-        pps.addStretch(1)
 
         p_appearance = QWidget()
         pal = QVBoxLayout(p_appearance)
@@ -246,7 +244,7 @@ class SettingsPage(PageScroll):
         b_diag.clicked.connect(w._collect_core_evidence)
         b_logo = SoftButton("Create Desktop Logo")
         b_logo.clicked.connect(lambda: w.create_desktop_logo(force=False))
-        b_logo_recreate = SoftButton("Recreate Desktop Logo")
+        b_logo_recreate = SoftButton("Rebuild Desktop Logo")
         b_logo_recreate.clicked.connect(lambda: w.create_desktop_logo(force=True))
         w.b_reset_onboarding = SoftButton("Reset Onboarding")
         w.b_reset_onboarding.clicked.connect(w.reset_onboarding_flow)
@@ -347,7 +345,7 @@ class SettingsPage(PageScroll):
         pfl.addWidget(c_fb)
         pfl.addStretch(1)
 
-        for page in (p_safety, p_privacy, p_priv_safety, p_appearance, p_advanced, p_about, p_feedback):
+        for page in (p_safety, p_privacy, p_appearance, p_advanced, p_about, p_feedback):
             w.settings_stack.addWidget(page)
         shell.addWidget(w.settings_stack, 1)
         layout.addLayout(shell, 1)

@@ -3,9 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QButtonGroup, QFrame, QHBoxLayout, QLabel, QSizePolicy, QToolButton, QVBoxLayout, QWidget
+from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtWidgets import QButtonGroup, QFrame, QSizePolicy, QToolButton, QVBoxLayout, QWidget
 
+from ..icons import get_icon
 from ..style import spacing
 
 
@@ -116,48 +117,39 @@ class NavRail(QWidget):
         if self._items:
             self.setCurrentRow(0)
 
-    def _make_button(self, label: str, glyph: str, row: int) -> QToolButton:
+    def _make_button(self, label: str, icon_name: str, row: int) -> QToolButton:
         btn = QToolButton()
         btn.setObjectName("NavRailButton")
-        btn.setToolButtonStyle(Qt.ToolButtonTextOnly)
-        btn.setText(glyph)
+        btn.setToolButtonStyle(Qt.ToolButtonIconOnly)
+        btn.setText("")
         btn.setToolTip(label)
         btn.setCheckable(True)
         btn.setAutoExclusive(False)
         btn.setFocusPolicy(Qt.TabFocus)
         btn.setCursor(Qt.PointingHandCursor)
         btn.setProperty("nav_label", label)
+        btn.setProperty("icon_name", icon_name)
         btn.setFixedSize(56, self._row_height)
+        icon_size = max(16, min(24, self._row_height - 24))
+        btn.setIconSize(QSize(icon_size, icon_size))
+        btn.setIcon(get_icon(icon_name, btn, size=icon_size))
         btn.setAccessibleName(f"Navigate to {label}")
         self._group.addButton(btn, row)
-
-        glyph_label = QLabel(glyph, btn)
-        glyph_label.setObjectName("NavRailGlyph")
-        glyph_label.setAlignment(Qt.AlignCenter)
-        glyph_label.setAttribute(Qt.WA_TransparentForMouseEvents, True)
-        glyph_layout = QHBoxLayout(btn)
-        glyph_layout.setContentsMargins(0, 0, 0, 0)
-        glyph_layout.setSpacing(0)
-        glyph_layout.addWidget(glyph_label, 1)
         return btn
 
-    def _make_aux_button(self, label: str, glyph: str) -> QToolButton:
+    def _make_aux_button(self, label: str, icon_name: str) -> QToolButton:
         btn = QToolButton()
         btn.setObjectName("NavRailAuxButton")
-        btn.setToolButtonStyle(Qt.ToolButtonTextOnly)
-        btn.setText(glyph)
+        btn.setToolButtonStyle(Qt.ToolButtonIconOnly)
+        btn.setText("")
         btn.setToolTip(label)
         btn.setFocusPolicy(Qt.TabFocus)
         btn.setCursor(Qt.PointingHandCursor)
+        btn.setProperty("icon_name", icon_name)
         btn.setFixedSize(56, self._row_height)
-        glyph_label = QLabel(glyph, btn)
-        glyph_label.setObjectName("NavRailGlyph")
-        glyph_label.setAlignment(Qt.AlignCenter)
-        glyph_label.setAttribute(Qt.WA_TransparentForMouseEvents, True)
-        glyph_layout = QHBoxLayout(btn)
-        glyph_layout.setContentsMargins(0, 0, 0, 0)
-        glyph_layout.setSpacing(0)
-        glyph_layout.addWidget(glyph_label, 1)
+        icon_size = max(16, min(24, self._row_height - 24))
+        btn.setIconSize(QSize(icon_size, icon_size))
+        btn.setIcon(get_icon(icon_name, btn, size=icon_size))
         return btn
 
     def _on_id_clicked(self, row: int) -> None:
@@ -195,3 +187,11 @@ class NavRail(QWidget):
             widget = item.widget()
             if widget is not None:
                 widget.deleteLater()
+
+    def refresh_icons(self) -> None:
+        for button in self.findChildren(QToolButton):
+            icon_name = str(button.property("icon_name") or "").strip().lower()
+            if not icon_name:
+                continue
+            size = button.iconSize().width() or 20
+            button.setIcon(get_icon(icon_name, button, size=size))

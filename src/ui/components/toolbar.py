@@ -6,6 +6,7 @@ from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QLineEdit, QStackedWi
 
 from ...core.brand import APP_DISPLAY_NAME
 from ...core.utils import resource_path
+from ..icons import get_icon
 from ..style import spacing
 from ..widgets import PrimaryButton, SoftButton
 
@@ -63,25 +64,28 @@ class AppToolbar(QFrame):
 
         self.top_search = QLineEdit()
         self.top_search.setObjectName("SearchInput")
-        self.top_search.setPlaceholderText("Search tools, fixes, sessions")
+        self.top_search.setPlaceholderText("Search across Fix Fox (Ctrl+K)")
         self.compact_search_btn = QToolButton()
         self.compact_search_btn.setObjectName("AppBarIconButton")
-        self.compact_search_btn.setText("S")
+        self.compact_search_btn.setText("")
+        self.compact_search_btn.setIcon(get_icon("search", self.compact_search_btn))
         self.compact_search_btn.setToolTip("Search")
         self.search_stack = QStackedWidget()
         self.search_stack.setObjectName("HeaderSearchStack")
         self.search_stack.addWidget(self.top_search)
         self.search_stack.addWidget(self.compact_search_btn)
 
-        self.btn_quick_check = PrimaryButton("Run Quick Check")
+        self.btn_quick_check = PrimaryButton("Quick Check")
         self.btn_quick_check.setToolTip("Run a safe quick diagnostic check (Ctrl+Shift+R)")
         self.btn_export = QToolButton()
         self.btn_export.setObjectName("AppBarIconButton")
-        self.btn_export.setText("EX")
+        self.btn_export.setText("")
+        self.btn_export.setIcon(get_icon("export", self.btn_export))
         self.btn_export.setToolTip("Open Reports")
         self.btn_overflow = QToolButton()
         self.btn_overflow.setObjectName("AppBarIconButton")
-        self.btn_overflow.setText("...")
+        self.btn_overflow.setText("")
+        self.btn_overflow.setIcon(get_icon("overflow", self.btn_overflow))
         self.btn_overflow.setToolTip("More actions")
 
         # Kept as hidden compatibility hooks for existing orchestration methods.
@@ -104,3 +108,8 @@ class AppToolbar(QFrame):
 
     def set_search_collapsed(self, collapsed: bool) -> None:
         self.search_stack.setCurrentIndex(1 if collapsed else 0)
+
+    def refresh_icons(self) -> None:
+        self.compact_search_btn.setIcon(get_icon("search", self.compact_search_btn))
+        self.btn_export.setIcon(get_icon("export", self.btn_export))
+        self.btn_overflow.setIcon(get_icon("overflow", self.btn_overflow))

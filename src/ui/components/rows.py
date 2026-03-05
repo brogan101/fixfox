@@ -66,7 +66,8 @@ class KebabMenuButton(QToolButton):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("KebabMenuButton")
-        self.setText("...")
+        self.setText("")
+        self.setIcon(get_icon("overflow", self, size=16))
         self.setCursor(Qt.PointingHandCursor)
         self.setFocusPolicy(Qt.TabFocus)
         self.clicked.connect(self._emit_request)
@@ -78,6 +79,8 @@ class KebabMenuButton(QToolButton):
     def set_density(self, density: str) -> None:
         d = resolve_density_tokens(density)
         self.setFixedSize(d.button_height, d.button_height)
+        self.setIconSize(QSize(d.icon_size, d.icon_size))
+        self.setIcon(get_icon("overflow", self, size=d.icon_size))
 
 
 class BaseRow(QFrame):

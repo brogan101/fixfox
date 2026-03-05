@@ -104,6 +104,7 @@ from .components.tool_runner import ToolRunnerWindow
 from .components.global_search import GlobalSearchPopup
 from .components.app_shell import AppShellFrame
 from .components.onboarding import OnboardingFlow
+from .icons import get_icon
 from .layout_guardrails import (
     MIN_NAV_WIDTH,
     MIN_RIGHT_PANEL_WIDTH,
@@ -445,7 +446,7 @@ class MainWindow(QMainWindow):
         self.top_search.textChanged.connect(self._schedule_global_search)
         self.top_search.returnPressed.connect(self._activate_global_search_or_palette)
         self.top_search.installEventFilter(self)
-        self.compact_search_btn.clicked.connect(self.open_command_palette)
+        self.compact_search_btn.clicked.connect(self._handle_compact_search)
         self.run_status_panel.clicked.connect(self.open_tool_runner)
         self.run_status_panel.setToolTip("Open ToolRunner (Ctrl+R)")
         self.btn_quick_check.clicked.connect(lambda: self.run_quick_check("Quick Check"))
@@ -502,6 +503,8 @@ class MainWindow(QMainWindow):
         self._refresh_db_info_label()
         self._sync_ui_mode_controls()
         self._apply_mode_visibility()
+        self.settings_state.right_panel_open = False
+        self._set_concierge_collapsed(True, persist=False)
         self._status_tick_timer = QTimer(self)
         self._status_tick_timer.timeout.connect(self._update_run_status_indicator)
         self._status_tick_timer.start(250)
@@ -520,22 +523,14 @@ class MainWindow(QMainWindow):
 
     def _build_nav(self) -> None:
         nav_height = resolve_density_tokens(self.settings_state.density).nav_item_height
-        glyphs = {
-            "home": "^",
-            "toolbox": "[]",
-            "diagnose": "!",
-            "fixes": "+",
-            "reports": "EX",
-            "history": "~",
-            "settings": "*",
-            "help": "?",
-        }
         self.nav_shell.set_items(
             list(self.NAV_ITEMS),
-            lambda label: glyphs.get(self.NAV_ICONS.get(label, str(label).strip().lower()), glyphs.get(str(label).strip().lower(), ".")),
+            lambda label: self.NAV_ICONS.get(label, str(label).strip().lower()),
             nav_height,
             self._nav_item_widget,
         )
+        if hasattr(self.nav_shell, "refresh_icons"):
+            self.nav_shell.refresh_icons()
 
     def _nav_item_widget(self, label: str) -> QWidget:
         return self._rail_row_widget(label, self.NAV_ICONS.get(label, "menu"))
@@ -609,6 +604,14 @@ class MainWindow(QMainWindow):
             self._search_popup.hide_popup()
             return
         self._search_debounce_timer.start()
+
+    def _handle_compact_search(self) -> None:
+        if hasattr(self, "top_search_stack") and self.top_search_stack.currentIndex() == 1:
+            self.open_command_palette()
+            return
+        self.top_search.setFocus(Qt.ShortcutFocusReason)
+        self.top_search.selectAll()
+        self._schedule_global_search()
 
     def _refresh_global_search_results(self) -> None:
         query = self.top_search.text().strip() if hasattr(self, "top_search") else ""
@@ -1001,8 +1004,23 @@ class MainWindow(QMainWindow):
         drawer.set_text(text)
         return drawer
 
-    def _settings_nav_item_widget(self, label: str) -> QWidget:
-        return self._rail_row_widget(label, "settings")
+    def _settings_nav_item_widget(self, label: str, icon_name: str = "settings") -> QWidget:
+        row = QWidget()
+        row.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        lay = QHBoxLayout(row)
+        lay.setContentsMargins(8, 0, 8, 0)
+        lay.setSpacing(8)
+        icon = QLabel()
+        icon.setObjectName("SettingsNavIcon")
+        icon.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        icon.setPixmap(get_icon(icon_name, row, size=16).pixmap(16, 16))
+        icon.setFixedSize(18, 18)
+        text = QLabel(label)
+        text.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        text.setWordWrap(False)
+        lay.addWidget(icon, 0)
+        lay.addWidget(text, 1)
+        return row
 
     def _rebuild_settings_nav_items(self) -> None:
         if not hasattr(self, "settings_nav"):
@@ -1012,8 +1030,9 @@ class MainWindow(QMainWindow):
         for index in range(self.settings_nav.count()):
             item = self.settings_nav.item(index)
             label = str(item.data(Qt.UserRole) or item.text())
+            icon_name = str(item.data(Qt.UserRole + 1) or "settings")
             item.setSizeHint(QSize(0, row_height))
-            self.settings_nav.setItemWidget(item, self._settings_nav_item_widget(label))
+            self.settings_nav.setItemWidget(item, self._settings_nav_item_widget(label, icon_name))
         if current >= 0:
             self.settings_nav.setCurrentRow(current)
 
@@ -1025,7 +1044,6 @@ class MainWindow(QMainWindow):
         desc = {
             "safety": "risk admin advanced rollback",
             "privacy": "sessions evidence logs local-only masking share-safe not collected storage path",
-            "privacy & safety": "local only telemetry sessions logs exports safe admin advanced",
             "appearance": "theme density palette right panel scale ui drawer pin",
             "advanced": "logs diagnostics data folder evidence",
             "about": "version help start here privacy safety",
@@ -1193,6 +1211,12 @@ class MainWindow(QMainWindow):
         app = QApplication.instance()
         if app is not None:
             app.setStyleSheet(build_qss(resolve_theme_tokens(palette, mode), mode, density))
+        if hasattr(self.app_shell, "toolbar") and hasattr(self.app_shell.toolbar, "refresh_icons"):
+            self.app_shell.toolbar.refresh_icons()
+        if hasattr(self, "side_sheet") and hasattr(self.side_sheet, "refresh_icons"):
+            self.side_sheet.refresh_icons()
+        if hasattr(self, "nav_shell") and hasattr(self.nav_shell, "refresh_icons"):
+            self.nav_shell.refresh_icons()
         self._apply_density()
         self._sync_panel_toggle_icon()
 
@@ -1342,7 +1366,6 @@ class MainWindow(QMainWindow):
         menu.addSection("Help")
         menu.addAction("Docs", self._open_docs)
         menu.addAction("About Fix Fox", self._show_about_fixfox_dialog)
-        menu.addAction("About Qt", QApplication.instance().aboutQt)
         if os.environ.get("FIXFOX_DEV_MODE", "1").strip() == "1":
             menu.addAction("Dump UI Tree", self._dump_ui_tree)
 
