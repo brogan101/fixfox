@@ -380,3 +380,6 @@ src/ui/style/qss_builder.py         |  45 +++---
 - Icon/branding/search/onboarding/tool-runner/settings/page styling and wiring were rebuilt to the new modernized UI baseline.
 - Verification is green: `scripts/ui_audit.py`, `python -m src.tests.smoke`, `python -m src.tests.test_unit`.
 - Checklist status: `docs/UI_REBUILD_CHECKLIST.md` is fully checked.
+### Finalization Update
+- Final pushed commit hash: `be8c94aa90d4dee4a650fcf0b088dd09bc4d5bb3`
+- Follow-up docs-only commit finalized checklist/proof after primary UI overhaul commit.
