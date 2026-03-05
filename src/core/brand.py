@@ -14,7 +14,7 @@ REPORT_TITLE = "Fix Fox - Support Pack"
 BRAND_PRIMARY_COLOR = "#FEA643"
 BRAND_ASSET_DIR = "assets/branding"
 ICON_PNG = "assets/branding/fixfox.png"
-ICON_ICO = "assets/branding/fixfox.ico"
+ICON_ICO = "assets/branding/fixfox_icon.ico"
 
 DESKTOP_LOGO_FILENAME = "FixFoxLogo.png"
 

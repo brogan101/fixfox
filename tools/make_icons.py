@@ -33,6 +33,7 @@ def generate_icons(source: Path, assets_dir: Path) -> None:
             image.resize((size, size), _resample()).save(target, format="PNG")
         ico_target = assets_dir / "fixfox.ico"
         image.save(ico_target, format="ICO", sizes=[(size, size) for size in ICO_SIZES])
+        shutil.copy2(ico_target, assets_dir / "fixfox_icon.ico")
 
     canonical_target = (assets_dir / "fixfox.png").resolve()
     if source.resolve() != canonical_target:
@@ -58,6 +59,7 @@ def main() -> int:
     sync_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy2(assets_dir / "fixfox.png", sync_dir / "fixfox.png")
     shutil.copy2(assets_dir / "fixfox.ico", sync_dir / "fixfox.ico")
+    shutil.copy2(assets_dir / "fixfox_icon.ico", sync_dir / "fixfox_icon.ico")
 
     print(f"Generated icons in: {assets_dir}")
     print(f"Mirrored runtime icons to: {sync_dir}")

@@ -32,7 +32,7 @@ class SideSheet(QFrame):
         super().__init__()
         self.setObjectName("SideSheet")
         self._pinned = False
-        self._collapsed = True
+        self._collapsed = False
 
         shell = QVBoxLayout(self)
         shell.setContentsMargins(spacing("sm"), spacing("sm"), spacing("sm"), spacing("sm"))

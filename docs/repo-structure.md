@@ -14,7 +14,7 @@
 ## Assets
 - `src/assets/branding/`: runtime brand assets.
   - `fixfox.png`
-  - `fixfox.ico`
+  - `fixfox_icon.ico`
   - `fixfox_mark.svg`
 - `src/assets/fonts/`: bundled UI font + license.
 - `src/assets/icons/`: reserved for future non-brand icon assets.

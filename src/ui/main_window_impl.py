@@ -703,6 +703,9 @@ class MainWindow(QMainWindow):
     def set_ui_mode(self, mode: str) -> None:
         next_mode = "pro" if str(mode).strip().lower() == "pro" else "basic"
         if self.settings_state.ui_mode == next_mode:
+            if next_mode == "basic":
+                self.settings_state.right_panel_open = False
+                self._set_concierge_collapsed(True, persist=False)
             self._sync_ui_mode_controls()
             return
         self.settings_state.ui_mode = next_mode

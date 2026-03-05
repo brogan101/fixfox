@@ -10,7 +10,7 @@ Key values:
 - `EXPORT_PREFIX = "FixFox_SupportPack"`
 - `REPORT_TITLE = "Fix Fox - Support Pack"`
 - `ICON_PNG = "assets/branding/fixfox.png"`
-- `ICON_ICO = "assets/branding/fixfox.ico"`
+- `ICON_ICO = "assets/branding/fixfox_icon.ico"`
 - `DESKTOP_LOGO_FILENAME = "FixFoxLogo.png"`
 
 ## Icon Pipeline
@@ -33,7 +33,7 @@ Generated outputs:
 - `assets/branding/png/fixfox_128.png`
 - `assets/branding/png/fixfox_256.png`
 - `assets/branding/png/fixfox_512.png`
-- `assets/branding/fixfox.ico`
+- `assets/branding/fixfox_icon.ico`
 
 The script also mirrors runtime icons to `src/assets/branding/`.
 
