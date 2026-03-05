@@ -118,6 +118,28 @@ Issues:
 - Context menu logic is duplicated inline inside `main_window.py` (`_finding_menu`, `_fix_menu`, `_tool_menu`, `_session_menu`, `_runbook_menu`) rather than centralized component module.
 - No explicit Runbook Studio UI surface.
 
+---
+
+# 2026-03-05 Audit Scaffold (Current Run)
+
+## Repo structure & hygiene
+
+## Branding & assets
+
+## UI architecture & theming
+
+## Search & navigation
+
+## Pages & features
+
+## Performance
+
+## Tests & QA
+
+## Cleanup removals/archives
+
+## Final verification checklist
+
 ## Export / Masking Audit
 
 Current exporter behavior (`src/core/exporter.py`):

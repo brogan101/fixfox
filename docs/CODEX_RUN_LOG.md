@@ -451,3 +451,25 @@ src/ui/style/qss_builder.py         |  45 +++---
 - Created `docs/REPO_AUDIT.md`
 - Created `docs/REBUILD_VERIFICATION.md`
 - Refreshed tracked inventory: `docs/_tracked_files.txt`
+
+## 2026-03-05 Audit+Fix Run Kickoff
+- Timestamp: 2026-03-05 14:27:48 -05:00
+- Starting commit: `ca9fed31502dc2696c92688c65a7d28a6708d677`
+- Goals for this run:
+  - full program audit while preserving diagnostics/fixes/runbooks/exports/masking/validator/sessions behavior
+  - branding path normalization checkpoint and proof
+  - correctness + UX fixes with performance safeguards
+  - cleanup plan execution and verified QA gates
+  - commit and push final audited fix pass
+- Planned files to touch:
+  - `docs/AUDIT_REPORT.md`
+  - `docs/REPO_CLEANUP_PLAN.md`
+  - `docs/REPO_CLEANUP_NOTES.md`
+  - `docs/REBUILD_VERIFICATION.md`
+  - `scripts/ui_walkthrough.py`
+  - `src/tests/test_requirements_gate.py`
+  - selected `src/ui/*` and `src/core/*` modules only if audit finds concrete regressions
+- Scope summary:
+  - exhaustive repo inventory, architecture and dependency audit
+  - runtime UI walkthrough at 1024x768, 1280x720, 1600x900 with screenshot evidence
+  - no feature removals of core FixFox workflows
