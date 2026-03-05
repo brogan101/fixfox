@@ -12,3 +12,18 @@
 
 ## Notes
 - Core behavior/outcomes for diagnostics, fixes, runbooks, exports, masking, validator, and sessions were preserved.
+
+## 2026-03-05 Additional Cleanup Execution
+- Removed stale walkthrough artifact folder:
+  - `docs/screenshots/20260305_143145`
+  - `docs/screenshots/20260305_143645`
+- Kept archived branding history:
+  - `archive/legacy_assets/branding/assets_brand/*`
+  - `archive/legacy_assets/branding/src_assets_branding/*`
+- Kept compatibility module:
+  - `src/ui/components/toolbar.py` (re-export shim to `app_bar.py`)
+
+Validation:
+- `scripts/ui_walkthrough.py` PASS with final artifact folder `docs/screenshots/20260305_144413`.
+- `src.tests.smoke` PASS.
+- `src.tests.test_unit` PASS.

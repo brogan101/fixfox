@@ -493,12 +493,12 @@ def _run_runtime_checks(_repo_root: Path) -> dict[str, Any]:
                 + bool(window.btn_export.isVisible())
                 + bool(window.btn_overflow.isVisible())
             ),
+            "details_toggle_visible": bool(window.btn_panel_toggle.isVisible()),
             "hidden_secondary_actions": all(
                 not button.isVisible()
                 for button in (
                     window.btn_cancel_task,
                     window.btn_open_runner,
-                    window.btn_panel_toggle,
                     window.mode_basic_btn,
                     window.mode_pro_btn,
                 )
@@ -602,6 +602,7 @@ def run_verification(write_report: Path | None = None, verbose: bool = True) -> 
         and runtime["search_narrow_index"] == 1
         and runtime["search_wide_index"] == 0
         and runtime["visible_primary_actions"] == 3
+        and runtime["details_toggle_visible"]
         and runtime["hidden_secondary_actions"]
         and not static["min_width_hits"]
     )
@@ -612,6 +613,7 @@ def run_verification(write_report: Path | None = None, verbose: bool = True) -> 
         f"Search index wide=1280: {runtime['search_wide_index']}",
         f"Search index narrow=900: {runtime['search_narrow_index']}",
         f"Visible primary actions: {runtime['visible_primary_actions']}",
+        f"Details toggle visible: {runtime['details_toggle_visible']}",
         f"Hidden secondary actions: {runtime['hidden_secondary_actions']}",
         f"Hard min-width hits >=700: {len(static['min_width_hits'])}",
     ]))
@@ -689,7 +691,8 @@ def run_verification(write_report: Path | None = None, verbose: bool = True) -> 
         f"Weekly reminder control present/enabled: {runtime['weekly_control_present']}",
     ]))
 
-    onboarding_steps_ok = all(snippet in static["onboarding_py"] for snippet in ("Welcome to Fix Fox", "Preferences", "First action"))
+    onboarding_text = static["onboarding_py"].lower()
+    onboarding_steps_ok = all(snippet in onboarding_text for snippet in ("welcome to fix fox", "preferences", "first action"))
     b8_pass = (
         "onboarding_completed" in static["settings_core"]
         and onboarding_steps_ok

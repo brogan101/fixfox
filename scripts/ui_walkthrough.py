@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import sys
 import time
@@ -109,7 +110,10 @@ def main() -> int:
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     out_dir = REPO_ROOT / "docs" / "screenshots" / ts
     failures: list[str] = []
+    clipping_issues: list[str] = []
+    captured: list[str] = []
     sizes = [(1024, 768), (1280, 720), (1600, 900)]
+    search_visible_ms = 0
 
     try:
         for width, height in sizes:
@@ -123,8 +127,10 @@ def main() -> int:
                     continue
                 shot = out_dir / f"{width}x{height}_{idx+1}_{_slug(page)}.png"
                 _capture_shell(window, shot)
+                captured.append(str(shot.relative_to(REPO_ROOT)).replace("\\", "/"))
                 issues = _detect_clipping(window)
                 if issues:
+                    clipping_issues.extend([f"{width}x{height}:{page}:{issue}" for issue in issues])
                     failures.append(f"text/layout clipping at {width}x{height} page={page}: {', '.join(issues[:4])}")
                     break
 
@@ -134,18 +140,24 @@ def main() -> int:
         _drain(app, cycles=4)
         if not window._search_popup.isVisible():
             failures.append("Search dropdown did not open.")
-        QTest.qWait(220)
+        started = time.perf_counter()
+        QTest.qWait(550)
         _drain(app, cycles=3)
+        search_visible_ms = int((time.perf_counter() - started) * 1000.0)
         if not window._search_popup.isVisible():
-            failures.append("Search dropdown disappears instantly.")
-        _capture_shell(window, out_dir / "search_dropdown_open.png", include_popup=True)
+            failures.append("Search dropdown disappears before 500ms.")
+        search_shot = out_dir / "search_dropdown_open.png"
+        _capture_shell(window, search_shot, include_popup=True)
+        captured.append(str(search_shot.relative_to(REPO_ROOT)).replace("\\", "/"))
 
         if getattr(window, "concierge", None) is not None and window.concierge.collapsed:
             window.btn_panel_toggle.click()
             _drain(app, cycles=4)
         if getattr(window, "concierge", None) is None or window.concierge.collapsed:
             failures.append("Details side sheet failed to open.")
-        _capture_shell(window, out_dir / "details_side_sheet_open.png")
+        detail_shot = out_dir / "details_side_sheet_open.png"
+        _capture_shell(window, detail_shot)
+        captured.append(str(detail_shot.relative_to(REPO_ROOT)).replace("\\", "/"))
         if getattr(window, "concierge", None) is not None and not window.concierge.collapsed:
             window.btn_panel_toggle.click()
             _drain(app, cycles=3)
@@ -156,10 +168,15 @@ def main() -> int:
             _drain(app, cycles=3, delay=0.08)
             runner = getattr(window, "tool_runner", None)
             if runner is not None and runner.isVisible():
-                runner.grab().save(str(out_dir / "tool_runner_quick_check.png"), "PNG")
+                runner_shot = out_dir / "tool_runner_quick_check.png"
+                runner.grab().save(str(runner_shot), "PNG")
+                captured.append(str(runner_shot.relative_to(REPO_ROOT)).replace("\\", "/"))
                 break
         else:
             failures.append("Tool Runner screenshot not captured from Quick Check.")
+        if getattr(window, "concierge", None) is not None and not window.concierge.collapsed:
+            window.btn_panel_toggle.click()
+            _drain(app, cycles=4)
     finally:
         try:
             deadline = time.time() + 90
@@ -173,15 +190,37 @@ def main() -> int:
         window.close()
         _drain(app, cycles=2)
 
+    manifest = {
+        "timestamp": ts,
+        "sizes": [f"{width}x{height}" for width, height in sizes],
+        "pages": list(getattr(window, "NAV_ITEMS", ())),
+        "screenshots": captured,
+        "search_dropdown_visible_ms": search_visible_ms,
+        "clipping_issue_count": len(clipping_issues),
+        "failure_count": len(failures),
+        "failures": failures,
+    }
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "MANIFEST.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    if clipping_issues:
+        clipping_text = "\n".join(clipping_issues) + "\n"
+    else:
+        clipping_text = "OK: no clipping issues detected.\n"
+    (out_dir / "clipping_report.txt").write_text(clipping_text, encoding="utf-8")
+
     if failures:
         print("UI walkthrough: FAIL")
         for row in failures:
             print(f"- {row}")
         print(f"- screenshots_dir={out_dir}")
+        print(f"- manifest={out_dir / 'MANIFEST.json'}")
+        print(f"- clipping_report={out_dir / 'clipping_report.txt'}")
         return 1
 
     print("UI walkthrough: PASS")
     print(f"screenshots_dir={out_dir}")
+    print(f"manifest={out_dir / 'MANIFEST.json'}")
+    print(f"clipping_report={out_dir / 'clipping_report.txt'}")
     return 0
 
 

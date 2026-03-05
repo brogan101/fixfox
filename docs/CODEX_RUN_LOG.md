@@ -1,4 +1,4 @@
-﻿# CODEX RUN LOG
+# CODEX RUN LOG
 
 ## Run Start
 - Start time: 2026-03-04 15:08:00 -05:00
@@ -473,3 +473,30 @@ src/ui/style/qss_builder.py         |  45 +++---
   - exhaustive repo inventory, architecture and dependency audit
   - runtime UI walkthrough at 1024x768, 1280x720, 1600x900 with screenshot evidence
   - no feature removals of core FixFox workflows
+
+### 2026-03-05 Run Progress (Audit+Fix)
+- Reliability harness outputs captured:
+  - `git fetch --all`
+  - `git status --porcelain`
+  - `git status`
+  - `git rev-parse HEAD`
+  - `.\.venv\Scripts\python.exe --version`
+  - `.\.venv\Scripts\python.exe -m pip --version`
+  - `Get-ChildItem`
+- Branding checkpoint:
+  - verified `src/assets/brand/fixfox_logo_source.png`
+  - verified PNG header and Pillow load
+  - committed and pushed: `Branding: normalize FixFox logo source path` (`e1ec205...`)
+- Walkthrough gate upgraded:
+  - `scripts/ui_walkthrough.py` now writes `MANIFEST.json` + `clipping_report.txt`
+  - search popup persistence threshold raised to >=500ms
+- Verification runs:
+  - `scripts/ui_audit.py` PASS
+  - `scripts/ui_smoke_check.py` PASS
+  - `scripts/ui_walkthrough.py` PASS (`docs/screenshots/20260305_144413`)
+  - `python -m src.tests.smoke` PASS
+  - `python -m src.tests.test_unit` PASS
+  - `python -m src.tests.test_requirements_gate` PASS
+- Cleanup execution:
+  - removed stale folder `docs/screenshots/20260305_143145`
+  - removed stale folder `docs/screenshots/20260305_143645`

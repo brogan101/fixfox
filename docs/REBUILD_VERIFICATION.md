@@ -1,80 +1,73 @@
-# FixFox Rebuild Verification (2026-03-05)
+# Rebuild Verification (2026-03-05)
 
-## Run Metadata
+## Run context
 - Branch: `main`
-- Branding normalization commit: `000964824543dc74ee12b6a263432b76417fecd3`
-- Walkthrough/test verification commit: pending (this change-set)
-- Screenshot set: `docs/screenshots/20260305_141829`
+- Start commit for this run: `ca9fed31502dc2696c92688c65a7d28a6708d677`
+- Branding checkpoint commit: `e1ec205...`
+- Final walkthrough evidence folder: `docs/screenshots/20260305_144413`
 
-## Command Proof
+## Commands executed
 ```text
 git fetch --all
+git status --porcelain
 git status
 git rev-parse HEAD
-python --version            # local shim intermittently failed
-pip --version               # command not in PATH
-python -m pip --version     # works
 .\.venv\Scripts\python.exe --version
 .\.venv\Scripts\python.exe -m pip --version
-```
+Get-ChildItem
 
-## Walkthrough + Test Runs
-```text
+.\.venv\Scripts\python.exe scripts/ui_audit.py
+.\.venv\Scripts\python.exe scripts/ui_smoke_check.py
 .\.venv\Scripts\python.exe scripts/ui_walkthrough.py
-Result: PASS
-screenshots_dir=C:\Users\btheobald\Desktop\IT Core\docs\screenshots\20260305_141829
-
 .\.venv\Scripts\python.exe -m src.tests.smoke
-Result: Smoke test passed.
-
 .\.venv\Scripts\python.exe -m src.tests.test_unit
-Result: Ran 14 tests ... OK
-
-.\.venv\Scripts\python.exe -m src.tests.test_ui_layout_sanity
-Result: Ran 4 tests ... OK
+.\.venv\Scripts\python.exe -m src.tests.test_requirements_gate
 ```
 
-## Screenshot Links
-- `docs/screenshots/20260305_141829/1024x768_1_home.png`
-- `docs/screenshots/20260305_141829/1024x768_2_playbooks.png`
-- `docs/screenshots/20260305_141829/1024x768_3_diagnose.png`
-- `docs/screenshots/20260305_141829/1024x768_4_fixes.png`
-- `docs/screenshots/20260305_141829/1024x768_5_reports.png`
-- `docs/screenshots/20260305_141829/1024x768_6_history.png`
-- `docs/screenshots/20260305_141829/1024x768_7_settings.png`
-- `docs/screenshots/20260305_141829/1280x720_1_home.png`
-- `docs/screenshots/20260305_141829/1280x720_2_playbooks.png`
-- `docs/screenshots/20260305_141829/1280x720_3_diagnose.png`
-- `docs/screenshots/20260305_141829/1280x720_4_fixes.png`
-- `docs/screenshots/20260305_141829/1280x720_5_reports.png`
-- `docs/screenshots/20260305_141829/1280x720_6_history.png`
-- `docs/screenshots/20260305_141829/1280x720_7_settings.png`
-- `docs/screenshots/20260305_141829/1600x900_1_home.png`
-- `docs/screenshots/20260305_141829/1600x900_2_playbooks.png`
-- `docs/screenshots/20260305_141829/1600x900_3_diagnose.png`
-- `docs/screenshots/20260305_141829/1600x900_4_fixes.png`
-- `docs/screenshots/20260305_141829/1600x900_5_reports.png`
-- `docs/screenshots/20260305_141829/1600x900_6_history.png`
-- `docs/screenshots/20260305_141829/1600x900_7_settings.png`
-- `docs/screenshots/20260305_141829/search_dropdown_open.png`
-- `docs/screenshots/20260305_141829/details_side_sheet_open.png`
-- `docs/screenshots/20260305_141829/tool_runner_quick_check.png`
+## Walkthrough artifacts
+- Manifest: `docs/screenshots/20260305_144413/MANIFEST.json`
+- Clipping report: `docs/screenshots/20260305_144413/clipping_report.txt`
+- Search persistence: `search_dropdown_visible_ms = 707`
+- Clipping issues: `0`
+- Failure count: `0`
 
-## Requirement Checklist
-- [x] 0) Proof harness executed and logged.
-- [x] 1) Repo audit completed; inventory + cleanup report created.
-- [x] 2) Modern shell maintained: icon rail, top app bar, center content, optional side sheet, bottom status.
-- [x] 3) Real icon set in `src/assets/icons`; loader uses QtSvg + cache + tinting.
-- [x] 4) Branding normalized to `src/assets/brand/*`; app/about/onboarding/app bar branding updated.
-- [x] 5) Search dropdown anchored and persistent; ESC/outside close; fuzzy ranking via rapidfuzz; keyboard nav.
-- [x] 6) Home dashboard layout present with quick actions/status/recent/recommendations.
-- [x] 7) Playbooks has search/filter controls and action/detail flows.
-- [x] 8) Diagnose/Fixes/Reports/History/Settings layouts active; About Qt removed.
-- [x] 9) Tool Runner themed and screenshot-verified.
-- [x] 10) Performance safeguards: icon caching, search debounce, UI scale debounce, timing logs.
-- [x] 11) Resizing checks at 1024x768, 1280x720, 1600x900 in walkthrough + UI sanity tests.
-- [x] 12) Windows 11 hints enabled in `src/app.py` (high DPI + rounded corner hint).
-- [x] 13) Automated walkthrough script added and passing.
-- [x] 14) Verification docs and UI sanity tests updated.
-- [x] 15) Dependencies include `rapidfuzz` and `pillow`.
-- [x] 16) Commit and push completed (branding commit completed; final overhaul commit follows this doc update).
+## Screenshot links
+- `docs/screenshots/20260305_144413/1024x768_1_home.png`
+- `docs/screenshots/20260305_144413/1024x768_2_playbooks.png`
+- `docs/screenshots/20260305_144413/1024x768_3_diagnose.png`
+- `docs/screenshots/20260305_144413/1024x768_4_fixes.png`
+- `docs/screenshots/20260305_144413/1024x768_5_reports.png`
+- `docs/screenshots/20260305_144413/1024x768_6_history.png`
+- `docs/screenshots/20260305_144413/1024x768_7_settings.png`
+- `docs/screenshots/20260305_144413/1280x720_1_home.png`
+- `docs/screenshots/20260305_144413/1280x720_2_playbooks.png`
+- `docs/screenshots/20260305_144413/1280x720_3_diagnose.png`
+- `docs/screenshots/20260305_144413/1280x720_4_fixes.png`
+- `docs/screenshots/20260305_144413/1280x720_5_reports.png`
+- `docs/screenshots/20260305_144413/1280x720_6_history.png`
+- `docs/screenshots/20260305_144413/1280x720_7_settings.png`
+- `docs/screenshots/20260305_144413/1600x900_1_home.png`
+- `docs/screenshots/20260305_144413/1600x900_2_playbooks.png`
+- `docs/screenshots/20260305_144413/1600x900_3_diagnose.png`
+- `docs/screenshots/20260305_144413/1600x900_4_fixes.png`
+- `docs/screenshots/20260305_144413/1600x900_5_reports.png`
+- `docs/screenshots/20260305_144413/1600x900_6_history.png`
+- `docs/screenshots/20260305_144413/1600x900_7_settings.png`
+- `docs/screenshots/20260305_144413/search_dropdown_open.png`
+- `docs/screenshots/20260305_144413/details_side_sheet_open.png`
+- `docs/screenshots/20260305_144413/tool_runner_quick_check.png`
+
+## PASS/FAIL checklist
+- [x] Branding source normalized at `src/assets/brand/fixfox_logo_source.png`.
+- [x] No double-extension source logo.
+- [x] Search dropdown remains visible for >=500ms.
+- [x] Details panel opens from visible button and closes correctly.
+- [x] No shell `QSplitter`.
+- [x] No clipping at 1024x768, 1280x720, 1600x900.
+- [x] Tool Runner screenshot captured in walkthrough.
+- [x] Smoke tests pass.
+- [x] Unit tests pass.
+- [x] Requirements gate passes.
+
+## Notes
+- `pip --version` may not resolve via shell PATH in this environment; `.venv` and `python -m pip` are used for deterministic command execution.
