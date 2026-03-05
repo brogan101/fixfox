@@ -27,7 +27,7 @@ scripts/build_exe.ps1
 ```
 
 `scripts/build_exe.ps1` builds `dist/FixFox.exe` with:
-- icon: `src/assets/branding/fixfox_icon.ico`
+- icon: `src/assets/brand/fixfox_icon.ico`
 - version metadata generated from `src/core/version.py`
 - bundled customer docs in `dist/docs`
 - bundled license/disclaimer in `dist/licenses`
@@ -55,9 +55,9 @@ py tools/make_icons.py
 ```
 
 Outputs:
-- `assets/branding/png/fixfox_*.png` (16/24/32/48/64/128/256/512)
-- `assets/branding/fixfox_icon.ico` (multi-layer)
-- mirrored runtime assets at `src/assets/branding/`
+- `src/assets/brand/png/fixfox_*.png` (16/24/32/48/64/128/256/512)
+- `src/assets/brand/fixfox_icon.ico` (multi-layer)
+- runtime assets remain canonical in `src/assets/brand/`
 
 ## Data Paths
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 import os
 from pathlib import Path
+import signal
 import sys
 
 INSTALL_CMD = "py -m pip install -r requirements.txt"
@@ -222,13 +223,20 @@ def main():
     w = AppShell()
     w.show()
     QTimer.singleShot(0, lambda: _apply_windows11_corner_hint(w))
+    if hasattr(signal, "SIGINT"):
+        signal.signal(signal.SIGINT, lambda *_args: app.quit())
     try:
         auto_exit_ms = int(os.environ.get("FIXFOX_AUTO_EXIT_MS", "0").strip() or "0")
     except Exception:
         auto_exit_ms = 0
     if auto_exit_ms > 0:
         QTimer.singleShot(max(200, auto_exit_ms), app.quit)
-    return app.exec()
+    try:
+        return app.exec()
+    except KeyboardInterrupt:
+        logger.info("KeyboardInterrupt received, exiting cleanly.")
+        app.quit()
+        return 130
 
 if __name__ == "__main__":
     raise SystemExit(main())

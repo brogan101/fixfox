@@ -22,7 +22,7 @@
     { "id": "PERF-004", "title": "Time-to-first-paint is within defined threshold.", "proof": ["check:ttfp_threshold"], "status": "pending" },
 
     { "id": "STYLE-001", "title": "Centralized theme/token pipeline exists.", "proof": ["check:theme_manager_present"], "status": "pending" },
-    { "id": "STYLE-002", "title": "QSS styling applies to app and dialogs/popups.", "proof": ["check:dialog_object_names", "check:qss_dialog_hooks"], "status": "pending" },
+    { "id": "STYLE-002", "title": "QSS styling applies to app and dialogs/popups.", "proof": ["check:dialog_object_names", "check:qss_dialog_hooks", "check:qss_sanity_script_pass"], "status": "pending" },
     { "id": "STYLE-003", "title": "Global combo down-arrow override is present.", "proof": ["check:combo_arrow_override"], "status": "pending" },
     { "id": "STYLE-004", "title": "No hardcoded absolute font paths; graceful fallback.", "proof": ["check:no_absolute_font_paths"], "status": "pending" },
 
@@ -42,6 +42,8 @@
     { "id": "SEARCH-003", "title": "Search results stay open >=500ms while typing.", "proof": ["check:search_dropdown_persistent_runtime"], "status": "pending" },
     { "id": "SEARCH-004", "title": "Search debounce and keyboard navigation exist.", "proof": ["check:search_debounce_keyboard"], "status": "pending" },
     { "id": "SEARCH-005", "title": "Search index includes route and play registries.", "proof": ["check:search_uses_route_play_registries"], "status": "pending" },
+    { "id": "SEARCH-006", "title": "Search query path does not rebuild static index on each keystroke.", "proof": ["check:search_no_static_rebuild_on_query_static", "check:search_cache_static_not_rebuilt_runtime"], "status": "pending" },
+    { "id": "SEARCH-007", "title": "Search typing remains responsive under debounced async execution.", "proof": ["check:search_ui_responsive_runtime", "check:search_keystroke_block_budget_runtime"], "status": "pending" },
 
     { "id": "DETAIL-001", "title": "Details sheet is hidden by default.", "proof": ["check:details_hidden_default_runtime"], "status": "pending" },
     { "id": "DETAIL-002", "title": "Details sheet has open toggle and open/close works.", "proof": ["check:details_toggle_visible_runtime", "check:details_open_close_runtime"], "status": "pending" },

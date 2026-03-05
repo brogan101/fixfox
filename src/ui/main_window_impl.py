@@ -79,7 +79,7 @@ from ..core.registry import get_visible_capabilities
 from ..core.runbooks import RUNBOOKS, execute_runbook, runbook_map
 from ..core.run_events import RunEventBus, RunEventType, get_run_event_bus
 from ..core.safety import policy_from_settings
-from ..core.search import SearchItem, query_index
+from ..core.search import SearchItem, get_search_cache_stats, query_index, refresh_dynamic_index_async
 from ..core.sessions import (
     SessionMeta,
     add_or_update_meta,
@@ -347,6 +347,83 @@ class HelpCenterDialog(QDialog):
         layout.addWidget(buttons)
 
 
+def _rank_search_rows_fast(query: str, rows: list[SearchItem]) -> list[SearchItem]:
+    q = str(query or "").strip().lower()
+    if not q:
+        return rows
+    ranked: list[tuple[float, SearchItem]] = []
+    for row in rows:
+        title = str(row.title or "")
+        subtitle = str(row.subtitle or "")
+        key = str(row.key or "")
+        haystack = f"{title} {subtitle} {key}".strip()
+        if not haystack:
+            continue
+        if _fuzz is not None:
+            score = max(
+                float(_fuzz.WRatio(q, title.lower())),
+                float(_fuzz.partial_ratio(q, haystack.lower())),
+            )
+        else:
+            score = 100.0 if q in haystack.lower() else 0.0
+            if title.lower().startswith(q):
+                score += 30.0
+            if key.lower().startswith(q):
+                score += 20.0
+        ranked.append((score, row))
+    ranked.sort(key=lambda item: item[0], reverse=True)
+    return [row for score, row in ranked if score > 0][:80]
+
+
+def _highlight_search_match_html(text: str, query: str) -> str:
+    raw = str(text or "")
+    tokens = [token for token in re.split(r"\s+", str(query or "").strip()) if token]
+    if not raw or not tokens:
+        return html.escape(raw)
+    pattern = re.compile("|".join(re.escape(token) for token in tokens), re.IGNORECASE)
+    parts: list[str] = []
+    last = 0
+    for match in pattern.finditer(raw):
+        start, end = match.span()
+        if start < last:
+            continue
+        parts.append(html.escape(raw[last:start]))
+        parts.append(f"<span style='font-weight:75'>{html.escape(raw[start:end])}</span>")
+        last = end
+    parts.append(html.escape(raw[last:]))
+    return "".join(parts)
+
+
+def _search_group_for_item_fast(row: SearchItem, *, basic: bool) -> str:
+    kind = str(row.kind or "").strip().lower()
+    key = str(row.key or "").strip().lower()
+    title = str(row.title or "").strip().lower()
+    if kind == "session" or kind == "run":
+        return "Sessions"
+    if kind == "fix" or key.startswith("fix_action."):
+        return "Fixes"
+    if kind == "tool" or kind == "task" or kind == "play":
+        return "Tools"
+    if kind == "route":
+        return "Goals"
+    if kind == "runbook":
+        if key.startswith("home_"):
+            return "Goals"
+        return "Runbooks"
+    if kind == "capability":
+        if key.startswith("runbook.home_") or "goal" in title or "quick check" in title:
+            return "Goals"
+        if key.startswith("tool.") or key.startswith("script_task."):
+            return "Tools"
+        if key.startswith("runbook."):
+            return "Runbooks"
+        if key.startswith("fix_action."):
+            return "Fixes"
+    if basic and kind in {"finding", "kb"}:
+        return "Goals"
+    return "Tools"
+
+
 class MainWindow(QMainWindow):
     run_bus_event = Signal(object)
     NAV_ITEMS = ("Home", "Playbooks", "Diagnose", "Fixes", "Reports", "History", "Settings")
@@ -398,6 +475,8 @@ class MainWindow(QMainWindow):
         self._search_debounce_timer.setSingleShot(True)
         self._search_debounce_timer.setInterval(180)
         self._search_debounce_timer.timeout.connect(self._refresh_global_search_results)
+        self._search_worker: TaskWorker | None = None
+        self._search_request_id = 0
         self._scale_apply_timer = QTimer(self)
         self._scale_apply_timer.setSingleShot(True)
         self._scale_apply_timer.setInterval(80)
@@ -612,10 +691,11 @@ class MainWindow(QMainWindow):
     def _schedule_global_search(self) -> None:
         query = self.top_search.text().strip() if hasattr(self, "top_search") else ""
         if not query:
+            self._cancel_active_search_worker()
             self._search_popup.hide_popup()
             return
         if os.environ.get("QT_QPA_PLATFORM", "").strip().lower() == "offscreen":
-            self._refresh_global_search_results()
+            self._dispatch_global_search()
             return
         self._search_debounce_timer.start()
 
@@ -627,15 +707,56 @@ class MainWindow(QMainWindow):
         self._focus_top_search()
 
     def _refresh_global_search_results(self) -> None:
+        self._dispatch_global_search()
+
+    def _cancel_active_search_worker(self) -> None:
+        if self._search_worker is not None:
+            self._search_worker.cancel()
+            self._search_worker = None
+
+    def _dispatch_global_search(self) -> None:
         started = time.perf_counter()
         query = self.top_search.text().strip() if hasattr(self, "top_search") else ""
         if not query:
+            self._cancel_active_search_worker()
             self._search_popup.hide_popup()
             return
-        visible = self._visible_capability_ids()
+        refresh_dynamic_index_async(force=False)
+        self._search_request_id += 1
+        request_id = self._search_request_id
+        self._cancel_active_search_worker()
+        worker = TaskWorker(
+            self._compute_global_search_payload,
+            kwargs={
+                "query": query,
+                "visible": self._visible_capability_ids(),
+                "basic_mode": self.layout_policy_state.mode == "basic",
+            },
+            config=WorkerConfig(timeout_s=20),
+        )
+        worker.signals.result.connect(lambda payload, rid=request_id: self._apply_global_search_payload(rid, payload))
+        worker.signals.error.connect(lambda message, rid=request_id: LOGGER.debug("global_search_worker_error rid=%s msg=%s", rid, message[:160]))
+        worker.signals.finished.connect(lambda rid=request_id, ref=worker: self._on_search_worker_finished(rid, ref))
+        self._search_worker = worker
+        start_worker(worker)
+        elapsed_ms = (time.perf_counter() - started) * 1000.0
+        LOGGER.debug("global_search_dispatch_ms=%.2f query=%s", elapsed_ms, query)
+
+    def _compute_global_search_payload(
+        self,
+        *,
+        query: str,
+        visible: set[str],
+        basic_mode: bool,
+        cancel_event: Any = None,
+        **_kwargs: Any,
+    ) -> dict[str, Any]:
         rows = query_index(query, limit=120, allowed_capability_ids=visible)
-        ranked_rows = self._rank_search_rows(query, rows)
-        basic = self.layout_policy_state.mode == "basic"
+        if cancel_event is not None and cancel_event.is_set():
+            return {"cancelled": True, "query": query, "grouped_rows": [], "row_count": 0}
+        ranked_rows = _rank_search_rows_fast(query, rows)
+        if cancel_event is not None and cancel_event.is_set():
+            return {"cancelled": True, "query": query, "grouped_rows": [], "row_count": len(ranked_rows)}
         groups: dict[str, list[dict[str, str]]] = {
             "Goals": [],
             "Tools": [],
@@ -644,95 +765,67 @@ class MainWindow(QMainWindow):
             "Sessions": [],
         }
         for row in ranked_rows:
-            group = self._search_group_for_item(row, basic=basic)
+            group = _search_group_for_item_fast(row, basic=basic_mode)
             payload = {
                 "kind": row.kind,
                 "key": row.key,
                 "title": row.title,
                 "subtitle": row.subtitle,
-                "title_html": self._highlight_search_match(row.title, query),
-                "subtitle_html": self._highlight_search_match(row.subtitle, query),
+                "title_html": _highlight_search_match_html(row.title, query),
+                "subtitle_html": _highlight_search_match_html(row.subtitle, query),
             }
             bucket = groups.get(group, groups["Tools"])
             if len(bucket) < 10:
                 bucket.append(payload)
-        order = ("Goals", "Fixes", "Runbooks", "Tools", "Sessions") if basic else ("Goals", "Tools", "Runbooks", "Fixes", "Sessions")
+            if cancel_event is not None and cancel_event.is_set():
+                return {"cancelled": True, "query": query, "grouped_rows": [], "row_count": len(ranked_rows)}
+        order = ("Goals", "Fixes", "Runbooks", "Tools", "Sessions") if basic_mode else ("Goals", "Tools", "Runbooks", "Fixes", "Sessions")
         grouped_rows = [(name, groups[name]) for name in order]
+        return {
+            "cancelled": False,
+            "query": query,
+            "grouped_rows": grouped_rows,
+            "row_count": len(ranked_rows),
+            "cache_stats": get_search_cache_stats(),
+        }
+
+    def _apply_global_search_payload(self, request_id: int, payload: Any) -> None:
+        if request_id != self._search_request_id:
+            return
+        if not isinstance(payload, dict):
+            return
+        if bool(payload.get("cancelled")):
+            return
+        query = str(payload.get("query", "")).strip()
+        current = self.top_search.text().strip() if hasattr(self, "top_search") else ""
+        if (not query) or query != current:
+            return
+        grouped_rows = payload.get("grouped_rows", [])
+        if not isinstance(grouped_rows, list):
+            return
         self._search_popup.show_results(self.top_search, grouped_rows, query)
-        elapsed_ms = (time.perf_counter() - started) * 1000.0
-        LOGGER.debug("global_search_refresh_ms=%.2f query=%s rows=%d", elapsed_ms, query, len(ranked_rows))
+        cache_stats = payload.get("cache_stats", {})
+        LOGGER.debug(
+            "global_search_result rid=%s query=%s rows=%s static_builds=%s dynamic_builds=%s",
+            request_id,
+            query,
+            payload.get("row_count", 0),
+            cache_stats.get("static_builds", "?") if isinstance(cache_stats, dict) else "?",
+            cache_stats.get("dynamic_builds", "?") if isinstance(cache_stats, dict) else "?",
+        )
+
+    def _on_search_worker_finished(self, request_id: int, worker_ref: TaskWorker) -> None:
+        if self._search_worker is worker_ref and request_id <= self._search_request_id:
+            self._search_worker = None
 
     def _rank_search_rows(self, query: str, rows: list[SearchItem]) -> list[SearchItem]:
-        q = str(query or "").strip().lower()
-        if not q:
-            return rows
-        ranked: list[tuple[float, SearchItem]] = []
-        for row in rows:
-            title = str(row.title or "")
-            subtitle = str(row.subtitle or "")
-            key = str(row.key or "")
-            haystack = f"{title} {subtitle} {key}".strip()
-            if not haystack:
-                continue
-            if _fuzz is not None:
-                score = max(
-                    float(_fuzz.WRatio(q, title.lower())),
-                    float(_fuzz.partial_ratio(q, haystack.lower())),
-                )
-            else:
-                score = 100.0 if q in haystack.lower() else 0.0
-                if title.lower().startswith(q):
-                    score += 30.0
-                if key.lower().startswith(q):
-                    score += 20.0
-            ranked.append((score, row))
-        ranked.sort(key=lambda item: item[0], reverse=True)
-        return [row for score, row in ranked if score > 0][:80]
+        return _rank_search_rows_fast(query, rows)
 
     def _highlight_search_match(self, text: str, query: str) -> str:
-        raw = str(text or "")
-        tokens = [token for token in re.split(r"\s+", str(query or "").strip()) if token]
-        if not raw or not tokens:
-            return html.escape(raw)
-        pattern = re.compile("|".join(re.escape(token) for token in tokens), re.IGNORECASE)
-        parts: list[str] = []
-        last = 0
-        for match in pattern.finditer(raw):
-            start, end = match.span()
-            if start < last:
-                continue
-            parts.append(html.escape(raw[last:start]))
-            parts.append(f"<span style='font-weight:700'>{html.escape(raw[start:end])}</span>")
-            last = end
-        parts.append(html.escape(raw[last:]))
-        return "".join(parts)
+        return _highlight_search_match_html(text, query)
 
     def _search_group_for_item(self, row: SearchItem, *, basic: bool) -> str:
-        kind = str(row.kind or "").strip().lower()
-        key = str(row.key or "").strip().lower()
-        title = str(row.title or "").strip().lower()
-        if kind == "session" or kind == "run":
-            return "Sessions"
-        if kind == "fix" or key.startswith("fix_action."):
-            return "Fixes"
-        if kind == "tool" or kind == "task":
-            return "Tools"
-        if kind == "runbook":
-            if key.startswith("home_"):
-                return "Goals"
-            return "Runbooks"
-        if kind == "capability":
-            if key.startswith("runbook.home_") or "goal" in title or "quick check" in title:
-                return "Goals"
-            if key.startswith("tool.") or key.startswith("script_task."):
-                return "Tools"
-            if key.startswith("runbook."):
-                return "Runbooks"
-            if key.startswith("fix_action."):
-                return "Fixes"
-        if basic and kind in {"finding", "kb"}:
-            return "Goals"
-        return "Tools"
+        return _search_group_for_item_fast(row, basic=basic)
 
     def _activate_global_search_or_palette(self) -> None:
         if self._search_popup.activate_current():
@@ -1594,7 +1687,10 @@ class MainWindow(QMainWindow):
         if idx < 0 or idx >= len(self.NAV_ITEMS):
             return
         self.pages.setCurrentIndex(idx)
-        self.settings_state.last_page = self.NAV_ITEMS[idx]
+        page_name = self.NAV_ITEMS[idx]
+        self.settings_state.last_page = page_name
+        if page_name in {"History", "Reports"}:
+            refresh_dynamic_index_async(force=True)
         self._sync_context_bar_visibility()
         self._sync_shell_status_bar()
         self._update_concierge()
@@ -2198,6 +2294,7 @@ class MainWindow(QMainWindow):
         if app is not None:
             app.removeEventFilter(self)
         self._persist_layout_state()
+        self._cancel_active_search_worker()
         self._search_popup.hide_popup()
         if self.tool_runner is not None:
             self.tool_runner.close()

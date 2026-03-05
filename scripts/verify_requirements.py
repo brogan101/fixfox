@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -10,7 +11,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QTimer, Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QListWidget, QSplitter, QToolButton
 
@@ -44,7 +45,13 @@ class VerificationOutcome:
 
     @property
     def passed(self) -> bool:
-        return all(r.passed for r in self.requirements)
+        critical_keys = (
+            "critical_qss_sanity",
+            "critical_search_cache_contract",
+            "critical_search_runtime_responsive",
+        )
+        critical_ok = all(self.checks.get(key, CheckResult(False)).passed for key in critical_keys)
+        return critical_ok and all(r.passed for r in self.requirements)
 
     def render_console(self) -> str:
         lines = ["FixFox requirements verification", ""]
@@ -97,11 +104,37 @@ def _run(cmd: list[str], timeout_s: int = 900, env: dict[str, str] | None = None
     return int(p.returncode), p.stdout, p.stderr
 
 
+def _python_cmd() -> list[str]:
+    exe = str(sys.executable or "").strip()
+    if exe and Path(exe).exists() and "windowsapps" not in exe.lower():
+        return [exe]
+    for candidate in ("python", "py"):
+        resolved = shutil.which(candidate)
+        if resolved:
+            if Path(resolved).name.lower() == "py.exe":
+                return [resolved, "-3"]
+            return [resolved]
+    return ["python"]
+
+
+def _qss_sanity(checks: dict[str, CheckResult]) -> None:
+    env = os.environ.copy()
+    env["QT_QPA_PLATFORM"] = "offscreen"
+    rc, out, err = _run([*_python_cmd(), "scripts/qss_sanity_check.py"], timeout_s=240, env=env)
+    report = REPO_ROOT / "docs" / "qss_sanity_report.txt"
+    report_text = report.read_text(encoding="utf-8", errors="ignore") if report.exists() else ""
+    parse_warning = "could not parse application stylesheet" in report_text.lower()
+    unknown_property = "unknown property" in report_text.lower()
+    ok = rc == 0 and report.exists() and ("OK" in report_text) and not parse_warning and not unknown_property
+    checks["qss_sanity_script_pass"] = CheckResult(ok, [f"rc={rc}", str(report)])
+    checks["critical_qss_sanity"] = CheckResult(ok, [err[-160:] if err else "no stderr"])
+
+
 def _walkthrough(checks: dict[str, CheckResult]) -> str:
     env = os.environ.copy()
     env["QT_QPA_PLATFORM"] = "offscreen"
     env["FIXFOX_SKIP_ONBOARDING"] = "1"
-    rc, out, err = _run([sys.executable, "scripts/ui_walkthrough.py"], timeout_s=1200, env=env)
+    rc, out, err = _run([*_python_cmd(), "scripts/ui_walkthrough.py"], timeout_s=1200, env=env)
     m = re.search(r"screenshots_dir=(.+)", out)
     path = m.group(1).strip() if m else ""
     clip_ok = False
@@ -129,8 +162,23 @@ def _collect_static(checks: dict[str, CheckResult]) -> None:
     runbooks = _read(REPO_ROOT / "src/core/runbooks.py")
     search_py = _read(REPO_ROOT / "src/core/search.py")
     workers = _read(REPO_ROOT / "src/core/workers.py")
+    readme = _read(REPO_ROOT / "README.md")
+    build_exe = _read(REPO_ROOT / "scripts/build_exe.ps1")
+    make_icons = _read(REPO_ROOT / "tools/make_icons.py")
+    brand_py = _read(REPO_ROOT / "src/core/brand.py")
+    brand_assets = _read(REPO_ROOT / "src/core/brand_assets.py")
     icon_root = REPO_ROOT / "src/assets/icons"
     required_icons = ["home.svg", "open_book.svg", "wrench.svg", "gear.svg", "diagnose.svg", "reports.svg", "history.svg", "quick_check.svg", "details.svg", "close.svg", "pin.svg", "overflow.svg", "search.svg", "chevron_down.svg"]
+    canonical_blob = "\n".join((readme, build_exe, make_icons, brand_py, brand_assets))
+    legacy_brand_tokens = ("assets/branding", "src/assets/branding", "assets\\branding", "src\\assets\\branding")
+    legacy_hits = [token for token in legacy_brand_tokens if token in canonical_blob]
+    canonical_ok = all(
+        token in canonical_blob
+        for token in ("src/assets/brand/fixfox_icon.ico", "src/assets/brand/fixfox_logo_source.png", "assets/brand/fixfox_mark.png")
+    )
+    query_index_match = re.search(r"def query_index\([^\)]*\)\s*->\s*list\[SearchItem\]:(?P<body>.*?)(?=\ndef |\Z)", search_py, flags=re.S)
+    query_body = query_index_match.group("body") if query_index_match else ""
+    no_rebuild_per_query = bool(query_body) and ("build_search_index(" not in query_body) and ("_ensure_static_rows()" in query_body)
 
     checks["requirements_file_exists"] = CheckResult(REQ_PATH.exists(), [str(REQ_PATH)])
     checks["verifier_script_exists"] = CheckResult((REPO_ROOT / "scripts/verify_requirements.py").exists(), ["scripts/verify_requirements.py"])
@@ -143,7 +191,7 @@ def _collect_static(checks: dict[str, CheckResult]) -> None:
     checks["audit_report_exists"] = CheckResult((REPO_ROOT / "docs/AUDIT_REPORT.md").exists(), ["docs/AUDIT_REPORT.md"])
     checks["cleanup_plan_exists"] = CheckResult((REPO_ROOT / "docs/REPO_CLEANUP_PLAN.md").exists(), ["docs/REPO_CLEANUP_PLAN.md"])
     checks["cleanup_notes_exists"] = CheckResult((REPO_ROOT / "docs/REPO_CLEANUP_NOTES.md").exists(), ["docs/REPO_CLEANUP_NOTES.md"])
-    checks["no_legacy_brand_paths"] = CheckResult(True, ["brand references normalized to src/assets/brand"])
+    checks["no_legacy_brand_paths"] = CheckResult((not legacy_hits) and canonical_ok, [f"legacy_hits={legacy_hits[:4]}", "canonical=src/assets/brand"])
     checks["theme_manager_present"] = CheckResult((REPO_ROOT / "src/ui/theme.py").exists() and "build_qss(" in app_py, ["theme.py + build_qss"])
     checks["task_runner_async_layer"] = CheckResult("TaskWorker" in workers and "QThreadPool" in workers, ["workers async execution layer"])
     checks["task_runner_cancel_timeout"] = CheckResult("cancel_event" in script_tasks and "timeout_s" in script_tasks, ["cancel + timeout fields present"])
@@ -159,6 +207,8 @@ def _collect_static(checks: dict[str, CheckResult]) -> None:
     checks["search_expand_contract"] = CheckResult("set_search_collapsed" in _read(REPO_ROOT / "src/ui/components/app_bar.py"), ["expandable search"])
     checks["search_debounce_keyboard"] = CheckResult(all(x in main for x in ["_search_debounce_timer", "Qt.Key_Down", "Qt.Key_Up"]), ["debounce+keyboard"])
     checks["search_uses_route_play_registries"] = CheckResult("list_routes" in search_py and "list_play_entries" in search_py, ["search uses registries"])
+    checks["search_no_static_rebuild_on_query_static"] = CheckResult(no_rebuild_per_query, ["query_index does not call build_search_index"])
+    checks["critical_search_cache_contract"] = CheckResult(no_rebuild_per_query, [f"query_body_found={bool(query_body)}"])
     checks["diagnose_contract"] = CheckResult((REPO_ROOT / "src/ui/pages/diagnose_page.py").exists(), ["diagnose page exists"])
     checks["history_contract"] = CheckResult((REPO_ROOT / "src/ui/pages/history_page.py").exists(), ["history page exists"])
     checks["settings_reset_export"] = CheckResult(("Reset to defaults" in main) or ("Export Settings" in main), ["reset/export settings"])
@@ -194,6 +244,7 @@ def _collect_runtime(checks: dict[str, CheckResult]) -> float:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     os.environ["FIXFOX_SKIP_ONBOARDING"] = "1"
     from src.ui.main_window import MainWindow
+    from src.core.search import get_search_cache_stats, reset_search_cache_for_tests
 
     app = QApplication.instance() or QApplication([])
     start = time.perf_counter()
@@ -226,6 +277,35 @@ def _collect_runtime(checks: dict[str, CheckResult]) -> float:
         vis1 = w._search_popup.isVisible()
         checks["search_ctrl_k_runtime"] = CheckResult(ctrl_k_ok, ["Ctrl+K focus"])
         checks["search_dropdown_persistent_runtime"] = CheckResult(vis0 and vis1, [f"opened={vis0}", f"visible_500ms={vis1}"])
+        reset_search_cache_for_tests()
+        before = get_search_cache_stats()
+        ticks = {"count": 0}
+        timer = QTimer()
+        timer.setInterval(15)
+        timer.timeout.connect(lambda: ticks.__setitem__("count", int(ticks["count"]) + 1))
+        timer.start()
+        probe_query = "quickcheck"
+        typing_start = time.perf_counter()
+        for i in range(1, min(10, len(probe_query)) + 1):
+            w.top_search.setText(probe_query[:i])
+            w._schedule_global_search()
+            app.processEvents()
+            QTest.qWait(18)
+        deadline = time.perf_counter() + 0.75
+        while time.perf_counter() < deadline:
+            app.processEvents()
+            time.sleep(0.01)
+        timer.stop()
+        typing_elapsed_ms = (time.perf_counter() - typing_start) * 1000.0
+        after = get_search_cache_stats()
+        static_delta = int(after.get("static_builds", 0.0) - before.get("static_builds", 0.0))
+        responsive_ok = int(ticks["count"]) >= 16
+        keystroke_budget_ok = typing_elapsed_ms <= 1400.0
+        cache_ok = static_delta <= 1
+        checks["search_cache_static_not_rebuilt_runtime"] = CheckResult(cache_ok, [f"static_build_delta={static_delta}"])
+        checks["search_ui_responsive_runtime"] = CheckResult(responsive_ok, [f"timer_ticks={ticks['count']}"])
+        checks["search_keystroke_block_budget_runtime"] = CheckResult(keystroke_budget_ok, [f"elapsed_ms={typing_elapsed_ms:.1f} threshold=1400"])
+        checks["critical_search_runtime_responsive"] = CheckResult(cache_ok and responsive_ok and keystroke_budget_ok, [f"cache_ok={cache_ok} responsive_ok={responsive_ok} budget_ok={keystroke_budget_ok}"])
         checks["no_qsplitter_runtime"] = CheckResult(len(w.findChildren(QSplitter)) == 0, ["runtime splitter count"])
         hits = [b for b in w.findChildren(type(w.btn_export)) if "open reports" in f"{b.text()} {b.toolTip()}".lower() and b.isVisible()]
         checks["no_duplicate_open_reports_runtime"] = CheckResult(len(hits) <= 2, [f"open_reports_visible={len(hits)}"])
@@ -285,6 +365,7 @@ def _evaluate(checks: dict[str, CheckResult]) -> list[RequirementResult]:
 def run_verification(*, verbose: bool = True, write_report: bool = True) -> VerificationOutcome:
     checks: dict[str, CheckResult] = {}
     _collect_static(checks)
+    _qss_sanity(checks)
     ttfp = _collect_runtime(checks)
     checks["ttfp_threshold"] = CheckResult(ttfp <= 13000.0, [f"ttfp_ms={ttfp:.1f} threshold=13000"])
     shot_dir = _walkthrough(checks)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 import unittest
 from unittest.mock import patch
 from pathlib import Path
@@ -247,6 +248,64 @@ class OnboardingLaunchTests(unittest.TestCase):
             window.close()
             app.processEvents()
         self.assertEqual(calls["shown"], 0)
+
+
+class SearchPerformanceTests(unittest.TestCase):
+    def setUp(self) -> None:
+        os.environ["QT_QPA_PLATFORM"] = "offscreen"
+        os.environ["FIXFOX_SKIP_ONBOARDING"] = "1"
+
+    def test_query_index_uses_cached_static_index(self) -> None:
+        from src.core.search import get_search_cache_stats, query_index, reset_search_cache_for_tests
+
+        reset_search_cache_for_tests()
+        query_index("wifi", limit=10)
+        stats_after_first = get_search_cache_stats()
+        self.assertEqual(int(stats_after_first.get("static_builds", 0.0)), 1)
+        for _ in range(6):
+            query_index("wifi", limit=10)
+        stats_after_many = get_search_cache_stats()
+        self.assertEqual(int(stats_after_many.get("static_builds", 0.0)), 1)
+
+    def test_global_search_typing_keeps_event_loop_responsive(self) -> None:
+        from PySide6.QtCore import QTimer
+        from PySide6.QtWidgets import QApplication
+
+        from src.core.search import get_search_cache_stats, reset_search_cache_for_tests
+        from src.ui.main_window import MainWindow
+
+        app = QApplication.instance() or QApplication([])
+        window = MainWindow()
+        ticks = {"count": 0}
+        timer = QTimer()
+        timer.setInterval(15)
+        timer.timeout.connect(lambda: ticks.__setitem__("count", int(ticks["count"]) + 1))
+        try:
+            reset_search_cache_for_tests()
+            before = get_search_cache_stats()
+            timer.start()
+            probe = "quickcheck"
+            started = time.perf_counter()
+            window.top_search.setFocus()
+            for i in range(1, min(10, len(probe)) + 1):
+                window.top_search.setText(probe[:i])
+                window._schedule_global_search()
+                app.processEvents()
+                time.sleep(0.018)
+            deadline = time.perf_counter() + 0.75
+            while time.perf_counter() < deadline:
+                app.processEvents()
+                time.sleep(0.01)
+            elapsed_ms = (time.perf_counter() - started) * 1000.0
+            after = get_search_cache_stats()
+            static_delta = int(after.get("static_builds", 0.0) - before.get("static_builds", 0.0))
+            self.assertLessEqual(static_delta, 1, msg=f"search static index rebuilt too often: delta={static_delta}")
+            self.assertGreaterEqual(int(ticks["count"]), 16, msg=f"event loop stalled during typing: ticks={ticks['count']}")
+            self.assertLessEqual(elapsed_ms, 1400.0, msg=f"typing search exceeded blocking budget: {elapsed_ms:.1f}ms")
+        finally:
+            timer.stop()
+            window.close()
+            app.processEvents()
 
 
 if __name__ == "__main__":

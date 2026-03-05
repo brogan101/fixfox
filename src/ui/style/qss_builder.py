@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from ...core.utils import resource_path
 from .theme import BASE_FONT_FAMILY, ThemeTokens, normalize_density, resolve_density_tokens
@@ -76,7 +76,7 @@ QFrame#BrandStatus {{
 }}
 QLabel#Wordmark {{
   font-size: {d.font_size + 1}pt;
-  font-weight: 700;
+  font-weight: 75;
 }}
 QLabel#TopBrandSubtitle {{
   color: {text_soft};
@@ -87,7 +87,7 @@ QLabel#BrandMark {{
 }}
 QLabel#TopStatusText {{
   color: {tokens.text};
-  font-weight: 600;
+  font-weight: 57;
 }}
 QLabel#TopStatusSubtle {{
   color: {tokens.text_muted};
@@ -133,7 +133,7 @@ QLabel#RunnerStatusChip {{
   border: 1px solid {border_soft};
   border-radius: 999px;
   padding: 3px 10px;
-  font-weight: 650;
+  font-weight: 63;
 }}
 QLabel#RunnerStatusChip[kind="ok"] {{
   color: {tokens.ok};
@@ -185,7 +185,6 @@ QListWidget#SettingsNav {{
   border: 1px solid {border_soft};
   border-radius: {d.corner_radius + 6}px;
   padding: 8px;
-  outline: 0;
 }}
 QListWidget#SettingsNav::item {{
   height: {max(d.nav_item_height + 2, d.input_height + 10)}px;
@@ -208,7 +207,7 @@ QLabel#SettingsNavIcon {{
 
 QLabel#Title {{
   font-size: {d.font_size + 5}pt;
-  font-weight: 650;
+  font-weight: 63;
   min-height: {max(26, d.font_size + 14)}px;
 }}
 QLabel#SubTitle {{
@@ -218,11 +217,11 @@ QLabel#SubTitle {{
 }}
 QLabel#SectionTitle {{
   font-size: {d.font_size + 1}pt;
-  font-weight: 650;
+  font-weight: 63;
 }}
 QLabel#CardTitle {{
   font-size: {d.font_size + 1}pt;
-  font-weight: 650;
+  font-weight: 63;
 }}
 QLabel#CardSubtitle {{
   color: {tokens.text_muted};
@@ -292,7 +291,7 @@ QPushButton#PrimaryButton {{
   border-radius: {d.corner_radius}px;
   padding: 0 14px;
   min-height: {d.button_height}px;
-  font-weight: 650;
+  font-weight: 63;
 }}
 QPushButton#PrimaryButton:hover {{
   background: {tokens.accent_hover};
@@ -345,7 +344,7 @@ QPushButton#TextButton {{
   border-radius: {d.corner_radius}px;
   padding: 0 10px;
   min-height: {d.button_height}px;
-  font-weight: 600;
+  font-weight: 57;
 }}
 QPushButton#TextButton:hover {{
   background: {accent_tint};
@@ -421,7 +420,7 @@ QLabel#SearchResultLabel {{
   color: {tokens.text};
 }}
 QLabel#ResultTitle {{
-  font-weight: 650;
+  font-weight: 63;
 }}
 QLabel#ResultDetail {{
   color: {tokens.text_muted};
@@ -429,31 +428,31 @@ QLabel#ResultDetail {{
 
 QLabel#TagOK, QLabel#BadgeOK {{
   color: {tokens.ok};
-  font-weight: 700;
+  font-weight: 75;
 }}
 QLabel#TagWARN, QLabel#BadgeWARN {{
   color: {tokens.warn};
-  font-weight: 700;
+  font-weight: 75;
 }}
 QLabel#TagCRIT, QLabel#BadgeCRIT {{
   color: {tokens.crit};
-  font-weight: 700;
+  font-weight: 75;
 }}
 QLabel#TagINFO, QLabel#BadgeINFO {{
   color: {tokens.info};
-  font-weight: 700;
+  font-weight: 75;
 }}
 QLabel#BadgeRiskSafe {{
   color: {tokens.ok};
-  font-weight: 700;
+  font-weight: 75;
 }}
 QLabel#BadgeRiskAdmin {{
   color: {tokens.warn};
-  font-weight: 700;
+  font-weight: 75;
 }}
 QLabel#BadgeRiskAdvanced {{
   color: {tokens.crit};
-  font-weight: 700;
+  font-weight: 75;
 }}
 
 QLineEdit#SearchInput,
@@ -545,7 +544,6 @@ QListWidget {{
   background: {tokens.panel};
   border: 1px solid {border_soft};
   border-radius: {d.corner_radius + 2}px;
-  outline: 0;
 }}
 QListWidget::item {{
   border-bottom: 1px solid {border_subtle};
@@ -652,7 +650,7 @@ QFrame#RowBase:focus {{
   border: 1px solid {focus_ring};
 }}
 QLabel#RowTitle {{
-  font-weight: 650;
+  font-weight: 63;
 }}
 QLabel#RowSubtitle {{
   color: {tokens.text_muted};
@@ -756,7 +754,6 @@ QListWidget#GlobalSearchList {{
   background: transparent;
   border: 0;
   border-radius: {d.corner_radius}px;
-  outline: 0;
 }}
 QListWidget#GlobalSearchList::item {{
   border-radius: {max(8, d.corner_radius - 4)}px;
@@ -765,7 +762,7 @@ QListWidget#GlobalSearchList::item {{
 }}
 QListWidget#GlobalSearchList::item:disabled {{
   color: {tokens.text_muted};
-  font-weight: 650;
+  font-weight: 63;
   background: transparent;
   border: 0;
   padding: 6px 2px;
@@ -790,3 +787,4 @@ QComboBox:disabled {{
   border: 1px solid {border_subtle};
 }}
 """
+

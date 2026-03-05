@@ -1,0 +1,10 @@
+FixFox QSS Sanity Check
+result=OK
+
+Failures:
+- none
+
+Qt Messages:
+- none
+
+OK
