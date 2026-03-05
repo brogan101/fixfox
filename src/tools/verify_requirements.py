@@ -633,11 +633,11 @@ def run_verification(write_report: Path | None = None, verbose: bool = True) -> 
         f"Help complete: {b4_help}",
     ]))
 
-    icon_ico = repo_root / "src" / "assets" / "branding" / "fixfox_icon.ico"
-    icon_fallback = repo_root / "src" / "assets" / "branding" / "fixfox.ico"
+    icon_ico = repo_root / "src" / "assets" / "brand" / "fixfox_icon.ico"
+    mark_png = repo_root / "src" / "assets" / "brand" / "fixfox_mark.png"
     b5_pass = (
         icon_ico.exists()
-        and icon_fallback.exists()
+        and mark_png.exists()
         and ((not runtime["app_icon_is_null"]) or ("app.setWindowIcon" in static["app_py"]))
         and (not runtime["window_icon_is_null"])
         and (not runtime["qt_toolbar_hits"])
@@ -646,7 +646,7 @@ def run_verification(write_report: Path | None = None, verbose: bool = True) -> 
     )
     results.append(RequirementResult("B5", "Branding and no Qt icon leakage", b5_pass, [
         f"fixfox_icon.ico exists: {icon_ico.exists()} ({icon_ico.relative_to(repo_root)})",
-        f"fixfox.ico exists: {icon_fallback.exists()} ({icon_fallback.relative_to(repo_root)})",
+        f"fixfox_mark.png exists: {mark_png.exists()} ({mark_png.relative_to(repo_root)})",
         f"QApplication icon is null: {runtime['app_icon_is_null']}",
         f"MainWindow icon is null: {runtime['window_icon_is_null']}",
         f"Toolbar Qt icon/action hits: {runtime['qt_toolbar_hits']}",
@@ -744,7 +744,7 @@ def run_verification(write_report: Path | None = None, verbose: bool = True) -> 
     repo_structure_doc = repo_root / "docs" / "repo-structure.md"
     icons_dir = repo_root / "src" / "assets" / "icons"
     fonts_dir = repo_root / "src" / "assets" / "fonts"
-    branding_dir = repo_root / "src" / "assets" / "branding"
+    branding_dir = repo_root / "src" / "assets" / "brand"
     b11_pass = (
         repo_structure_doc.exists()
         and branding_dir.exists()
@@ -755,7 +755,7 @@ def run_verification(write_report: Path | None = None, verbose: bool = True) -> 
     )
     results.append(RequirementResult("B11", "Repo cleanup and structure safety checks", b11_pass, [
         f"docs/repo-structure.md exists: {repo_structure_doc.exists()}",
-        f"assets/branding exists: {branding_dir.exists()}",
+        f"assets/brand exists: {branding_dir.exists()}",
         f"assets/icons exists: {icons_dir.exists()}",
         f"assets/fonts exists: {fonts_dir.exists()}",
         f"Legacy wrapper files present: {static['wrapper_files_present']}",

@@ -22,7 +22,7 @@ python -m PyInstaller `
     --onefile `
     --windowed `
     --name FixFox `
-    --icon "src\assets\branding\fixfox.ico" `
+    --icon "src\assets\brand\fixfox_icon.ico" `
     --version-file "packaging\windows_version.txt" `
     --add-data "src\assets;assets" `
     src\app.py

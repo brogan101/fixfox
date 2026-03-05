@@ -3,6 +3,7 @@ from __future__ import annotations
 from functools import partial
 from typing import Any
 
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QGridLayout, QHBoxLayout, QLabel, QSizePolicy, QVBoxLayout, QWidget
 
@@ -56,9 +57,9 @@ class HomePage(PageScroll):
 
         hero = Card("Welcome to Fix Fox", "Run local diagnostics and generate share-safe exports.", right_widget=hero_actions)
         mark = QLabel()
-        pix = QPixmap(resource_path("assets/branding/fixfox_mark.svg"))
+        pix = QPixmap(resource_path("assets/brand/fixfox_mark.png"))
         if not pix.isNull():
-            mark.setPixmap(pix.scaled(40, 40))
+            mark.setPixmap(pix.scaled(40, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         hero.body_layout().addWidget(mark)
         hero.body_layout().addWidget(QLabel("Local-only by default. No telemetry."))
         layout.addWidget(hero)

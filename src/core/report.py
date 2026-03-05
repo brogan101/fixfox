@@ -17,7 +17,7 @@ def _normalize_user_path(text: str) -> str:
     return out
 
 
-def render_html(session: dict[str, Any], icon_rel_path: str = "brand/fixfox.png") -> str:
+def render_html(session: dict[str, Any], icon_rel_path: str = "brand/fixfox_mark.png") -> str:
     summary = str(session.get("symptom", "Quick Check"))
     session_id = str(session.get("session_id", "unknown"))
     findings = session.get("findings", []) if isinstance(session.get("findings", []), list) else []

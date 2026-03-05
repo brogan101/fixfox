@@ -3,11 +3,12 @@ from __future__ import annotations
 from typing import Callable
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QComboBox, QDialog, QGridLayout, QHBoxLayout, QLabel, QStackedWidget, QVBoxLayout, QWidget
 
 from ...core.brand import APP_DISPLAY_NAME
 from ...core.utils import resource_path
-from ..icons import get_icon, render_svg
+from ..icons import get_icon
 from ..style import spacing
 from ..widgets import Card, PrimaryButton, SoftButton
 
@@ -92,7 +93,7 @@ class OnboardingFlow(QDialog):
         card = Card("Welcome to Fix Fox", "Local-first desktop diagnostics and support workflows.", object_name="OnboardingCard")
         mark = QLabel()
         mark.setObjectName("BrandMark")
-        pix = render_svg(resource_path("assets/branding/fixfox_mark.svg"), 60)
+        pix = QPixmap(resource_path("assets/brand/fixfox_mark.png")).scaled(60, 60, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         if not pix.isNull():
             mark.setPixmap(pix)
         copy = QLabel("Runs locally on this machine. No telemetry and no cloud sync.")

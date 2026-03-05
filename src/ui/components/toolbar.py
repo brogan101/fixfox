@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QLineEdit, QStackedWidget, QToolButton, QVBoxLayout
 
 from ...core.brand import APP_DISPLAY_NAME, APP_TAGLINE
 from ...core.utils import resource_path
-from ..icons import get_icon, render_svg
+from ..icons import get_icon
 from ..style import spacing
 from ..widgets import PrimaryButton, SoftButton
 
@@ -119,7 +120,9 @@ class AppToolbar(QFrame):
         self.set_details_open(False)
 
     def _refresh_brand_mark(self) -> None:
-        pixmap = render_svg(resource_path("assets/branding/fixfox_mark.svg"), 34)
+        pixmap = QPixmap(resource_path("assets/brand/fixfox_mark.png")).scaled(
+            34, 34, Qt.KeepAspectRatio, Qt.SmoothTransformation
+        )
         if not pixmap.isNull():
             self.brand_mark.setPixmap(pixmap)
 

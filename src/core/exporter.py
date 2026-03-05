@@ -154,10 +154,10 @@ def _copy_brand_icon(report_dir: Path) -> str:
     src = Path(resource_path(ICON_PNG))
     dst_dir = report_dir / "brand"
     dst_dir.mkdir(parents=True, exist_ok=True)
-    dst = dst_dir / "fixfox.png"
+    dst = dst_dir / "fixfox_mark.png"
     if src.exists():
         shutil.copy2(src, dst)
-    return "brand/fixfox.png"
+    return "brand/fixfox_mark.png"
 
 
 def _as_evidence_rows(session: dict[str, Any]) -> list[dict[str, str]]:
