@@ -352,12 +352,12 @@ class MainWindow(QMainWindow):
     NAV_ITEMS = ("Home", "Playbooks", "Diagnose", "Fixes", "Reports", "History", "Settings")
     NAV_ICONS = {
         "Home": "home",
-        "Playbooks": "playbooks",
+        "Playbooks": "open_book",
         "Diagnose": "diagnose",
-        "Fixes": "fixes",
+        "Fixes": "wrench",
         "Reports": "reports",
         "History": "history",
-        "Settings": "settings_gear",
+        "Settings": "gear",
     }
 
     def __init__(self) -> None:
@@ -774,6 +774,7 @@ class MainWindow(QMainWindow):
             if next_mode == "basic":
                 self.settings_state.right_panel_open = False
                 self._set_concierge_collapsed(True, persist=False)
+                QTimer.singleShot(0, lambda: self._set_concierge_collapsed(True, persist=False))
             self._sync_ui_mode_controls()
             return
         self.settings_state.ui_mode = next_mode
@@ -801,6 +802,8 @@ class MainWindow(QMainWindow):
         self._update_context_labels()
         self._update_concierge()
         self._set_concierge_collapsed(not self.settings_state.right_panel_open, persist=False)
+        if next_mode == "basic":
+            QTimer.singleShot(0, lambda: self._set_concierge_collapsed(True, persist=False))
         self.toasts.show_toast(f"Mode switched to {next_mode.title()}.")
 
     def _visible_capability_ids(self) -> set[str]:
@@ -4095,7 +4098,25 @@ class MainWindow(QMainWindow):
         k, v = str(kind or "").strip(), str(key or "").strip()
         if not k or not v:
             return
-        if k == "session":
+        if k == "route":
+            route_map = {
+                "home": "Home",
+                "playbooks": "Playbooks",
+                "diagnose": "Diagnose",
+                "fixes": "Fixes",
+                "reports": "Reports",
+                "history": "History",
+                "settings": "Settings",
+            }
+            route_name = route_map.get(v.lower(), "")
+            if route_name and route_name in self.NAV_ITEMS:
+                self.nav.setCurrentRow(self.NAV_ITEMS.index(route_name))
+        elif k == "play":
+            if v.startswith("runbook."):
+                self._dispatch_search_selection("runbook", v.split(".", 1)[1])
+            elif v.startswith("task."):
+                self._dispatch_search_selection("task", v.split(".", 1)[1])
+        elif k == "session":
             self._load_session(v); self.nav.setCurrentRow(self.NAV_ITEMS.index("History"))
         elif k == "fix":
             self.nav.setCurrentRow(self.NAV_ITEMS.index("Fixes")); self._select_fix(v)
