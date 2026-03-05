@@ -22,6 +22,9 @@ docs/REPO_AUDIT.md:... archived legacy branding ...
 Get-ChildItem docs/screenshots
 20260305_141829
 20260305_144413
+20260305_152753
+20260305_153308
+20260305_153732
 ```
 
 ```text
@@ -39,6 +42,9 @@ Test-Path docs/screenshots/20260305_143645 -> False
 | `archive/legacy_assets/branding/src_assets_branding/*` | Keep archived | Same as above; not referenced by runtime UI. | `rg` results only in docs/index/archive references. |
 | `src/ui/components/toolbar.py` | Keep (compat shim) | Existing imports can rely on this path; now re-exports from `app_bar.py`. | `rg` shows live reference and explicit re-export. |
 | `docs/screenshots/20260305_141829` | Keep | Prior committed evidence set; not harmful and still valid proof history. | Tracked file set includes this folder. |
+| `docs/screenshots/20260305_152753` | Archive/remove later | Intermediate run output superseded by latest pass folder. | New final run is `20260305_153732`. |
+| `docs/screenshots/20260305_153308` | Archive/remove later | Intermediate run output superseded by latest pass folder. | New final run is `20260305_153732`. |
+| `docs/screenshots/20260305_153732` | Keep | Latest passing walkthrough evidence used in final verification. | Manifest + clipping report both PASS. |
 
 ## Execution plan
 1. Remove only stale transient walkthrough folder for this run.

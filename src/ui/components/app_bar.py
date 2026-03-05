@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QEasingCurve, QPropertyAnimation, Qt, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QLineEdit, QStackedWidget, QToolButton, QVBoxLayout
 
-from ...core.brand import APP_DISPLAY_NAME, APP_TAGLINE
+from ...core.brand import APP_DISPLAY_NAME
 from ...core.utils import resource_path
 from ..icons import get_icon
 from ..style import spacing
@@ -37,7 +37,7 @@ class AppToolbar(QFrame):
 
         self.brand_mark = QLabel()
         self.brand_mark.setObjectName("BrandMark")
-        self.brand_mark.setFixedSize(36, 36)
+        self.brand_mark.setFixedSize(48, 48)
         self._refresh_brand_mark()
 
         text_col = QVBoxLayout()
@@ -45,15 +45,12 @@ class AppToolbar(QFrame):
         text_col.setSpacing(0)
         self.app_identity = QLabel(APP_DISPLAY_NAME)
         self.app_identity.setObjectName("Wordmark")
-        self.app_subtitle = QLabel(APP_TAGLINE)
-        self.app_subtitle.setObjectName("TopBrandSubtitle")
-        self.run_status_title = QLabel("Ready")
+        self.run_status_title = QLabel("Idle")
         self.run_status_title.setObjectName("TopStatusText")
-        self.run_status_detail = QLabel("No active run.")
+        self.run_status_detail = QLabel("No active task.")
         self.run_status_detail.setObjectName("TopStatusSubtle")
         self.run_status_detail.setWordWrap(False)
         text_col.addWidget(self.app_identity)
-        text_col.addWidget(self.app_subtitle)
         text_col.addWidget(self.run_status_title)
         text_col.addWidget(self.run_status_detail)
 
@@ -77,6 +74,9 @@ class AppToolbar(QFrame):
         self.search_stack.setObjectName("HeaderSearchStack")
         self.search_stack.addWidget(self.top_search)
         self.search_stack.addWidget(self.compact_search_btn)
+        self._search_expand_anim = QPropertyAnimation(self.top_search, b"maximumWidth", self)
+        self._search_expand_anim.setDuration(180)
+        self._search_expand_anim.setEasingCurve(QEasingCurve.OutCubic)
 
         self.btn_quick_check = PrimaryButton("Quick Check")
         self.btn_quick_check.setToolTip("Run a safe quick diagnostic check (Ctrl+Shift+R)")
@@ -122,7 +122,7 @@ class AppToolbar(QFrame):
 
     def _refresh_brand_mark(self) -> None:
         pixmap = QPixmap(resource_path("assets/brand/fixfox_mark.png")).scaled(
-            34, 34, Qt.KeepAspectRatio, Qt.SmoothTransformation
+            44, 44, Qt.KeepAspectRatio, Qt.SmoothTransformation
         )
         if not pixmap.isNull():
             self.brand_mark.setPixmap(pixmap)
@@ -137,8 +137,30 @@ class AppToolbar(QFrame):
         self.btn_panel_toggle.setIcon(get_icon(icon_name, self.btn_panel_toggle))
         self.btn_panel_toggle.setToolTip(tip)
 
-    def set_search_collapsed(self, collapsed: bool) -> None:
-        self.search_stack.setCurrentIndex(1 if collapsed else 0)
+    def set_search_collapsed(self, collapsed: bool, *, animate: bool = False) -> None:
+        if not animate:
+            self.top_search.setMaximumWidth(16777215)
+            self._search_expand_anim.stop()
+            self.search_stack.setCurrentIndex(1 if collapsed else 0)
+            return
+        if collapsed:
+            self.top_search.setMaximumWidth(16777215)
+            self._search_expand_anim.stop()
+            self.search_stack.setCurrentIndex(1)
+            return
+        self.search_stack.setCurrentIndex(0)
+        self.top_search.setMaximumWidth(1)
+        self._search_expand_anim.stop()
+        target_width = max(280, self.search_stack.width() or 320)
+        self._search_expand_anim.setStartValue(1)
+        self._search_expand_anim.setEndValue(target_width)
+        self._search_expand_anim.start()
+
+    def expand_search(self, *, animate: bool = True) -> None:
+        self.set_search_collapsed(False, animate=animate)
+
+    def collapse_search(self, *, animate: bool = False) -> None:
+        self.set_search_collapsed(True, animate=animate)
 
     def refresh_icons(self) -> None:
         self._refresh_brand_mark()

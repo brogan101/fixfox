@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from ...core.utils import resource_path
 from .theme import BASE_FONT_FAMILY, ThemeTokens, normalize_density, resolve_density_tokens
 
 
@@ -13,6 +14,14 @@ def _hex_to_rgb(color: str) -> tuple[int, int, int]:
 def _alpha(color: str, a: float) -> str:
     r, g, b = _hex_to_rgb(color)
     return f"rgba({r}, {g}, {b}, {a:.3f})"
+
+
+def _qss_file_url(rel_path: str) -> str:
+    path = resource_path(rel_path).replace("\\", "/")
+    if len(path) > 1 and path[1] == ":":
+        path = "/" + path
+    path = path.replace(" ", "%20")
+    return f"file://{path}"
 
 
 def build_qss(tokens: ThemeTokens, mode: str, density: str) -> str:
@@ -31,6 +40,7 @@ def build_qss(tokens: ThemeTokens, mode: str, density: str) -> str:
     text_soft = _alpha(tokens.text, 0.76)
     disabled_bg = _alpha(tokens.panel2, 0.48)
     disabled_text = _alpha(tokens.text_muted, 0.74)
+    combo_arrow_url = _qss_file_url("assets/icons/chevron_down.svg")
 
     return f"""
 QWidget {{
@@ -466,7 +476,19 @@ QLineEdit {{
 }}
 QComboBox {{
   min-height: {d.input_height}px;
-  padding: 0 10px;
+  padding: 0 28px 0 10px;
+}}
+QComboBox::drop-down {{
+  subcontrol-origin: padding;
+  subcontrol-position: top right;
+  width: 24px;
+  border: 0;
+  padding-right: 8px;
+}}
+QComboBox::down-arrow {{
+  image: url({combo_arrow_url});
+  width: 12px;
+  height: 12px;
 }}
 QTextEdit,
 QPlainTextEdit {{

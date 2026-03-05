@@ -500,3 +500,27 @@ src/ui/style/qss_builder.py         |  45 +++---
 - Cleanup execution:
   - removed stale folder `docs/screenshots/20260305_143145`
   - removed stale folder `docs/screenshots/20260305_143645`
+
+### 2026-03-05 Final Polish + QA Re-run
+- Applied targeted UI fixes:
+  - `src/ui/components/app_bar.py`
+    - larger brand mark in left status block
+    - removed tagline row from status block
+    - compact search button now expands input with subtle animation
+  - `src/ui/style/qss_builder.py`
+    - combo box down-arrow overridden to themed SVG icon
+  - `src/assets/icons/chevron_down.svg` added
+  - `src/ui/main_window_impl.py`
+    - wired responsive header/search focus through new animated app-bar methods
+- Sequential QA verification (non-parallel to avoid GUI race conditions):
+  - `.\.venv\Scripts\python.exe -m src.tests.smoke` -> PASS
+  - `.\.venv\Scripts\python.exe -m src.tests.test_unit` -> PASS
+  - `.\.venv\Scripts\python.exe scripts/ui_walkthrough.py` -> PASS
+  - `.\.venv\Scripts\python.exe -m src.tests.test_requirements_gate` -> PASS
+  - `python scripts/ui_walkthrough.py` -> PASS
+  - `python -m src.tests.smoke` -> PASS
+  - `python -m src.tests.test_unit` -> PASS
+- Latest proof artifact:
+  - `docs/screenshots/20260305_153732`
+  - `search_dropdown_visible_ms=704`
+  - `clipping_issue_count=0`

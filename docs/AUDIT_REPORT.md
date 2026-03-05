@@ -1,4 +1,4 @@
-# AUDIT REPORT (2026-03-05)
+﻿# AUDIT REPORT (2026-03-05)
 
 ## Repo structure & hygiene
 - Inventory regenerated: `git ls-files > docs/_tracked_files.txt`.
@@ -41,6 +41,10 @@
   - `src/ui/style/qss_builder.py`
   - runtime apply path in `src/ui/main_window_impl.py`.
 - Tool Runner visuals align with shared tokens and pass UI smoke/audit checks.
+- Follow-up pass in this run:
+  - compact search button now expands to input with animation in narrow header mode.
+  - combo-box down arrows use themed SVG (`assets/icons/chevron_down.svg`) instead of native platform arrows.
+  - app-bar status block refreshed with larger transparent brand mark and no legacy tagline line.
 
 ## Search & navigation
 - Global search behavior:
@@ -49,6 +53,9 @@
   - keyboard navigation (`Up/Down/Enter/Esc`) via event filter.
 - Reliability fix in this run:
   - walkthrough now enforces search popup persistence >=500ms and fails otherwise.
+- Latest walkthrough proof:
+  - `docs/screenshots/20260305_153732/MANIFEST.json`
+  - search persistence `704 ms` (PASS).
 - Nav rail is icon-based and verified singleton (`NavRail` only).
 
 ## Pages & features
@@ -62,7 +69,7 @@
   - Home, Playbooks, Diagnose, Fixes, Reports, History, Settings.
 - Correctness checks confirmed:
   - details side sheet closed by default, visible toggle present
-  - duplicate top-level Home “Open Reports” action already removed in previous pass
+  - duplicate top-level Home "Open Reports" action already removed in previous pass
   - no About Qt user-surface strings in app UI modules.
 
 ## Performance
@@ -76,15 +83,16 @@
 
 ## Tests & QA
 - Commands run:
-  - `.\.venv\Scripts\python.exe scripts/ui_audit.py` -> PASS
-  - `.\.venv\Scripts\python.exe scripts/ui_smoke_check.py` -> PASS
   - `.\.venv\Scripts\python.exe scripts/ui_walkthrough.py` -> PASS
   - `.\.venv\Scripts\python.exe -m src.tests.smoke` -> PASS
   - `.\.venv\Scripts\python.exe -m src.tests.test_unit` -> PASS
   - `.\.venv\Scripts\python.exe -m src.tests.test_requirements_gate` -> PASS
+  - `python scripts/ui_walkthrough.py` -> PASS
+  - `python -m src.tests.smoke` -> PASS
+  - `python -m src.tests.test_unit` -> PASS
 - Walkthrough artifacts:
-  - `docs/screenshots/20260305_144413/MANIFEST.json`
-  - `docs/screenshots/20260305_144413/clipping_report.txt`
+  - `docs/screenshots/20260305_153732/MANIFEST.json`
+  - `docs/screenshots/20260305_153732/clipping_report.txt`
   - per-page screenshots across 1024x768 / 1280x720 / 1600x900.
 
 ## Cleanup removals/archives
@@ -106,3 +114,4 @@
 - [x] Clipping checks at common resolutions passed.
 - [x] Walkthrough screenshots + manifest + clipping report generated.
 - [x] Smoke/unit/requirements gate passed.
+

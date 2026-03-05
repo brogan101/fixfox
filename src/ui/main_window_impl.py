@@ -595,7 +595,7 @@ class MainWindow(QMainWindow):
 
     def _focus_top_search(self) -> None:
         if hasattr(self, "top_search_stack"):
-            self.top_search_stack.setCurrentIndex(0)
+            self.app_shell.toolbar.expand_search(animate=self.width() < 1120)
         self.top_search.setFocus(Qt.ShortcutFocusReason)
         self.top_search.selectAll()
         if self.top_search.text().strip():
@@ -621,6 +621,7 @@ class MainWindow(QMainWindow):
 
     def _handle_compact_search(self) -> None:
         if hasattr(self, "top_search_stack") and self.top_search_stack.currentIndex() == 1:
+            self.app_shell.toolbar.expand_search(animate=True)
             self._focus_top_search()
             return
         self._focus_top_search()
@@ -1708,7 +1709,7 @@ class MainWindow(QMainWindow):
             return
         narrow = self.width() < 1120
         very_narrow = self.width() < 980
-        self.top_search_stack.setCurrentIndex(1 if narrow else 0)
+        self.app_shell.toolbar.set_search_collapsed(narrow, animate=False)
         if hasattr(self, "run_status_detail"):
             self.run_status_detail.setVisible(not very_narrow)
 

@@ -24,6 +24,16 @@
   - `src/ui/components/toolbar.py` (re-export shim to `app_bar.py`)
 
 Validation:
-- `scripts/ui_walkthrough.py` PASS with final artifact folder `docs/screenshots/20260305_144413`.
+- `scripts/ui_walkthrough.py` PASS with final artifact folder `docs/screenshots/20260305_153732`.
 - `src.tests.smoke` PASS.
 - `src.tests.test_unit` PASS.
+
+## 2026-03-05 Final Touchups
+- Added themed combo down-arrow asset:
+  - `src/assets/icons/chevron_down.svg`
+- Applied app-wide combo arrow styling override:
+  - `src/ui/style/qss_builder.py`
+- App bar polish:
+  - larger transparent brand mark in status block
+  - removed tagline line from status block copy
+  - compact-search button now expands with subtle animation
