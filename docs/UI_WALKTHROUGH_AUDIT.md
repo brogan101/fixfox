@@ -11,8 +11,8 @@ Scope: `src/ui/main_window.py`, `src/ui/components/tool_runner.py`, `src/ui/widg
   - Implementation: `_build_top_bar()`
 - Session context bar (session/symptom/share-safe/preset/last run + Export/Copy/End Session)
   - Implementation: `_build_context_bar()`, `_update_context_labels()`, `_on_nav()`
-- Right panel (Concierge)
-  - Implementation: `ConciergePanel`, `_update_concierge()`
+- Right panel (Details Side Sheet)
+  - Implementation: `SideSheet`, `_update_concierge()`
 
 Problems:
 - Context bar is only page-gated by nav (`Diagnose`, `Fixes`, `Reports`) instead of session state.

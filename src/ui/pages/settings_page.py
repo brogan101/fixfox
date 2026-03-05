@@ -29,6 +29,7 @@ from ...core.runbooks import RUNBOOKS
 from ...core.utils import resource_path
 from ...core.version import APP_VERSION
 from ...core.logging_setup import log_path, logs_dir
+from ..style import spacing
 from ..theme import available_palette_labels, resolve_density_tokens
 from ..widgets import Card, DrawerCard, SoftButton
 from .common import PageScroll, build_page_header
@@ -44,7 +45,7 @@ class SettingsPage(PageScroll):
         w = self.services
         layout = QVBoxLayout(self.content)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(10)
+        layout.setSpacing(spacing("md"))
         layout.addWidget(
             build_page_header(
                 "Settings",
@@ -58,13 +59,13 @@ class SettingsPage(PageScroll):
         tools_row = QWidget()
         tools_row_l = QVBoxLayout(tools_row)
         tools_row_l.setContentsMargins(0, 0, 0, 0)
-        tools_row_l.setSpacing(6)
+        tools_row_l.setSpacing(spacing("xs"))
         tools_row_top = QHBoxLayout()
         tools_row_top.setContentsMargins(0, 0, 0, 0)
-        tools_row_top.setSpacing(8)
+        tools_row_top.setSpacing(spacing("sm"))
         tools_row_bottom = QHBoxLayout()
         tools_row_bottom.setContentsMargins(0, 0, 0, 0)
-        tools_row_bottom.setSpacing(8)
+        tools_row_bottom.setSpacing(spacing("sm"))
         w.settings_search = QLineEdit()
         w.settings_search.setObjectName("SearchInput")
         w.settings_search.setPlaceholderText("Search settings")
@@ -87,7 +88,7 @@ class SettingsPage(PageScroll):
 
         shell = QHBoxLayout()
         shell.setContentsMargins(0, 0, 0, 0)
-        shell.setSpacing(10)
+        shell.setSpacing(spacing("md"))
         w.settings_nav = QListWidget()
         w.settings_nav.setObjectName("SettingsNav")
         w.settings_nav.setMinimumWidth(200)
@@ -181,13 +182,9 @@ class SettingsPage(PageScroll):
         pal.setContentsMargins(0, 0, 0, 0)
         pal.setSpacing(10)
         c_look = Card("Appearance", "Theme applies live across the whole app.")
-        w.s_panel = QCheckBox("Keep concierge panel open")
         w.s_weekly = QCheckBox("Enable weekly check reminder")
-        w.s_nav_compact = QCheckBox("Compact navigation rail")
         w.s_drawer_pin = QCheckBox("Pin details drawer")
-        w.s_panel.stateChanged.connect(w.save_settings_from_ui)
         w.s_weekly.stateChanged.connect(w.save_settings_from_ui)
-        w.s_nav_compact.stateChanged.connect(w.save_settings_from_ui)
         w.s_drawer_pin.stateChanged.connect(w.save_settings_from_ui)
         w.s_palette = QComboBox()
         w.s_palette.addItems(list(available_palette_labels()))
@@ -201,13 +198,8 @@ class SettingsPage(PageScroll):
         w.s_ui_mode = QComboBox()
         w.s_ui_mode.addItems(["basic", "pro"])
         w.s_ui_mode.currentTextChanged.connect(w.set_ui_mode)
-        c_look.body_layout().addWidget(w.s_panel)
-        w.s_panel_hint = w._setting_hint("Keeps the right concierge panel expanded when window width allows.")
-        c_look.body_layout().addWidget(w.s_panel_hint)
         c_look.body_layout().addWidget(w.s_weekly)
         c_look.body_layout().addWidget(w._setting_hint("Shows a weekly reminder card on Home."))
-        c_look.body_layout().addWidget(w.s_nav_compact)
-        c_look.body_layout().addWidget(w._setting_hint("Collapses main navigation to icon rail only."))
         c_look.body_layout().addWidget(w.s_drawer_pin)
         c_look.body_layout().addWidget(w._setting_hint("Keeps details drawer open at smaller widths when enabled."))
         c_look.body_layout().addWidget(QLabel("UI Mode"))
@@ -256,6 +248,8 @@ class SettingsPage(PageScroll):
         b_logo.clicked.connect(lambda: w.create_desktop_logo(force=False))
         b_logo_recreate = SoftButton("Recreate Desktop Logo")
         b_logo_recreate.clicked.connect(lambda: w.create_desktop_logo(force=True))
+        w.b_reset_onboarding = SoftButton("Reset Onboarding")
+        w.b_reset_onboarding.clicked.connect(w.reset_onboarding_flow)
         b_rebuild_db = SoftButton("Rebuild Database Index")
         b_rebuild_db.clicked.connect(w._rebuild_database_index)
         b_vacuum_db = SoftButton("Vacuum Database")
@@ -282,6 +276,8 @@ class SettingsPage(PageScroll):
         c_adv.body_layout().addWidget(b_logo)
         c_adv.body_layout().addWidget(w._setting_hint("Creates FixFoxLogo.png on your Desktop for support docs/screenshots."))
         c_adv.body_layout().addWidget(b_logo_recreate)
+        c_adv.body_layout().addWidget(w.b_reset_onboarding)
+        c_adv.body_layout().addWidget(w._setting_hint("Pro only: clears onboarding_completed so onboarding appears on next launch."))
         pdl.addWidget(c_adv)
         pdl.addStretch(1)
 

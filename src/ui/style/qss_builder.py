@@ -54,55 +54,64 @@ QWidget[page_id] {{
   background: transparent;
 }}
 
-QFrame#TopBar {{
-  background: {tokens.panel};
-  border: 1px solid {border_soft};
-  border-radius: {d.corner_radius + 4}px;
-}}
-
-QWidget#IconRail {{
-  background: {tokens.panel};
-  border: 1px solid {border_soft};
+QFrame#TopAppBar {{
+  background: {_alpha(tokens.panel, 0.96)};
+  border: 0;
   border-radius: {d.corner_radius + 6}px;
-  min-width: 56px;
-  max-width: 56px;
 }}
 
-QListWidget#IconRailList {{
+QFrame#BrandStatus {{
+  background: {surface_raised};
+  border: 0;
+  border-radius: {d.corner_radius + 8}px;
+}}
+QLabel#Wordmark {{
+  font-size: {d.font_size + 1}pt;
+  font-weight: 700;
+}}
+QLabel#TopStatusText {{
+  color: {tokens.text};
+  font-weight: 600;
+}}
+QLabel#TopStatusSubtle {{
+  color: {tokens.text_muted};
+  font-size: {max(8, d.font_size - 1)}pt;
+}}
+
+QWidget#NavRail {{
+  background: {_alpha(tokens.panel, 0.92)};
+  border: 0;
+  border-radius: {d.corner_radius + 8}px;
+  min-width: 72px;
+  max-width: 72px;
+}}
+QFrame#NavRailDivider {{
+  background: {_alpha(tokens.border, 0.55)};
+  border: 0;
+  min-height: 1px;
+  max-height: 1px;
+}}
+QToolButton#NavRailButton,
+QToolButton#NavRailAuxButton {{
   background: transparent;
   border: 0;
-  outline: 0;
+  border-radius: {d.corner_radius + 8}px;
+  font-size: {d.font_size + 2}pt;
 }}
-QListWidget#IconRailList::item {{
-  border-radius: {max(8, d.corner_radius - 4)}px;
-  margin: 2px;
-  min-height: {d.nav_item_height}px;
-}}
-QListWidget#IconRailList::item:selected {{
+QToolButton#NavRailButton:checked {{
   background: {accent_tint};
   border: 1px solid {focus_ring};
 }}
-QLabel#IconRailGlyph {{
+QToolButton#NavRailButton:hover,
+QToolButton#NavRailAuxButton:hover {{
+  background: {surface_alt};
+}}
+QToolButton#NavRailButton:focus,
+QToolButton#NavRailAuxButton:focus {{
+  border: 1px solid {focus_ring};
+}}
+QLabel#NavRailGlyph {{
   font-weight: 700;
-}}
-
-QFrame#RunStatusCard {{
-  background: {surface_raised};
-  border: 1px solid {border_soft};
-  border-radius: {d.corner_radius + 6}px;
-}}
-QFrame#RunStatusCard:hover {{
-  border-color: {focus_ring};
-  background: {_alpha(tokens.panel2, 0.98)};
-}}
-
-QLabel#RunStatusTitle {{
-  font-size: {d.font_size + 2}pt;
-  font-weight: 700;
-}}
-QLabel#RunStatusDetail {{
-  color: {tokens.text_muted};
-  font-size: {d.font_size - 1}pt;
 }}
 QLabel#RunnerStatusChip {{
   background: {tokens.panel2};
@@ -130,9 +139,10 @@ QFrame#SessionContext {{
   border-radius: {d.corner_radius + 2}px;
 }}
 
-QWidget#DetailsDrawer {{
+QWidget#DetailsDrawer,
+QFrame#SideSheet {{
   background: {tokens.panel};
-  border: 1px solid {border_soft};
+  border: 0;
   border-radius: {d.corner_radius + 4}px;
 }}
 
@@ -153,29 +163,6 @@ QScrollArea#PageScroll {{
 
 QWidget#PageViewport {{
   background: transparent;
-}}
-
-QListWidget#MainNav {{
-  background: {tokens.panel};
-  border: 1px solid {border_soft};
-  border-radius: {d.corner_radius + 6}px;
-  padding: 8px;
-  outline: 0;
-}}
-QListWidget#MainNav::item {{
-  height: {d.nav_item_height}px;
-  padding: 0;
-  border-radius: {d.corner_radius}px;
-}}
-QListWidget#MainNav::item:selected {{
-  background: {accent_tint};
-  border: 1px solid {focus_ring};
-}}
-QListWidget#MainNav::item:hover {{
-  background: {surface_alt};
-}}
-QListWidget#MainNav::item:disabled {{
-  color: {disabled_text};
 }}
 
 QListWidget#SettingsNav {{
@@ -225,7 +212,7 @@ QLabel#CardSubtitle {{
 QFrame#Card,
 QFrame#Drawer,
 QFrame#EmptyState,
-QFrame#ConciergePanel,
+QFrame#InlineCallout,
 QFrame#AccordionSection {{
   background: {tokens.panel};
   border: 1px solid {border_soft};
@@ -241,6 +228,22 @@ QFrame#Drawer[elevation="2"],
 QFrame#EmptyState[elevation="2"] {{
   background: {_alpha(tokens.shadow2, 0.20)};
   border-color: {_alpha(tokens.border, 0.92)};
+}}
+QFrame#InlineCallout[level="info"] {{
+  border-color: {_alpha(tokens.info, 0.65)};
+  background: {_alpha(tokens.info, 0.10)};
+}}
+QFrame#InlineCallout[level="warn"] {{
+  border-color: {_alpha(tokens.warn, 0.70)};
+  background: {_alpha(tokens.warn, 0.11)};
+}}
+QFrame#InlineCallout[level="error"] {{
+  border-color: {_alpha(tokens.crit, 0.74)};
+  background: {_alpha(tokens.crit, 0.10)};
+}}
+QFrame#InlineCallout[level="success"] {{
+  border-color: {_alpha(tokens.ok, 0.70)};
+  background: {_alpha(tokens.ok, 0.10)};
 }}
 
 QLabel#Pill {{
@@ -277,6 +280,10 @@ QPushButton#PrimaryButton:hover {{
 }}
 QPushButton#PrimaryButton:pressed {{
   background: {tokens.accent_pressed};
+}}
+QPushButton#PrimaryButton[busy="true"] {{
+  background: {_alpha(tokens.accent, 0.70)};
+  border-color: {_alpha(tokens.accent_pressed, 0.60)};
 }}
 
 QPushButton#SoftButton,
@@ -332,6 +339,7 @@ QPushButton#PrimaryButton:focus,
 QPushButton#SoftButton:focus,
 QPushButton#SecondaryButton:focus,
 QPushButton#TextButton:focus,
+QToolButton#AppBarIconButton:focus,
 QToolButton#IconButton:focus,
 QToolButton#KebabMenuButton:focus,
 QToolButton#MoreButton:focus,
@@ -339,12 +347,30 @@ QLineEdit#SearchInput:focus,
 QLineEdit:focus,
 QComboBox:focus,
 QListWidget:focus,
-QListWidget#MainNav:focus,
 QListWidget#SettingsNav:focus,
 QTreeWidget:focus,
 QTextEdit:focus,
 QPlainTextEdit:focus {{
   border: 1px solid {focus_ring};
+}}
+
+QToolButton#AppBarIconButton {{
+  min-width: {d.button_height}px;
+  max-width: {d.button_height}px;
+  min-height: {d.button_height}px;
+  max-height: {d.button_height}px;
+  border-radius: {max(12, d.corner_radius + 4)}px;
+  background: {tokens.panel2};
+  border: 1px solid {border_soft};
+  font-size: {d.font_size + 2}pt;
+  padding: 0;
+}}
+QToolButton#AppBarIconButton:hover {{
+  background: {surface_alt};
+  border-color: {focus_ring};
+}}
+QToolButton#AppBarIconButton:pressed {{
+  background: {accent_tint};
 }}
 
 QToolButton#IconButton {{

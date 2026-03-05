@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+import subprocess
 import time
 import traceback
 from pathlib import Path
@@ -45,7 +46,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..core import diagnostics
-from ..core.brand import APP_DISPLAY_NAME, APP_TAGLINE, ICON_PNG
+from ..core.brand import APP_DISPLAY_NAME, APP_TAGLINE, ICON_ICO, ICON_PNG
 from ..core.brand_assets import ensure_logo_on_desktop
 from ..core.db import (
     db_stats,
@@ -102,7 +103,7 @@ from .components.rows import BaseRow, FindingRow, FixRow, IconButton, SessionRow
 from .components.tool_runner import ToolRunnerWindow
 from .components.global_search import GlobalSearchPopup
 from .components.app_shell import AppShellFrame
-from .icons import get_icon
+from .components.onboarding import OnboardingFlow
 from .layout_guardrails import (
     MIN_NAV_WIDTH,
     MIN_RIGHT_PANEL_WIDTH,
@@ -135,7 +136,7 @@ from .theme import (
     resolve_theme_tokens,
     set_ui_scale_percent,
 )
-from .widgets import Card, ConciergePanel, DrawerCard, EmptyState, Pill, PrimaryButton, SoftButton, ToastHost
+from .widgets import Card, DrawerCard, EmptyState, Pill, PrimaryButton, SoftButton, ToastHost
 
 LOGGER = logging.getLogger("fixfox.ui")
 
@@ -225,70 +226,6 @@ class CommandPaletteDialog(QDialog):
         if not self.selected_kind or not self.selected_key:
             return
         self.accept()
-
-
-class OnboardingDialog(QDialog):
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setWindowTitle(f"Welcome to {APP_DISPLAY_NAME}")
-        self.resize(620, 340)
-        self.goal = "speed"
-        self.skip_forever = False
-        layout = QVBoxLayout(self)
-        self.tabs = QTabWidget()
-        self.tabs.setDocumentMode(True)
-
-        p1 = QWidget(); l1 = QVBoxLayout(p1)
-        l1.addWidget(QLabel("What it does"))
-        l1.addWidget(QLabel("Scan -> Explain -> Fix -> Summary with local export packs."))
-        l1.addStretch(1)
-
-        p2 = QWidget(); l2 = QVBoxLayout(p2)
-        l2.addWidget(QLabel("Privacy and Share-safe"))
-        l2.addWidget(QLabel("Masking can hide user/device identifiers in exports and copy actions."))
-        self.chk_skip = QCheckBox("Do not show onboarding again")
-        l2.addWidget(self.chk_skip)
-        l2.addStretch(1)
-
-        p3 = QWidget(); l3 = QVBoxLayout(p3)
-        l3.addWidget(QLabel("Pick your default goal"))
-        self.goal_combo = QComboBox(); self.goal_combo.addItems(["speed", "space", "wifi"])
-        l3.addWidget(self.goal_combo)
-        l3.addStretch(1)
-
-        self.tabs.addTab(p1, "1")
-        self.tabs.addTab(p2, "2")
-        self.tabs.addTab(p3, "3")
-        layout.addWidget(self.tabs)
-
-        btns = QDialogButtonBox()
-        self.b_back = btns.addButton("Back", QDialogButtonBox.ActionRole)
-        self.b_next = btns.addButton("Next", QDialogButtonBox.ActionRole)
-        self.b_skip = btns.addButton("Skip", QDialogButtonBox.RejectRole)
-        self.b_finish = btns.addButton("Finish", QDialogButtonBox.AcceptRole)
-        layout.addWidget(btns)
-        self.b_back.clicked.connect(lambda: self.tabs.setCurrentIndex(max(self.tabs.currentIndex() - 1, 0)))
-        self.b_next.clicked.connect(lambda: self.tabs.setCurrentIndex(min(self.tabs.currentIndex() + 1, 2)))
-        self.b_skip.clicked.connect(self.reject)
-        self.b_finish.clicked.connect(self.accept)
-        self.tabs.currentChanged.connect(self._sync)
-        self._sync()
-
-    def _sync(self) -> None:
-        i = self.tabs.currentIndex()
-        self.b_back.setEnabled(i > 0)
-        self.b_next.setEnabled(i < 2)
-        self.b_finish.setEnabled(i == 2)
-
-    def accept(self) -> None:
-        self.goal = self.goal_combo.currentText().strip() or "speed"
-        self.skip_forever = self.chk_skip.isChecked()
-        super().accept()
-
-    def reject(self) -> None:
-        self.goal = self.goal_combo.currentText().strip() or "speed"
-        self.skip_forever = self.chk_skip.isChecked()
-        super().reject()
 
 
 class FixConfirmDialog(QDialog):
@@ -470,7 +407,10 @@ class MainWindow(QMainWindow):
         )
 
         self.setWindowTitle("Fix Fox")
-        self.setWindowIcon(QIcon(resource_path(ICON_PNG)))
+        window_icon = QIcon(resource_path(ICON_ICO))
+        if window_icon.isNull():
+            window_icon = QIcon(resource_path(ICON_PNG))
+        self.setWindowIcon(window_icon)
         self.resize(1380, 900)
         self.setMinimumSize(scaled_min_window_size(self.settings_state.ui_scale_pct))
         self.setObjectName("RootWindow")
@@ -479,12 +419,9 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.app_shell)
         self.split = self.app_shell.splitter
         self.nav_shell = self.app_shell.nav_shell
-        self.nav = self.nav_shell.nav_list
-        self.icon_nav = self.nav_shell.icon_list
-        self.nav.setMinimumWidth(MIN_NAV_WIDTH)
-        self.nav.setMaximumWidth(260)
+        self.nav = self.nav_shell
         self.nav.currentRowChanged.connect(self._on_nav)
-        self.nav_shell.collapsed_changed.connect(self._on_nav_collapsed_changed)
+        self.nav_shell.help_requested.connect(lambda: self._open_settings_section("About"))
 
         self.run_status_panel = self.app_shell.toolbar.run_status_panel
         self.app_identity = self.app_shell.toolbar.app_identity
@@ -494,6 +431,8 @@ class MainWindow(QMainWindow):
         self.top_search = self.app_shell.toolbar.top_search
         self.compact_search_btn = self.app_shell.toolbar.compact_search_btn
         self.top_search_stack = self.app_shell.toolbar.search_stack
+        self.btn_quick_check = self.app_shell.toolbar.btn_quick_check
+        self._quick_check_default_label = self.btn_quick_check.text()
         self.btn_cancel_task = self.app_shell.toolbar.btn_cancel_task
         self.btn_open_runner = self.app_shell.toolbar.btn_open_runner
         self.btn_export = self.app_shell.toolbar.btn_export
@@ -509,11 +448,14 @@ class MainWindow(QMainWindow):
         self.compact_search_btn.clicked.connect(self.open_command_palette)
         self.run_status_panel.clicked.connect(self.open_tool_runner)
         self.run_status_panel.setToolTip("Open ToolRunner (Ctrl+R)")
+        self.btn_quick_check.clicked.connect(lambda: self.run_quick_check("Quick Check"))
+        self.btn_quick_check.setShortcut("Ctrl+Shift+R")
         self.btn_open_runner.clicked.connect(self.open_tool_runner)
         self.btn_export.clicked.connect(lambda: self.nav.setCurrentRow(self.NAV_ITEMS.index("Reports")))
         self.btn_overflow.clicked.connect(self._open_header_overflow_menu)
-        self.mode_basic_btn.clicked.connect(lambda: self.set_ui_mode("basic"))
-        self.mode_pro_btn.clicked.connect(lambda: self.set_ui_mode("pro"))
+        self.mode_basic_btn.setVisible(False)
+        self.mode_pro_btn.setVisible(False)
+        self.btn_panel_toggle.setVisible(False)
 
         self.context = self._build_context_bar()
         self.app_shell.center_layout.addWidget(self.context)
@@ -522,16 +464,17 @@ class MainWindow(QMainWindow):
 
         self.details_drawer = self.app_shell.details_drawer
         self.details_drawer.setMinimumWidth(MIN_RIGHT_PANEL_WIDTH)
-        self.concierge = ConciergePanel()
-        self.app_shell.details_layout.addWidget(self.concierge, 1)
+        self.side_sheet = self.app_shell.side_sheet
+        self.concierge = self.side_sheet
+        self.side_sheet.pin_changed.connect(self._on_side_sheet_pin_changed)
         self.toasts = ToastHost()
-        self.app_shell.details_layout.addWidget(self.toasts, 0, Qt.AlignBottom)
+        self.app_shell.center_layout.addWidget(self.toasts, 0, Qt.AlignRight)
 
         self.shell_session_label = self.app_shell.bottom_status.session_label
         self.shell_mode_label = self.app_shell.bottom_status.mode_label
         self.shell_safety_label = self.app_shell.bottom_status.safety_label
 
-        self.split.setSizes([280, 860, 300])
+        self.split.setSizes([72, 1040, 0])
         self._build_nav()
         self._build_pages()
 
@@ -539,6 +482,7 @@ class MainWindow(QMainWindow):
         self.btn_cancel_task.clicked.connect(self._cancel_task)
         self.btn_panel_toggle.clicked.connect(self._toggle_concierge)
         QShortcut(QKeySequence("Ctrl+K"), self, self.open_command_palette)
+        QShortcut(QKeySequence("Ctrl+Shift+R"), self, lambda: self.run_quick_check("Quick Check"))
         QShortcut(QKeySequence("Ctrl+Alt+L"), self, self._toggle_layout_debug_overlay)
         QShortcut(QKeySequence("Ctrl+Alt+T"), self, self._run_ui_self_check)
 
@@ -546,7 +490,7 @@ class MainWindow(QMainWindow):
         self._restore_layout_state()
         self._apply_theme()
         apply_button_guardrails(self, self.settings_state.density)
-        default_open = self.settings_state.right_panel_open and self.layout_policy_state.right_panel_default_open
+        default_open = False
         self._set_concierge_collapsed(not default_open, persist=False)
         self._apply_responsive_concierge()
         self._apply_responsive_header()
@@ -562,6 +506,7 @@ class MainWindow(QMainWindow):
         self._status_tick_timer.timeout.connect(self._update_run_status_indicator)
         self._status_tick_timer.start(250)
         self._show_onboarding_if_needed()
+        self._run_ui_structure_audit_once()
 
     def resizeEvent(self, event: Any) -> None:
         super().resizeEvent(event)
@@ -575,48 +520,35 @@ class MainWindow(QMainWindow):
 
     def _build_nav(self) -> None:
         nav_height = resolve_density_tokens(self.settings_state.density).nav_item_height
-        if hasattr(self, "nav_shell"):
-            glyphs = {
-                "home": "H",
-                "toolbox": "T",
-                "diagnose": "D",
-                "fixes": "F",
-                "reports": "R",
-                "history": "Y",
-                "settings": "S",
-            }
-            self.nav_shell.set_items(
-                list(self.NAV_ITEMS),
-                lambda label: glyphs.get(self.NAV_ICONS.get(label, "menu"), "â€¢"),
-                nav_height,
-                self._nav_item_widget,
-            )
-        else:
-            self.nav.clear()
-            for name in self.NAV_ITEMS:
-                item = QListWidgetItem()
-                item.setData(Qt.UserRole, name)
-                item.setSizeHint(QSize(0, nav_height))
-                self.nav.addItem(item)
-                self.nav.setItemWidget(item, self._nav_item_widget(name))
+        glyphs = {
+            "home": "^",
+            "toolbox": "[]",
+            "diagnose": "!",
+            "fixes": "+",
+            "reports": "EX",
+            "history": "~",
+            "settings": "*",
+            "help": "?",
+        }
+        self.nav_shell.set_items(
+            list(self.NAV_ITEMS),
+            lambda label: glyphs.get(self.NAV_ICONS.get(label, str(label).strip().lower()), glyphs.get(str(label).strip().lower(), ".")),
+            nav_height,
+            self._nav_item_widget,
+        )
 
     def _nav_item_widget(self, label: str) -> QWidget:
         return self._rail_row_widget(label, self.NAV_ICONS.get(label, "menu"))
 
     def _rail_row_widget(self, label: str, icon_name: str) -> QWidget:
-        d = resolve_density_tokens(self.settings_state.density)
+        del icon_name
         row = QWidget()
         row.setAttribute(Qt.WA_TransparentForMouseEvents, True)
         lay = QHBoxLayout(row)
-        pad = max(spacing("sm"), d.card_padding_h - 2)
-        lay.setContentsMargins(pad, 0, pad, 0)
-        lay.setSpacing(max(spacing("sm"), d.icon_size // 2 + 1))
-        icon = QLabel()
-        icon.setAttribute(Qt.WA_TransparentForMouseEvents, True)
-        icon.setPixmap(get_icon(icon_name, self).pixmap(d.icon_size, d.icon_size))
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(0)
         text = QLabel(label)
         text.setAttribute(Qt.WA_TransparentForMouseEvents, True)
-        lay.addWidget(icon)
         lay.addWidget(text, 1)
         return row
     def _build_context_bar(self) -> QWidget:
@@ -662,6 +594,14 @@ class MainWindow(QMainWindow):
             if event.type() == QEvent.FocusOut:
                 QTimer.singleShot(120, self._search_popup.hide_popup)
         return super().eventFilter(watched, event)
+
+    def keyPressEvent(self, event: Any) -> None:  # type: ignore[override]
+        if event.key() == Qt.Key_Escape and hasattr(self, "concierge"):
+            if (not self.concierge.collapsed) and (not bool(getattr(self.concierge, "pinned", False))):
+                self._set_concierge_collapsed(True, persist=True)
+                event.accept()
+                return
+        super().keyPressEvent(event)
 
     def _schedule_global_search(self) -> None:
         query = self.top_search.text().strip() if hasattr(self, "top_search") else ""
@@ -841,18 +781,8 @@ class MainWindow(QMainWindow):
                 if basic
                 else "Show admin-only fixes and runbooks."
             )
-        if hasattr(self, "s_panel"):
-            self.s_panel.setEnabled(not basic)
-        if hasattr(self, "s_nav_compact"):
-            self.s_nav_compact.setEnabled(True)
         if hasattr(self, "s_drawer_pin"):
             self.s_drawer_pin.setEnabled(True)
-        if hasattr(self, "s_panel_hint"):
-            self.s_panel_hint.setText(
-                "Basic mode starts with the concierge panel collapsed. Use the panel button in the top bar to expand it when needed."
-                if basic
-                else "Keeps the right concierge panel expanded when window width allows."
-            )
         if hasattr(self, "s_safe"):
             self.s_safe.setEnabled(not self.settings_state.show_admin_tools)
             if self.settings_state.show_admin_tools and self.s_safe.isChecked():
@@ -863,6 +793,8 @@ class MainWindow(QMainWindow):
             self.s_export_btn.setVisible(not basic)
             self.s_export_btn.setEnabled(not basic)
             self.s_export_btn.setToolTip("Switch to Pro mode to export settings JSON." if basic else "Export settings JSON.")
+        if hasattr(self, "b_reset_onboarding"):
+            self.b_reset_onboarding.setEnabled(not basic)
 
     def _apply_playbooks_mode_visibility(self) -> None:
         policy = self.layout_policy_state
@@ -946,8 +878,22 @@ class MainWindow(QMainWindow):
             self.run_status_chip.style().unpolish(self.run_status_chip)
             self.run_status_chip.style().polish(self.run_status_chip)
 
+    def _set_quick_check_busy(self, busy: bool, spinner: str = "") -> None:
+        if not hasattr(self, "btn_quick_check"):
+            return
+        self.btn_quick_check.setEnabled(not busy)
+        self.btn_quick_check.setProperty("busy", bool(busy))
+        if busy:
+            spin = f"{spinner} " if spinner else ""
+            self.btn_quick_check.setText(f"{spin}Running Quick Check")
+        else:
+            self.btn_quick_check.setText(self._quick_check_default_label)
+        self.btn_quick_check.style().unpolish(self.btn_quick_check)
+        self.btn_quick_check.style().polish(self.btn_quick_check)
+
     def _update_run_status_indicator(self) -> None:
         if self.active_worker is None:
+            self._set_quick_check_busy(False)
             detail = self._last_run_line[:120].strip()
             if detail:
                 self._set_run_status("Ready", f"{self._last_run_status}: {detail}")
@@ -970,6 +916,8 @@ class MainWindow(QMainWindow):
             line = "Running... waiting for live output."
         detail = f"{spinner} {line} | {elapsed}"
         self._set_run_status(title, detail)
+        if "quick check" in str(self.active_run_name or "").strip().lower():
+            self._set_quick_check_busy(True, spinner=spinner)
 
     def _subscribe_run_status_events(self, run_id: str) -> None:
         self.active_run_id = str(run_id or "").strip()
@@ -1075,7 +1023,7 @@ class MainWindow(QMainWindow):
             "safety": "risk admin advanced rollback",
             "privacy": "sessions evidence logs local-only masking share-safe not collected storage path",
             "privacy & safety": "local only telemetry sessions logs exports safe admin advanced",
-            "appearance": "theme density palette right panel scale ui nav compact drawer pin",
+            "appearance": "theme density palette right panel scale ui drawer pin",
             "advanced": "logs diagnostics data folder evidence",
             "about": "version help start here privacy safety",
             "feedback": "bug ui feature message",
@@ -1105,6 +1053,18 @@ class MainWindow(QMainWindow):
         self._update_context_labels()
         self._update_concierge()
         self.toasts.show_toast("Settings reset to defaults.")
+
+    def reset_onboarding_flow(self) -> None:
+        if self.settings_state.ui_mode != "pro":
+            self.toasts.show_toast("Reset onboarding is available in Pro mode.")
+            if hasattr(self, "b_reset_onboarding"):
+                self.b_reset_onboarding.setEnabled(False)
+            return
+        self.settings_state.onboarding_completed = False
+        save_settings(self.settings_state)
+        if hasattr(self, "b_reset_onboarding"):
+            self.b_reset_onboarding.setEnabled(True)
+        self.toasts.show_toast("Onboarding reset. It will appear on next launch.")
 
     def _export_settings_json(self) -> None:
         if self.settings_state.ui_mode != "pro":
@@ -1285,16 +1245,193 @@ class MainWindow(QMainWindow):
         if isinstance(sender, QWidget):
             menu.exec(sender.mapToGlobal(sender.rect().bottomLeft()))
 
+    def _open_docs(self) -> None:
+        docs_file = Path.cwd() / "docs" / "ui-polish-checklist.md"
+        if docs_file.exists() and os.name == "nt":
+            os.startfile(str(docs_file))
+            return
+        self._show_page_help("Docs", "See docs/ui-polish-checklist.md for manual QA steps.")
+
+    def _show_about_fixfox_dialog(self) -> None:
+        local_paths = ensure_dirs()
+        commit = "unknown"
+        try:
+            commit = (
+                subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], text=True, stderr=subprocess.DEVNULL).strip()
+                or "unknown"
+            )
+        except Exception:
+            commit = os.environ.get("FIXFOX_COMMIT", "unknown").strip() or "unknown"
+        build_date = datetime.utcnow().strftime("%Y-%m-%d")
+        text = (
+            f"{APP_DISPLAY_NAME} {APP_VERSION}\n"
+            f"Build date: {build_date}\n"
+            f"Commit: {commit}\n\n"
+            "Local-only by design. No telemetry and no automatic cloud transfer.\n\n"
+            f"Logs path: {local_paths['logs']}\n"
+            f"Exports path: {local_paths['exports']}"
+        )
+        QMessageBox.information(self, "About Fix Fox", text)
+
     def _open_header_overflow_menu(self) -> None:
         menu = QMenu(self)
-        menu.addAction("Help", self._open_help_menu)
-        menu.addAction("Settings", lambda: self.nav.setCurrentRow(self.NAV_ITEMS.index("Settings")))
-        menu.addAction("Privacy", lambda: self._open_settings_section("Privacy"))
-        menu.addAction("Safety", lambda: self._open_settings_section("Safety"))
-        menu.addAction("Command Palette", self.open_command_palette)
+        menu.setObjectName("HeaderOverflowMenu")
+
+        menu.addSection("Session")
+        menu.addAction("New Session", self._start_new_session)
+        menu.addAction("Open Session", self._open_session_file)
+        menu.addAction("Export", lambda: self.nav.setCurrentRow(self.NAV_ITEMS.index("Reports")))
+        menu.addAction("Open Exports Folder", self.open_last_export_folder)
+
+        menu.addSection("View")
+        details_toggle = QAction("Toggle Details Panel", self)
+        details_toggle.setCheckable(True)
+        details_toggle.setChecked(not self.concierge.collapsed)
+        details_toggle.triggered.connect(lambda checked: self._set_concierge_collapsed(not checked, persist=True))
+        menu.addAction(details_toggle)
+        menu.addSeparator()
+
+        density_menu = menu.addMenu("Density")
+        d_compact = QAction("Compact", self)
+        d_compact.setCheckable(True)
+        d_compact.setChecked(self.settings_state.density == "compact")
+        d_compact.triggered.connect(lambda: self._set_density_mode("compact"))
+        d_comfort = QAction("Comfortable", self)
+        d_comfort.setCheckable(True)
+        d_comfort.setChecked(self.settings_state.density != "compact")
+        d_comfort.triggered.connect(lambda: self._set_density_mode("comfortable"))
+        density_menu.addAction(d_compact)
+        density_menu.addAction(d_comfort)
+
+        theme_menu = menu.addMenu("Theme")
+        t_light = QAction("Light", self)
+        t_light.setCheckable(True)
+        t_light.setChecked(self.settings_state.theme_mode == "light")
+        t_light.triggered.connect(lambda: self._set_theme_mode("light"))
+        t_dark = QAction("Dark", self)
+        t_dark.setCheckable(True)
+        t_dark.setChecked(self.settings_state.theme_mode == "dark")
+        t_dark.triggered.connect(lambda: self._set_theme_mode("dark"))
+        theme_menu.addAction(t_light)
+        theme_menu.addAction(t_dark)
+
+        palette_menu = menu.addMenu("Palette")
+        for key in ("fixfox", "graphite", "high_contrast"):
+            label = palette_label(key)
+            action = QAction(label, self)
+            action.setCheckable(True)
+            action.setChecked(normalize_palette(self.settings_state.theme_palette) == key)
+            action.triggered.connect(lambda _checked=False, value=key: self._set_theme_palette(value))
+            palette_menu.addAction(action)
+
+        mode_menu = menu.addMenu("Mode")
+        m_basic = QAction("Basic", self)
+        m_basic.setCheckable(True)
+        m_basic.setChecked(self.settings_state.ui_mode == "basic")
+        m_basic.triggered.connect(lambda: self.set_ui_mode("basic"))
+        m_pro = QAction("Pro", self)
+        m_pro.setCheckable(True)
+        m_pro.setChecked(self.settings_state.ui_mode == "pro")
+        m_pro.triggered.connect(lambda: self.set_ui_mode("pro"))
+        mode_menu.addAction(m_basic)
+        mode_menu.addAction(m_pro)
+
+        menu.addSection("Help")
+        menu.addAction("Docs", self._open_docs)
+        menu.addAction("About Fix Fox", self._show_about_fixfox_dialog)
+        menu.addAction("About Qt", QApplication.instance().aboutQt)
+        if os.environ.get("FIXFOX_DEV_MODE", "1").strip() == "1":
+            menu.addAction("Dump UI Tree", self._dump_ui_tree)
+
         sender = self.sender()
         if isinstance(sender, QWidget):
             menu.exec(sender.mapToGlobal(sender.rect().bottomLeft()))
+
+    def _set_theme_mode(self, mode: str) -> None:
+        self.settings_state.theme_mode = normalize_mode(mode)
+        self._apply_theme()
+        save_settings(self.settings_state)
+
+    def _set_density_mode(self, density: str) -> None:
+        self.settings_state.density = normalize_density(density)
+        self._apply_theme()
+        save_settings(self.settings_state)
+
+    def _set_theme_palette(self, palette: str) -> None:
+        self.settings_state.theme_palette = normalize_palette(palette)
+        self._apply_theme()
+        save_settings(self.settings_state)
+
+    def _start_new_session(self) -> None:
+        self.current_session = {}
+        self.selected_finding = {}
+        self._sync_context_bar_visibility()
+        self._update_context_labels()
+        self._update_concierge()
+        self.toasts.show_toast("Started a new session context.")
+
+    def _open_session_file(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Open Session JSON",
+            str(ensure_dirs()["sessions"]),
+            "JSON (*.json)",
+        )
+        if not path:
+            return
+        sid = Path(path).stem
+        self._load_session(sid)
+        self.toasts.show_toast(f"Opened session {sid}.")
+
+    def _log_ui_audit(self, message: str) -> None:
+        line = str(message or "").strip()
+        if not line:
+            return
+        print(line)
+        LOGGER.info(line)
+        if hasattr(self, "concierge") and hasattr(self.concierge, "append_log"):
+            try:
+                self.concierge.append_log(line)
+            except Exception:
+                pass
+
+    def _dump_ui_tree(self) -> None:
+        lines: list[str] = ["[FixFox UI Tree]"]
+        roots = (
+            getattr(self, "nav_shell", None),
+            getattr(self.app_shell, "toolbar", None),
+            getattr(self, "details_drawer", None),
+        )
+        labels = ("nav", "header", "side_sheet")
+        for label, root in zip(labels, roots):
+            if root is None:
+                continue
+            lines.append(f"{label}: {root.objectName()} ({root.__class__.__name__})")
+            for child in root.findChildren(QWidget):
+                name = child.objectName() or "-"
+                lines.append(f"  - {name} ({child.__class__.__name__})")
+        for line in lines:
+            self._log_ui_audit(line)
+
+    def _run_ui_structure_audit_once(self) -> None:
+        nav_rails = [w for w in self.findChildren(QWidget) if w.objectName() == "NavRail"]
+        legacy_names = {"Nav", "NavList", "DrawerNav", "LegacyNav", "MainNav"}
+        legacy_widgets = [w for w in self.findChildren(QWidget) if w.objectName() in legacy_names]
+        list_nav_candidates = [
+            w
+            for w in self.findChildren(QWidget)
+            if (w.__class__.__name__ in {"QListWidget", "QTreeView"}) and (w.objectName() in legacy_names)
+        ]
+        sheet_visible = bool(hasattr(self, "concierge") and self.concierge.isVisible())
+        self._log_ui_audit(f"[FixFox UI AUDIT] nav_widgets={len(nav_rails)} expected=1 (NavRail)")
+        self._log_ui_audit(f"[FixFox UI AUDIT] legacy_nav_widgets={len(legacy_widgets)} list_candidates={len(list_nav_candidates)}")
+        self._log_ui_audit(f"[FixFox UI AUDIT] side_sheet_visible_default={sheet_visible}")
+        dev_mode = os.environ.get("FIXFOX_DEV_MODE", "1").strip() == "1"
+        if dev_mode and nav_rails and (legacy_widgets or list_nav_candidates):
+            raise RuntimeError(
+                "Legacy main navigation widgets detected alongside NavRail. "
+                "Delete legacy nav list construction instead of hiding it."
+            )
 
     def _open_settings_section(self, label: str) -> None:
         target = str(label or "").strip().lower()
@@ -1321,16 +1458,41 @@ class MainWindow(QMainWindow):
     def _show_onboarding_if_needed(self) -> None:
         if os.environ.get("FIXFOX_SKIP_ONBOARDING", "").strip() == "1":
             return
-        if os.environ.get("QT_QPA_PLATFORM", "").strip().lower() in {"offscreen", "minimal"}:
+        force = os.environ.get("FIXFOX_FORCE_ONBOARDING", "").strip() == "1"
+        if (not force) and os.environ.get("QT_QPA_PLATFORM", "").strip().lower() in {"offscreen", "minimal"}:
             return
         if self.settings_state.onboarding_completed:
             return
-        d = OnboardingDialog(self)
-        ok = d.exec() == QDialog.Accepted
-        self.settings_state.onboarding_goal = d.goal
-        if ok or d.skip_forever:
-            self.settings_state.onboarding_completed = True
+        d = OnboardingFlow(
+            self,
+            theme_mode=self.settings_state.theme_mode,
+            density=self.settings_state.density,
+            ui_mode=self.settings_state.ui_mode,
+            apply_preferences=self._apply_onboarding_preferences,
+            can_resume_session=True,
+        )
+        completed = d.exec() == QDialog.Accepted and d.completed
+        self.settings_state.onboarding_completed = bool(completed)
         save_settings(self.settings_state)
+        if not completed:
+            return
+        if d.result_action == "quick_check":
+            self.run_quick_check("Quick Check")
+        elif d.result_action == "settings":
+            self._open_settings_section("Appearance")
+        elif d.result_action == "resume":
+            self.nav.setCurrentRow(self.NAV_ITEMS.index("History"))
+        else:
+            self.nav.setCurrentRow(self.NAV_ITEMS.index("Home"))
+        self.toasts.show_toast("You're set up.", timeout_ms=3200)
+
+    def _apply_onboarding_preferences(self, theme_mode: str, density: str, ui_mode: str) -> None:
+        self.settings_state.theme_mode = normalize_mode(theme_mode)
+        self.settings_state.density = normalize_density(density)
+        self.settings_state.ui_mode = "pro" if str(ui_mode).strip().lower() == "pro" else "basic"
+        self._apply_theme()
+        self._sync_ui_mode_controls()
+        self._apply_mode_visibility()
 
     def _on_nav(self, idx: int) -> None:
         if idx < 0 or idx >= len(self.NAV_ITEMS):
@@ -1342,7 +1504,7 @@ class MainWindow(QMainWindow):
         self._update_concierge()
 
     def _on_nav_collapsed_changed(self, collapsed: bool) -> None:
-        self.settings_state.nav_collapsed = bool(collapsed)
+        self.settings_state.nav_collapsed = True
         self._sync_shell_status_bar()
 
     def _on_settings_section_changed(self, idx: int) -> None:
@@ -1360,9 +1522,8 @@ class MainWindow(QMainWindow):
             self.move(s.window_x, s.window_y)
         sizes = list(s.splitter_sizes or [])
         if len(sizes) == 3:
-            self.split.setSizes([max(MIN_NAV_WIDTH, sizes[0]), max(640, sizes[1]), max(MIN_RIGHT_PANEL_WIDTH, sizes[2])])
-        if hasattr(self, "nav_shell"):
-            self.nav_shell.set_collapsed(s.nav_collapsed)
+            self.split.setSizes([72, max(640, sizes[1]), max(0, sizes[2])])
+        self.settings_state.nav_collapsed = True
         page = s.last_page if s.last_page in self.NAV_ITEMS else "Home"
         self.nav.setCurrentRow(self.NAV_ITEMS.index(page))
         if hasattr(self, "settings_nav"):
@@ -1381,7 +1542,7 @@ class MainWindow(QMainWindow):
         self.settings_state.window_width = int(max(1080, geo.width()))
         self.settings_state.window_height = int(max(720, geo.height()))
         self.settings_state.splitter_sizes = [int(v) for v in self.split.sizes()]
-        self.settings_state.nav_collapsed = bool(getattr(self.nav_shell, "collapsed", False))
+        self.settings_state.nav_collapsed = True
         nav_idx = self.nav.currentRow()
         if 0 <= nav_idx < len(self.NAV_ITEMS):
             self.settings_state.last_page = self.NAV_ITEMS[nav_idx]
@@ -1400,6 +1561,10 @@ class MainWindow(QMainWindow):
         self.concierge.set_collapsed(collapsed)
         if hasattr(self, "details_drawer"):
             self.details_drawer.setVisible(not collapsed)
+        if (not collapsed) and self.split.count() == 3:
+            sizes = self.split.sizes()
+            if len(sizes) == 3 and sizes[2] < MIN_RIGHT_PANEL_WIDTH:
+                self.split.setSizes([72, max(680, sizes[1]), MIN_RIGHT_PANEL_WIDTH])
         self._persist_concierge_events = True
         self._sync_panel_toggle_icon()
 
@@ -1411,10 +1576,38 @@ class MainWindow(QMainWindow):
         safety = "Safe-only ON" if self.settings_state.safe_only_mode else "Safe-only OFF"
         self.shell_session_label.setText(f"Session: {sid}")
         self.shell_mode_label.setText(f"Mode: {mode}")
-        self.shell_safety_label.setText(f"{safety}{' | Nav: compact' if getattr(self.settings_state, 'nav_collapsed', False) else ''}")
+        self.shell_safety_label.setText(f"{safety} | Rail navigation")
+
+    def _page_callout_attr(self, page_name: str) -> str:
+        mapping = {
+            "Home": "home_callout",
+            "Diagnose": "diag_callout",
+            "Fixes": "fix_callout",
+            "Reports": "rep_callout",
+            "History": "hist_callout",
+            "Playbooks": "pb_callout",
+        }
+        return mapping.get(page_name, "")
+
+    def _show_page_callout(self, page_name: str, title: str, message: str, level: str = "warn") -> None:
+        attr = self._page_callout_attr(page_name)
+        if not attr:
+            return
+        widget = getattr(self, attr, None)
+        if widget is None or not hasattr(widget, "set_message"):
+            return
+        widget.set_message(title, message, level=level)
+
+    def _clear_page_callouts(self) -> None:
+        for page_name in ("Home", "Diagnose", "Fixes", "Reports", "History", "Playbooks"):
+            attr = self._page_callout_attr(page_name)
+            widget = getattr(self, attr, None)
+            if widget is None or not hasattr(widget, "set_message"):
+                continue
+            widget.set_message("", "", level="info")
 
     def _apply_responsive_concierge(self) -> None:
-        pinned = bool(getattr(self.settings_state, "details_drawer_pinned", True))
+        pinned = bool(getattr(self.concierge, "pinned", getattr(self.settings_state, "details_drawer_pinned", True)))
         narrow = should_auto_collapse_right_panel(self.width()) and (not pinned)
         if narrow and not self._auto_concierge_collapse:
             self._auto_concierge_collapse = True
@@ -1425,19 +1618,16 @@ class MainWindow(QMainWindow):
         if self.split.count() == 3:
             sizes = self.split.sizes()
             if len(sizes) == 3 and (not self.concierge.collapsed) and sizes[2] < MIN_RIGHT_PANEL_WIDTH:
-                self.split.setSizes([max(self.nav.width(), MIN_NAV_WIDTH), max(680, sizes[1]), MIN_RIGHT_PANEL_WIDTH])
+                self.split.setSizes([72, max(680, sizes[1]), MIN_RIGHT_PANEL_WIDTH])
 
     def _apply_responsive_header(self) -> None:
         if not hasattr(self, "top_search_stack"):
             return
-        narrow = self.width() < 1240
-        very_narrow = self.width() < 1140
+        narrow = self.width() < 1120
+        very_narrow = self.width() < 980
         self.top_search_stack.setCurrentIndex(1 if narrow else 0)
         if hasattr(self, "run_status_detail"):
             self.run_status_detail.setVisible(not very_narrow)
-        if hasattr(self, "mode_basic_btn") and hasattr(self, "mode_pro_btn"):
-            self.mode_basic_btn.setVisible(not very_narrow)
-            self.mode_pro_btn.setVisible(not very_narrow)
 
     def _toggle_layout_debug_overlay(self) -> None:
         if self.layout_overlay is None:
@@ -1506,15 +1696,19 @@ class MainWindow(QMainWindow):
         )
 
     def _sync_panel_toggle_icon(self) -> None:
-        icon_key = "panel_closed" if self.concierge.collapsed else "panel_open"
-        self.btn_panel_toggle._icon_name = icon_key
-        self.btn_panel_toggle.refresh_icon()
+        if hasattr(self, "btn_panel_toggle"):
+            self.btn_panel_toggle.setText("DP")
+            self.btn_panel_toggle.setToolTip("Open details panel" if self.concierge.collapsed else "Close details panel")
 
     def _on_concierge(self, collapsed: bool) -> None:
         if self._persist_concierge_events:
             self.settings_state.right_panel_open = not collapsed
             save_settings(self.settings_state)
         self._sync_panel_toggle_icon()
+
+    def _on_side_sheet_pin_changed(self, pinned: bool) -> None:
+        self.settings_state.details_drawer_pinned = bool(pinned)
+        save_settings(self.settings_state)
 
     def _update_concierge(self) -> None:
         self.concierge.clear_widgets()
@@ -1730,12 +1924,15 @@ class MainWindow(QMainWindow):
         self.active_run_id = resolved_run_id
         self.active_run_name = name
         self.active_run_started = time.monotonic()
+        self._clear_page_callouts()
         self._last_run_status = "Running"
         self._last_run_line = "Starting..."
         self._last_run_log_line = ""
         self._subscribe_run_status_events(resolved_run_id)
         self.run_event_bus.publish(resolved_run_id, RunEventType.STATUS, message=f"Running: {name}")
         self._set_run_status(f"Running: {name}", "Starting... | 0s")
+        if "quick check" in str(name or "").strip().lower():
+            self._set_quick_check_busy(True)
         self.tool_runner = ToolRunnerWindow(
             name,
             risk=risk,
@@ -1874,6 +2071,8 @@ class MainWindow(QMainWindow):
             ]
         )
         self.toasts.show_toast(plain)
+        page = self.NAV_ITEMS[self.nav.currentRow()] if self.nav.currentRow() >= 0 else "Home"
+        self._show_page_callout(page, f"{name} failed", reason, level="error")
         self._last_run_status = "Failed"
         self._last_run_line = reason
         rid = str(run_id or self.active_run_id or "").strip()
@@ -1900,6 +2099,7 @@ class MainWindow(QMainWindow):
         self.active_run_name = ""
         self.active_run_started = 0.0
         self.btn_cancel_task.setEnabled(False)
+        self._set_quick_check_busy(False)
         self._unsubscribe_run_status_events()
         self._update_run_status_indicator()
 
@@ -1974,6 +2174,12 @@ class MainWindow(QMainWindow):
         self._rebuild_report_tree(); self._update_redaction_preview(); self._refresh_evidence_items(); self._refresh_home_history(); self._refresh_history(); self._refresh_run_center(); self._update_context_labels(); self._update_weekly_status(); self._update_diagnose_context({}); self._update_concierge()
         self._sync_shell_status_bar()
         self.nav.setCurrentRow(self.NAV_ITEMS.index("Diagnose"))
+        total = len(rows)
+        self._show_page_callout("Diagnose", "Scan complete", f"{total} findings ready for review.", level="success")
+        self.toasts.show_toast(
+            f"Quick Check complete: {total} findings (CRIT {counts['CRIT']} / WARN {counts['WARN']} / OK {counts['OK']} / INFO {counts['INFO']}).",
+            timeout_ms=3600,
+        )
 
     def _clear_layout(self, layout: QVBoxLayout) -> None:
         while layout.count():
@@ -2068,6 +2274,7 @@ class MainWindow(QMainWindow):
         if not finding:
             self._update_concierge()
             return
+        self._set_concierge_collapsed(False, persist=True)
         self._update_concierge()
 
     def _run_next_best_action(self) -> None:
@@ -2444,6 +2651,12 @@ class MainWindow(QMainWindow):
         r.addChild(QTreeWidgetItem(["Preset", self.rep_preset.currentText()]))
         self.rep_tree.addTopLevelItem(r); self.rep_tree.expandAll()
         self._sync_reports_empty_state()
+
+    def _on_report_tree_item_selected(self, item: QTreeWidgetItem | None) -> None:
+        if item is None:
+            return
+        self._set_concierge_collapsed(False, persist=True)
+        self._update_concierge()
 
     def _refresh_evidence_items(self) -> None:
         if not hasattr(self, "rep_evidence"):
@@ -3248,6 +3461,7 @@ class MainWindow(QMainWindow):
                 )
             if hasattr(self, "rb_steps"):
                 self.rb_steps.set_text("\n".join([f"{step.title} ({step.task_id})" for step in selected.steps]))
+        self._set_concierge_collapsed(False, persist=True)
         self._update_concierge()
 
     def _launch_tool_payload(self, tid: str) -> None:
@@ -4251,11 +4465,11 @@ class MainWindow(QMainWindow):
         s = self.settings_state
         self.s_safe.setChecked(s.safe_only_mode); self.s_admin.setChecked(s.show_admin_tools); self.s_adv.setChecked(s.show_advanced_tools)
         self.s_diag.setChecked(s.diagnostic_mode); self.s_share.setChecked(s.share_safe_default); self.s_ip.setChecked(s.mask_ip_default)
-        self.s_panel.setChecked(s.right_panel_open); self.s_weekly.setChecked(s.weekly_reminder_enabled)
-        if hasattr(self, "s_nav_compact"):
-            self.s_nav_compact.setChecked(bool(getattr(s, "nav_collapsed", False)))
+        self.s_weekly.setChecked(s.weekly_reminder_enabled)
         if hasattr(self, "s_drawer_pin"):
             self.s_drawer_pin.setChecked(bool(getattr(s, "details_drawer_pinned", True)))
+        if hasattr(self, "side_sheet"):
+            self.side_sheet.set_pinned(bool(getattr(s, "details_drawer_pinned", True)))
         self.s_palette.setCurrentText(palette_label(s.theme_palette)); self.s_mode.setCurrentText(normalize_mode(s.theme_mode)); self.s_density.setCurrentText(normalize_density(s.density))
         if hasattr(self, "s_ui_scale"):
             self._pending_ui_scale_pct = clamp_ui_scale(getattr(s, "ui_scale_pct", 100))
@@ -4275,11 +4489,12 @@ class MainWindow(QMainWindow):
         if self._syncing_settings:
             return
         self.settings_state.safe_only_mode = self.s_safe.isChecked(); self.settings_state.show_admin_tools = self.s_admin.isChecked(); self.settings_state.show_advanced_tools = self.s_adv.isChecked(); self.settings_state.diagnostic_mode = self.s_diag.isChecked()
-        self.settings_state.share_safe_default = self.s_share.isChecked(); self.settings_state.mask_ip_default = self.s_ip.isChecked(); self.settings_state.right_panel_open = self.s_panel.isChecked(); self.settings_state.weekly_reminder_enabled = self.s_weekly.isChecked()
-        if hasattr(self, "s_nav_compact"):
-            self.settings_state.nav_collapsed = self.s_nav_compact.isChecked()
+        self.settings_state.share_safe_default = self.s_share.isChecked(); self.settings_state.mask_ip_default = self.s_ip.isChecked(); self.settings_state.weekly_reminder_enabled = self.s_weekly.isChecked()
+        self.settings_state.nav_collapsed = True
         if hasattr(self, "s_drawer_pin"):
             self.settings_state.details_drawer_pinned = self.s_drawer_pin.isChecked()
+        if hasattr(self, "side_sheet"):
+            self.side_sheet.set_pinned(bool(self.settings_state.details_drawer_pinned))
         self.settings_state.theme_palette = palette_key_from_label(self.s_palette.currentText()); self.settings_state.theme_mode = self.s_mode.currentText(); self.settings_state.density = self.s_density.currentText()
         if hasattr(self, "s_ui_scale"):
             self.settings_state.ui_scale_pct = clamp_ui_scale(self.s_ui_scale.value())
@@ -4310,11 +4525,8 @@ class MainWindow(QMainWindow):
         self._apply_mode_visibility()
         self._apply_theme()
         self._refresh_db_info_label()
-        if hasattr(self, "nav_shell"):
-            self.nav_shell.set_collapsed(bool(self.settings_state.nav_collapsed))
-        desired_open = self.s_panel.isChecked() and self.layout_policy_state.right_panel_default_open
-        if self.concierge.collapsed == desired_open:
-            self._set_concierge_collapsed(not desired_open, persist=False)
+        desired_open = self.settings_state.right_panel_open and self.layout_policy_state.right_panel_default_open
+        self._set_concierge_collapsed(not desired_open, persist=False)
         self._update_weekly_status()
         self._update_context_labels()
         self._sync_shell_status_bar()

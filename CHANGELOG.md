@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.1-beta3 - 2026-03-05
+- UI polish pass for D-style shell: unified spacing/radius tokens, consistent page section rhythm, and tighter typography hierarchy.
+- Added inline callout pattern for non-modal error/status messaging on Home/Diagnose/Fixes/Playbooks/Reports/History pages.
+- Added busy-state behavior for Quick Check (app bar button busy/disabled, running status pill, completion summary toast).
+- Improved interaction state coverage (focus, selected, hover/pressed consistency) including rail buttons and app bar icon buttons.
+- Added About Fix Fox dialog from overflow with version/build date/commit plus local-only/logs/exports info.
+- Consolidated runtime branding assets to `src/assets/branding/` and updated build scripts/docs to match.
+- Removed unused runtime assets (`src/assets/mascot.svg`) and legacy onboarding dialog code path.
+- Added `docs/repo-structure.md` and refreshed `docs/ui-polish-checklist.md` for post-polish QA.
+
 ## 0.9.1-beta2 - 2026-03-04
 - Rebuilt page architecture to class-based page widgets under `src/ui/pages/*_page.py`; removed legacy wrapper page modules.
 - Rebuilt top header for responsive behavior with compact search fallback and overflow actions menu.

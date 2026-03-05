@@ -58,7 +58,7 @@ def _load_runtime_imports():
     from PySide6.QtGui import QIcon
     from PySide6.QtWidgets import QApplication
     try:
-        from .core.brand import APP_NAME, ICON_PNG
+        from .core.brand import APP_NAME, ICON_ICO, ICON_PNG
         from .core.brand_assets import ensure_logo_on_desktop
         from .core.db import initialize_db
         from .core.logging_setup import configure_logging, install_global_exception_handler
@@ -69,7 +69,7 @@ def _load_runtime_imports():
         from .ui.shell import AppShell
     except ImportError:
         _ensure_repo_on_sys_path()
-        from src.core.brand import APP_NAME, ICON_PNG
+        from src.core.brand import APP_NAME, ICON_ICO, ICON_PNG
         from src.core.brand_assets import ensure_logo_on_desktop
         from src.core.db import initialize_db
         from src.core.logging_setup import configure_logging, install_global_exception_handler
@@ -82,6 +82,7 @@ def _load_runtime_imports():
         QIcon,
         QApplication,
         APP_NAME,
+        ICON_ICO,
         ICON_PNG,
         ensure_logo_on_desktop,
         initialize_db,
@@ -170,6 +171,7 @@ def main():
             QIcon,
             QApplication,
             APP_NAME,
+            ICON_ICO,
             ICON_PNG,
             ensure_logo_on_desktop,
             initialize_db,
@@ -198,7 +200,11 @@ def main():
 
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
-    app.setWindowIcon(QIcon(resource_path(ICON_PNG)))
+    icon_path = resource_path(ICON_ICO)
+    app_icon = QIcon(icon_path)
+    if app_icon.isNull():
+        app_icon = QIcon(resource_path(ICON_PNG))
+    app.setWindowIcon(app_icon)
     _load_bundled_font(logger, resource_path)
     try:
         ensure_logo_on_desktop(overwrite=False)

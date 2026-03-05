@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QTimer, Qt, Signal
+from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QTimer, Qt
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
     QPushButton,
-    QScrollArea,
     QStackedLayout,
     QTextEdit,
     QVBoxLayout,
@@ -14,7 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from .style import control_height, spacing, tight_spacing
-from .theme import resolve_density_tokens
+from .theme import ELEVATION_SCALE, resolve_density_tokens
 
 
 class Card(QFrame):
@@ -33,7 +32,7 @@ class Card(QFrame):
         self.setProperty("elevation", max(0, min(2, int(elevation))))
         self.setFrameShape(QFrame.NoFrame)
         self.layout_main = QVBoxLayout(self)
-        self.layout_main.setContentsMargins(14, 12, 14, 12)
+        self.layout_main.setContentsMargins(spacing("lg"), spacing("md"), spacing("lg"), spacing("md"))
         self.layout_main.setSpacing(spacing("sm"))
         self.set_density(density)
 
@@ -194,49 +193,6 @@ class ToastHost(QWidget):
         QTimer.singleShot(timeout_ms, frame.deleteLater)
 
 
-class ConciergePanel(Card):
-    collapsed_changed = Signal(bool)
-
-    def __init__(self) -> None:
-        self.collapse_btn = SoftButton("Collapse")
-        super().__init__("Concierge Panel", "Context help and next action.", right_widget=self.collapse_btn, object_name="ConciergePanel")
-        self.content = QScrollArea()
-        self.content.setObjectName("ConciergeScroll")
-        self.content.setWidgetResizable(True)
-        self.content.setFrameShape(QFrame.NoFrame)
-        self.content_host = QWidget()
-        self.content_layout = QVBoxLayout(self.content_host)
-        self.content_layout.setContentsMargins(0, spacing("xs"), 0, 0)
-        self.content_layout.setSpacing(spacing("sm"))
-        self.content.setWidget(self.content_host)
-        self.body_layout().addWidget(self.content)
-        self._collapsed = False
-        self.collapse_btn.clicked.connect(self.toggle_collapsed)
-
-    def add_widget(self, widget: QWidget) -> None:
-        self.content_layout.addWidget(widget)
-
-    def clear_widgets(self) -> None:
-        while self.content_layout.count():
-            item = self.content_layout.takeAt(0)
-            widget = item.widget()
-            if widget:
-                widget.deleteLater()
-
-    def set_collapsed(self, collapsed: bool) -> None:
-        self._collapsed = collapsed
-        self.content.setVisible(not collapsed)
-        self.collapse_btn.setText("Expand" if collapsed else "Collapse")
-        self.collapsed_changed.emit(collapsed)
-
-    def toggle_collapsed(self) -> None:
-        self.set_collapsed(not self._collapsed)
-
-    @property
-    def collapsed(self) -> bool:
-        return self._collapsed
-
-
 class EmptyState(Card):
     def __init__(self, title: str, subtitle: str, cta: QWidget | None = None, icon: str = "i"):
         super().__init__(title, subtitle, right_widget=cta, object_name="EmptyState")
@@ -248,4 +204,20 @@ class EmptyState(Card):
 
 class DrawerPanel(Card):
     def __init__(self, title: str, subtitle: str = "", density: str = "comfortable"):
-        super().__init__(title, subtitle, object_name="Drawer", density=density, elevation=2)
+        super().__init__(title, subtitle, object_name="Drawer", density=density, elevation=ELEVATION_SCALE["overlay"])
+
+
+class InlineCallout(Card):
+    def __init__(self, title: str = "Issue", message: str = "", level: str = "warn", density: str = "comfortable"):
+        super().__init__(title, message, object_name="InlineCallout", density=density, elevation=ELEVATION_SCALE["raised"])
+        self.setProperty("level", str(level or "warn").strip().lower())
+        self.sub.setWordWrap(True)
+        self.setVisible(bool(message))
+
+    def set_message(self, title: str, message: str, level: str = "warn") -> None:
+        self.title.setText(str(title or "Issue"))
+        self.sub.setText(str(message or "").strip())
+        self.setProperty("level", str(level or "warn").strip().lower())
+        self.style().unpolish(self)
+        self.style().polish(self)
+        self.setVisible(bool(str(message or "").strip()))

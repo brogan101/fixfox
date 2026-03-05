@@ -6,7 +6,8 @@ from PySide6.QtWidgets import QCheckBox, QComboBox, QLabel, QTabWidget, QTextEdi
 
 from ...core.exporter import PRESETS
 from ..components.feed_renderer import FeedRenderer
-from ..widgets import Card, EmptyState, PrimaryButton, SoftButton
+from ..style import spacing
+from ..widgets import Card, EmptyState, InlineCallout, PrimaryButton, SoftButton
 from .common import PageScroll, build_page_header
 
 
@@ -20,7 +21,7 @@ class ReportsPage(PageScroll):
         w = self.services
         layout = QVBoxLayout(self.content)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(10)
+        layout.setSpacing(spacing("md"))
         layout.addWidget(
             build_page_header(
                 "Reports",
@@ -29,13 +30,12 @@ class ReportsPage(PageScroll):
                 on_help=w._show_page_help,
             )
         )
+        w.rep_callout = InlineCallout("Reports", "", level="warn", density=w.settings_state.density)
+        layout.addWidget(w.rep_callout)
 
-        start_btn = PrimaryButton("Run Quick Check")
-        start_btn.clicked.connect(lambda: w.run_quick_check("Quick Check"))
         w.rep_empty_state = EmptyState(
             "Run a goal first",
-            "Start from Home to generate a session, then return here to configure and export.",
-            cta=start_btn,
+            "Start from Home or the top app bar to generate a session, then return here to configure and export.",
             icon="!",
         )
         layout.addWidget(w.rep_empty_state)
@@ -46,7 +46,7 @@ class ReportsPage(PageScroll):
         step1 = QWidget()
         step1_layout = QVBoxLayout(step1)
         step1_layout.setContentsMargins(0, 0, 0, 0)
-        step1_layout.setSpacing(10)
+        step1_layout.setSpacing(spacing("md"))
         w.rep_preset = QComboBox()
         w.rep_preset.addItems(list(PRESETS))
         w.rep_preset.currentTextChanged.connect(w._update_context_labels)
@@ -71,7 +71,7 @@ class ReportsPage(PageScroll):
         step2 = QWidget()
         step2_layout = QVBoxLayout(step2)
         step2_layout.setContentsMargins(0, 0, 0, 0)
-        step2_layout.setSpacing(10)
+        step2_layout.setSpacing(spacing("md"))
         w.rep_preview = QTextEdit()
         w.rep_preview.setReadOnly(True)
         w.rep_preview.setMinimumHeight(180)
@@ -82,6 +82,7 @@ class ReportsPage(PageScroll):
         redaction_card.body_layout().addWidget(w.rep_token_map)
         w.rep_tree = QTreeWidget()
         w.rep_tree.setHeaderLabels(["Export Preview", "Value"])
+        w.rep_tree.currentItemChanged.connect(lambda item, _prev: w._on_report_tree_item_selected(item))
         tree_card = Card("Export Tree Preview", "Review what will be included.")
         tree_card.body_layout().addWidget(w.rep_tree)
         w.rep_evidence_status = QTreeWidget()
@@ -104,7 +105,7 @@ class ReportsPage(PageScroll):
         step3 = QWidget()
         step3_layout = QVBoxLayout(step3)
         step3_layout.setContentsMargins(0, 0, 0, 0)
-        step3_layout.setSpacing(10)
+        step3_layout.setSpacing(spacing("md"))
         w.rep_generate = PrimaryButton("Generate Export")
         w.rep_generate.clicked.connect(w.export_current_session)
         w.rep_generate_override = SoftButton("Generate (Allow Warnings)")

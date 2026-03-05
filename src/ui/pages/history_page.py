@@ -5,7 +5,8 @@ from typing import Any
 from PySide6.QtWidgets import QHBoxLayout, QLineEdit, QVBoxLayout, QWidget
 
 from ..components.feed_renderer import FeedRenderer
-from ..widgets import Card, DrawerCard, SoftButton
+from ..style import spacing
+from ..widgets import Card, DrawerCard, InlineCallout, SoftButton
 from .common import PageScroll, build_page_header
 
 
@@ -19,12 +20,12 @@ class HistoryPage(PageScroll):
         w = self.services
         layout = QHBoxLayout(self.content)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(10)
+        layout.setSpacing(spacing("md"))
 
         center = QWidget()
         center_layout = QVBoxLayout(center)
         center_layout.setContentsMargins(0, 0, 0, 0)
-        center_layout.setSpacing(10)
+        center_layout.setSpacing(spacing("md"))
         center_layout.addWidget(
             build_page_header(
                 "History",
@@ -33,6 +34,8 @@ class HistoryPage(PageScroll):
                 on_help=w._show_page_help,
             )
         )
+        w.hist_callout = InlineCallout("History", "", level="info", density=w.settings_state.density)
+        center_layout.addWidget(w.hist_callout)
         w.hist_search = QLineEdit()
         w.hist_search.setObjectName("SearchInput")
         w.hist_search.setPlaceholderText("Search sessions")
@@ -47,11 +50,11 @@ class HistoryPage(PageScroll):
         right = QWidget()
         right_layout = QVBoxLayout(right)
         right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(10)
+        right_layout.setSpacing(spacing("md"))
         w.hist_detail = Card("Case Summary", "Select a session.")
         reopen_btn = SoftButton("Reopen Session")
         reopen_btn.clicked.connect(w.reopen_selected_session)
-        compare_btn = SoftButton("Compare with Active")
+        compare_btn = SoftButton("Compare to Active")
         compare_btn.clicked.connect(w.compare_with_active_session)
         reexport_btn = SoftButton("Re-export")
         reexport_btn.clicked.connect(w.reexport_selected_session)

@@ -42,10 +42,10 @@ def generate_icons(source: Path, assets_dir: Path) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Generate Fix Fox icon sizes and ICO layers.")
     parser.add_argument("--source", default="assets/brand/fixfox.png", help="Path to source brand PNG.")
-    parser.add_argument("--assets-dir", default="assets/brand", help="Target brand assets directory.")
+    parser.add_argument("--assets-dir", default="assets/branding", help="Target brand assets directory.")
     parser.add_argument(
         "--sync-src-assets",
-        default="src/assets/brand",
+        default="src/assets/branding",
         help="Optional src/assets brand directory to mirror generated outputs.",
     )
     args = parser.parse_args()

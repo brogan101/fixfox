@@ -54,14 +54,18 @@ SPACING_SCALE: dict[str, int] = {
     "md": 12,
     "lg": 16,
     "xl": 24,
-    "xxl": 32,
 }
 
 
 RADIUS_SCALE: dict[str, int] = {
-    "sm": 12,
-    "md": 16,
-    "lg": 20,
+    "sm": 10,
+    "md": 14,
+}
+
+
+ELEVATION_SCALE: dict[str, int] = {
+    "raised": 1,
+    "overlay": 2,
 }
 
 
@@ -74,7 +78,7 @@ DENSITY_TOKENS: dict[str, DensityTokens] = {
         input_height=36,
         card_padding_v=16,
         card_padding_h=16,
-        corner_radius=16,
+        corner_radius=14,
         icon_size=18,
     ),
     "compact": DensityTokens(
@@ -85,7 +89,7 @@ DENSITY_TOKENS: dict[str, DensityTokens] = {
         input_height=30,
         card_padding_v=12,
         card_padding_h=12,
-        corner_radius=12,
+        corner_radius=10,
         icon_size=16,
     ),
 }

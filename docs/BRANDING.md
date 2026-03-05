@@ -8,15 +8,15 @@ Key values:
 - `APP_NAME = "Fix Fox"`
 - `APP_TAGLINE = "Fast fixes. Clean support packs."`
 - `EXPORT_PREFIX = "FixFox_SupportPack"`
-- `REPORT_TITLE = "Fix Fox — Support Pack"`
-- `ICON_PNG = "assets/brand/fixfox.png"`
-- `ICON_ICO = "assets/brand/fixfox.ico"`
+- `REPORT_TITLE = "Fix Fox - Support Pack"`
+- `ICON_PNG = "assets/branding/fixfox.png"`
+- `ICON_ICO = "assets/branding/fixfox.ico"`
 - `DESKTOP_LOGO_FILENAME = "FixFoxLogo.png"`
 
 ## Icon Pipeline
 
 Source icon:
-- `assets/brand/fixfox.png`
+- `assets/branding/fixfox.png`
 
 Generate icons:
 
@@ -25,22 +25,22 @@ py tools/make_icons.py
 ```
 
 Generated outputs:
-- `assets/brand/png/fixfox_16.png`
-- `assets/brand/png/fixfox_24.png`
-- `assets/brand/png/fixfox_32.png`
-- `assets/brand/png/fixfox_48.png`
-- `assets/brand/png/fixfox_64.png`
-- `assets/brand/png/fixfox_128.png`
-- `assets/brand/png/fixfox_256.png`
-- `assets/brand/png/fixfox_512.png`
-- `assets/brand/fixfox.ico`
+- `assets/branding/png/fixfox_16.png`
+- `assets/branding/png/fixfox_24.png`
+- `assets/branding/png/fixfox_32.png`
+- `assets/branding/png/fixfox_48.png`
+- `assets/branding/png/fixfox_64.png`
+- `assets/branding/png/fixfox_128.png`
+- `assets/branding/png/fixfox_256.png`
+- `assets/branding/png/fixfox_512.png`
+- `assets/branding/fixfox.ico`
 
-The script also mirrors runtime icons to `src/assets/brand/`.
+The script also mirrors runtime icons to `src/assets/branding/`.
 
 ## Desktop Logo Behavior
 
 Helper: `src/core/brand_assets.py`
-- `ensure_logo_on_desktop(overwrite=False)` copies `src/assets/brand/fixfox.png` to Desktop as `FixFoxLogo.png`.
+- `ensure_logo_on_desktop(overwrite=False)` copies `src/assets/branding/fixfox.png` to Desktop as `FixFoxLogo.png`.
 - By default, it does not overwrite an existing Desktop logo.
 - On first launch, app startup attempts this copy once (safe no-overwrite mode).
 - In Settings -> Advanced:

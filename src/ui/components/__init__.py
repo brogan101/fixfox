@@ -2,8 +2,9 @@ from .accordion import AccordionSection
 from .context_menu import ContextAction, show_context_menu
 from .feed_renderer import FeedItemAdapter, FeedRenderer
 from .global_search import GlobalSearchPopup
-from .app_shell import AppShellFrame, BottomStatusBar
-from .nav import NavShell
+from .onboarding import OnboardingFlow
+from .app_shell import AppShellFrame, PageHost, SideSheet, StatusBar
+from .nav import NavRail
 from .toolbar import AppToolbar, RunStatusPanel
 from .rows import (
     Badge,
@@ -23,9 +24,12 @@ __all__ = [
     "FeedItemAdapter",
     "FeedRenderer",
     "GlobalSearchPopup",
+    "OnboardingFlow",
     "AppShellFrame",
-    "BottomStatusBar",
-    "NavShell",
+    "PageHost",
+    "SideSheet",
+    "StatusBar",
+    "NavRail",
     "AppToolbar",
     "RunStatusPanel",
     "Badge",

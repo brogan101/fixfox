@@ -8,6 +8,7 @@ from .qss_builder import build_qss
 from .theme import (
     BASE_FONT_FAMILY,
     DENSITY_TOKENS,
+    ELEVATION_SCALE,
     PALETTE_ALIASES,
     PALETTE_LABELS,
     PALETTE_ORDER,
@@ -35,6 +36,7 @@ from .theme import (
 __all__ = [
     "BASE_FONT_FAMILY",
     "DENSITY_TOKENS",
+    "ELEVATION_SCALE",
     "DensityTokens",
     "PALETTE_ALIASES",
     "PALETTE_LABELS",

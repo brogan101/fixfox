@@ -5,7 +5,8 @@ from typing import Any
 from PySide6.QtWidgets import QCheckBox, QComboBox, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 from ..components.feed_renderer import FeedRenderer
-from ..widgets import Card, DrawerCard, PrimaryButton, SoftButton
+from ..style import spacing
+from ..widgets import Card, DrawerCard, InlineCallout, PrimaryButton, SoftButton
 from .common import PageScroll, build_page_header
 
 
@@ -19,12 +20,12 @@ class FixesPage(PageScroll):
         w = self.services
         layout = QHBoxLayout(self.content)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(10)
+        layout.setSpacing(spacing("md"))
 
         left = QWidget()
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(10)
+        left_layout.setSpacing(spacing("md"))
         left_layout.addWidget(
             build_page_header(
                 "Fixes",
@@ -33,6 +34,8 @@ class FixesPage(PageScroll):
                 on_help=w._show_page_help,
             )
         )
+        w.fix_callout = InlineCallout("Fixes", "", level="warn", density=w.settings_state.density)
+        left_layout.addWidget(w.fix_callout)
         w.fix_scope = QComboBox()
         w.fix_scope.addItems(["Recommended", "All"])
         w.fix_scope.currentTextChanged.connect(w._refresh_fixes)
@@ -49,7 +52,7 @@ class FixesPage(PageScroll):
         chip_row = QWidget()
         chip_layout = QHBoxLayout(chip_row)
         chip_layout.setContentsMargins(0, 0, 0, 0)
-        chip_layout.setSpacing(8)
+        chip_layout.setSpacing(spacing("sm"))
         chip_layout.addWidget(w.fix_chip_safe)
         chip_layout.addWidget(w.fix_chip_admin)
         chip_layout.addWidget(w.fix_chip_adv)
@@ -69,7 +72,7 @@ class FixesPage(PageScroll):
         right = QWidget()
         right_layout = QVBoxLayout(right)
         right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(10)
+        right_layout.setSpacing(spacing("md"))
         w.fix_detail = Card("Fix Detail", "Select a fix.")
         w.fix_detail_text = QLabel("Select a fix to see plain language, risk, and rollback guidance.")
         w.fix_detail_text.setWordWrap(True)
@@ -79,9 +82,9 @@ class FixesPage(PageScroll):
         detail_actions = QWidget()
         detail_actions_layout = QHBoxLayout(detail_actions)
         detail_actions_layout.setContentsMargins(0, 0, 0, 0)
-        detail_actions_layout.setSpacing(8)
-        w.fix_preview_btn = SoftButton("Preview")
-        w.fix_run_btn = PrimaryButton("Run")
+        detail_actions_layout.setSpacing(spacing("sm"))
+        w.fix_preview_btn = SoftButton("Preview Fix")
+        w.fix_run_btn = PrimaryButton("Run Fix")
         w.fix_preview_btn.clicked.connect(w._preview_selected_fix)
         w.fix_run_btn.clicked.connect(w._run_selected_fix)
         detail_actions_layout.addWidget(w.fix_preview_btn)

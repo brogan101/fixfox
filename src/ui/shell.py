@@ -24,5 +24,5 @@ class AppShell(MainWindow):
             "nav": getattr(self, "nav", None),
             "top_bar": getattr(self, "run_status_panel", None),
             "content": getattr(self, "pages", None),
-            "right_pane": getattr(self, "concierge", None),
+            "right_pane": getattr(self, "side_sheet", getattr(self, "concierge", None)),
         }

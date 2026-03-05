@@ -12,7 +12,7 @@ from .paths import settings_path
 class AppSettings:
     share_safe_default: bool = True
     mask_ip_default: bool = False
-    right_panel_open: bool = True
+    right_panel_open: bool = False
     onboarding_completed: bool = False
     onboarding_goal: str = "speed"
     diagnostic_mode: bool = False

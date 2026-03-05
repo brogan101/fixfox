@@ -3,6 +3,7 @@ from __future__ import annotations
 from .tokens import (
     BASE_FONT_FAMILY,
     DENSITY_TOKENS,
+    ELEVATION_SCALE,
     RADIUS_SCALE,
     SPACING_SCALE,
     TYPOGRAPHY_SCALE,
@@ -245,6 +246,7 @@ __all__ = [
     "TYPOGRAPHY_SCALE",
     "SPACING_SCALE",
     "RADIUS_SCALE",
+    "ELEVATION_SCALE",
     "ThemeTokens",
     "DensityTokens",
     "PALETTE_ORDER",

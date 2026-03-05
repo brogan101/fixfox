@@ -12,9 +12,9 @@ EXPORT_PREFIX = "FixFox_SupportPack"
 REPORT_TITLE = "Fix Fox - Support Pack"
 
 BRAND_PRIMARY_COLOR = "#FEA643"
-BRAND_ASSET_DIR = "assets/brand"
-ICON_PNG = "assets/brand/fixfox.png"
-ICON_ICO = "assets/brand/fixfox.ico"
+BRAND_ASSET_DIR = "assets/branding"
+ICON_PNG = "assets/branding/fixfox.png"
+ICON_ICO = "assets/branding/fixfox.ico"
 
 DESKTOP_LOGO_FILENAME = "FixFoxLogo.png"
 

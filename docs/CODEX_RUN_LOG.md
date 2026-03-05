@@ -164,3 +164,54 @@ Smoke test passed.
   - python -m src.tests.test_ui_layout_sanity -> PASS
 - Font startup check:
   - python -m src.app (offscreen auto-exit) -> [FixFox] UI font: Noto Sans
+
+## Run Start: 2026-03-05T09:10:17.3924789-05:00
+- Starting commit: b900392a93bed260bfa7ecd90505b8e39b3d29a1
+- Goals:
+  - Full D-style UI rebuild with rail-only navigation and simple top app bar
+  - Remove legacy expanded nav list + always-visible concierge panel from runtime construction
+  - Add optional right side sheet (hidden by default) with pin/ESC behavior
+  - Rebuild onboarding flow (3-step), persist onboarding flag, add reset action
+  - Enforce UI audit/runtime assertion for duplicate legacy nav
+  - Ensure settings are real and grouped overflow actions work
+  - Run smoke/unit/ui sanity tests, then commit and push
+- Planned files:
+  - src/ui/components/app_shell.py
+  - src/ui/components/nav.py
+  - src/ui/components/toolbar.py
+  - src/ui/components/onboarding.py
+  - src/ui/main_window.py
+  - src/ui/main_window_impl.py
+  - src/ui/style/qss_builder.py
+  - src/ui/pages/home_page.py
+  - src/ui/pages/diagnose_page.py
+  - src/ui/pages/settings_page.py
+  - src/core/settings.py
+  - src/tests/test_ui_layout_sanity.py
+  - src/tests/test_unit.py
+  - docs/CODEX_RUN_LOG.md
+
+## Run Start: 2026-03-05T09:34:34.4024600-05:00
+- Starting commit: b900392a93bed260bfa7ecd90505b8e39b3d29a1
+- Goals:
+  - Production polish pass for D-style shell (consistency, typography, interaction states, empty/error patterns)
+  - Keep rail/app bar/side sheet architecture and remove UI inconsistencies
+  - Add busy states for quick check and improve accessibility/focus/selection behavior
+  - Branding/About polish and verify no Qt icon/font warnings
+  - Repo cleanup with proof of usage before remove/relocate
+  - Update QA docs and run smoke/unit/ui sanity tests
+  - Commit and push
+
+### Run End: 2026-03-05T09:53:25.9058354-05:00
+- Consistency system: spacing/radius/elevation tokens normalized (4/8/12/16/24 and 10/14 with elevation levels 1/2).
+- UI polish: callout pattern added, quick-check busy state added, interaction/focus states tightened.
+- Branding cleanup: runtime branding consolidated to src/assets/branding and build/docs updated.
+- Cleanup actions:
+  - Removed dead runtime assets/classes: src/assets/mascot.svg, legacy OnboardingDialog, legacy ConciergePanel class.
+  - Removed duplicate old runtime branding files under src/assets/brand/.
+  - Added docs/repo-structure.md.
+- QA commands:
+  - python -m src.tests.smoke -> PASS
+  - python -m src.tests.test_unit -> PASS
+  - python -m src.tests.test_ui_layout_sanity -> PASS
+  - python -m src.app (offscreen auto-exit) -> PASS, no font warnings observed

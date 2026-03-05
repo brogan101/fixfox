@@ -5,6 +5,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QScrollArea, QVBoxLayout, QWidget
 
 from ..components.rows import IconButton
+from ..style import spacing
 
 
 class PageScroll(QScrollArea):
@@ -30,11 +31,11 @@ def build_page_header(
     widget = QWidget()
     layout = QVBoxLayout(widget)
     layout.setContentsMargins(0, 0, 0, 0)
-    layout.setSpacing(8)
+    layout.setSpacing(spacing("sm"))
     top = QHBoxLayout()
     labels = QVBoxLayout()
     labels.setContentsMargins(0, 0, 0, 0)
-    labels.setSpacing(2)
+    labels.setSpacing(spacing("xs"))
     title_label = QLabel(title)
     title_label.setObjectName("Title")
     subtitle_label = QLabel(subtitle)

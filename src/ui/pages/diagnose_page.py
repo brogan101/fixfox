@@ -5,7 +5,8 @@ from typing import Any
 from PySide6.QtWidgets import QCheckBox, QComboBox, QHBoxLayout, QLineEdit, QVBoxLayout, QWidget
 
 from ..components.feed_renderer import SkeletonLoader
-from ..widgets import Card, EmptyState, PrimaryButton
+from ..style import spacing
+from ..widgets import Card, EmptyState, InlineCallout, PrimaryButton
 from .common import PageScroll, build_page_header
 
 
@@ -19,12 +20,12 @@ class DiagnosePage(PageScroll):
         w = self.services
         layout = QHBoxLayout(self.content)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(10)
+        layout.setSpacing(spacing("md"))
 
         left = QWidget()
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(10)
+        left_layout.setSpacing(spacing("md"))
         left_layout.addWidget(
             build_page_header(
                 "Diagnose",
@@ -33,6 +34,8 @@ class DiagnosePage(PageScroll):
                 on_help=w._show_page_help,
             )
         )
+        w.diag_callout = InlineCallout("Diagnose", "", level="warn", density=w.settings_state.density)
+        left_layout.addWidget(w.diag_callout)
         w.diag_summary = Card("No active session", "Run Quick Check from Home.")
         w.diag_counts = Card("Severity Snapshot", "CRIT 0 | WARN 0 | OK 0 | INFO 0")
         w.diag_top3 = Card("Top 3 Findings", "No findings yet.")
@@ -48,12 +51,12 @@ class DiagnosePage(PageScroll):
         center = QWidget()
         center_layout = QVBoxLayout(center)
         center_layout.setContentsMargins(0, 0, 0, 0)
-        center_layout.setSpacing(10)
+        center_layout.setSpacing(spacing("md"))
         toolbar = Card("Findings Toolbar", "Search and filter findings.")
         toolbar_row = QWidget()
         toolbar_row_layout = QHBoxLayout(toolbar_row)
         toolbar_row_layout.setContentsMargins(0, 0, 0, 0)
-        toolbar_row_layout.setSpacing(8)
+        toolbar_row_layout.setSpacing(spacing("sm"))
         w.diag_search = QLineEdit()
         w.diag_search.setObjectName("SearchInput")
         w.diag_search.setPlaceholderText("Search findings")
@@ -74,10 +77,8 @@ class DiagnosePage(PageScroll):
         w.diag_feed = QWidget()
         w.diag_feed_layout = QVBoxLayout(w.diag_feed)
         w.diag_feed_layout.setContentsMargins(0, 0, 0, 0)
-        w.diag_feed_layout.setSpacing(8)
-        run_cta = PrimaryButton("Run Quick Check")
-        run_cta.clicked.connect(lambda: w.run_quick_check("Quick Check"))
-        w.diag_feed_layout.addWidget(EmptyState("No Findings", "Run a scan to populate findings.", cta=run_cta, icon="!"))
+        w.diag_feed_layout.setSpacing(spacing("sm"))
+        w.diag_feed_layout.addWidget(EmptyState("No Findings", "Run a scan from the top app bar to populate findings.", icon="!"))
         center_layout.addWidget(w.diag_feed, 1)
 
         layout.addWidget(left, 1)

@@ -9,6 +9,8 @@ from PySide6.QtWidgets import QAbstractButton, QApplication, QLabel, QWidget
 
 from src.ui.main_window import MainWindow
 
+LEGACY_NAV_OBJECTS = {"Nav", "NavList", "DrawerNav", "LegacyNav", "MainNav"}
+
 
 def _assert_within_parent(widget: QWidget, tolerance: int = 2) -> None:
     parent = widget.parentWidget()
@@ -81,6 +83,20 @@ class UiLayoutSanityTests(unittest.TestCase):
                     continue
                 _assert_within_parent(widget, tolerance=2)
                 _assert_text_not_clipped(widget, padding=2)
+
+    def test_no_legacy_main_navigation_widgets(self) -> None:
+        nav_rails = [w for w in self.window.findChildren(QWidget) if w.objectName() == "NavRail"]
+        self.assertEqual(len(nav_rails), 1, "Expected exactly one NavRail widget.")
+
+        legacy = [w for w in self.window.findChildren(QWidget) if w.objectName() in LEGACY_NAV_OBJECTS]
+        self.assertFalse(legacy, f"Legacy navigation widgets found: {[w.objectName() for w in legacy]}")
+
+        list_nav = [
+            w
+            for w in self.window.findChildren(QWidget)
+            if w.__class__.__name__ in {"QListWidget", "QTreeView"} and w.objectName() in LEGACY_NAV_OBJECTS
+        ]
+        self.assertFalse(list_nav, "Legacy list/tree main navigation widgets are not allowed.")
 
 
 if __name__ == "__main__":

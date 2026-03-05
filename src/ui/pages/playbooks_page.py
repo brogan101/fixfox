@@ -16,7 +16,8 @@ from PySide6.QtWidgets import (
 )
 
 from ..components.feed_renderer import FeedRenderer
-from ..widgets import Card, DrawerCard, PrimaryButton, SoftButton
+from ..style import spacing
+from ..widgets import Card, DrawerCard, InlineCallout, PrimaryButton, SoftButton
 from .common import PageScroll, build_page_header
 
 
@@ -30,7 +31,7 @@ class PlaybooksPage(PageScroll):
         w = self.services
         layout = QVBoxLayout(self.content)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(10)
+        layout.setSpacing(spacing("md"))
         layout.addWidget(
             build_page_header(
                 "Playbooks",
@@ -39,34 +40,36 @@ class PlaybooksPage(PageScroll):
                 on_help=w._show_page_help,
             )
         )
+        w.pb_callout = InlineCallout("Playbooks", "", level="info", density=w.settings_state.density)
+        layout.addWidget(w.pb_callout)
 
         w.pb_basic_container = QWidget()
         basic_layout = QVBoxLayout(w.pb_basic_container)
         basic_layout.setContentsMargins(0, 0, 0, 0)
-        basic_layout.setSpacing(10)
+        basic_layout.setSpacing(spacing("md"))
         basic_intro = Card("Guided Goals", "Pick a goal, run the guided path, and review results in ToolRunner.")
         basic_layout.addWidget(basic_intro)
         w.pb_basic_goal_grid = QGridLayout()
         w.pb_basic_goal_grid.setContentsMargins(0, 0, 0, 0)
-        w.pb_basic_goal_grid.setSpacing(10)
+        w.pb_basic_goal_grid.setSpacing(spacing("md"))
         basic_layout.addLayout(w.pb_basic_goal_grid, 1)
         layout.addWidget(w.pb_basic_container, 1)
 
         w.pb_pro_console = QWidget()
         pro_layout = QVBoxLayout(w.pb_pro_console)
         pro_layout.setContentsMargins(0, 0, 0, 0)
-        pro_layout.setSpacing(10)
+        pro_layout.setSpacing(spacing("md"))
 
         controls_shell = QWidget()
         controls_outer = QVBoxLayout(controls_shell)
         controls_outer.setContentsMargins(0, 0, 0, 0)
-        controls_outer.setSpacing(6)
+        controls_outer.setSpacing(spacing("xs"))
         controls_row1 = QHBoxLayout()
         controls_row1.setContentsMargins(0, 0, 0, 0)
-        controls_row1.setSpacing(8)
+        controls_row1.setSpacing(spacing("sm"))
         controls_row2 = QHBoxLayout()
         controls_row2.setContentsMargins(0, 0, 0, 0)
-        controls_row2.setSpacing(8)
+        controls_row2.setSpacing(spacing("sm"))
         w.tb_search = QLineEdit()
         w.tb_search.setObjectName("SearchInput")
         w.tb_search.setPlaceholderText("Search tools, script tasks, and runbooks")
@@ -89,12 +92,12 @@ class PlaybooksPage(PageScroll):
         tools_view = QWidget()
         tools_layout = QHBoxLayout(tools_view)
         tools_layout.setContentsMargins(0, 0, 0, 0)
-        tools_layout.setSpacing(10)
+        tools_layout.setSpacing(spacing("md"))
 
         left = QWidget()
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(10)
+        left_layout.setSpacing(spacing("md"))
         w.tb_filter = QComboBox()
         w.tb_filter.addItems(
             [
@@ -145,7 +148,7 @@ class PlaybooksPage(PageScroll):
         right = QWidget()
         right_layout = QVBoxLayout(right)
         right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(10)
+        right_layout.setSpacing(spacing("md"))
         w.pb_tool_detail = Card("Tool Detail", "Select a tool to see details and run it.")
         w.pb_tool_detail_text = QLabel("Select a tool to see details and run it.")
         w.pb_tool_detail_text.setWordWrap(True)
@@ -155,9 +158,9 @@ class PlaybooksPage(PageScroll):
         detail_btn_row = QWidget()
         detail_btn_layout = QHBoxLayout(detail_btn_row)
         detail_btn_layout.setContentsMargins(0, 0, 0, 0)
-        detail_btn_layout.setSpacing(6)
-        w.pb_detail_run = PrimaryButton("Run")
-        w.pb_detail_dry = SoftButton("Dry Run")
+        detail_btn_layout.setSpacing(spacing("xs"))
+        w.pb_detail_run = PrimaryButton("Run Tool")
+        w.pb_detail_dry = SoftButton("Dry-Run Tool")
         w.pb_detail_export = SoftButton("Export Pack")
         w.pb_detail_run.clicked.connect(w._run_selected_tool)
         w.pb_detail_dry.clicked.connect(w._dry_run_selected_tool)
@@ -205,7 +208,7 @@ class PlaybooksPage(PageScroll):
         w.task_card.body_layout().addWidget(w.task_filter)
         w.task_card.body_layout().addWidget(w.task_feed)
         task_actions = QHBoxLayout()
-        run_task = SoftButton("Run Selected")
+        run_task = SoftButton("Run Selected Task")
         run_task.clicked.connect(w._run_selected_script_task)
         collect_evidence = SoftButton("Collect Core Evidence")
         collect_evidence.clicked.connect(w._collect_core_evidence)
@@ -228,7 +231,7 @@ class PlaybooksPage(PageScroll):
         w.file_index_budget.setSuffix(" s")
         index_top = QHBoxLayout()
         index_top.setContentsMargins(0, 0, 0, 0)
-        index_top.setSpacing(6)
+        index_top.setSpacing(spacing("xs"))
         w.btn_file_index_add_root = SoftButton("Add Root")
         w.btn_file_index_build = SoftButton("Build Index")
         w.btn_file_index_add_root.clicked.connect(w._pick_file_index_root)
@@ -249,7 +252,7 @@ class PlaybooksPage(PageScroll):
         w.file_index_query.returnPressed.connect(w._search_file_index)
         index_search = QHBoxLayout()
         index_search.setContentsMargins(0, 0, 0, 0)
-        index_search.setSpacing(6)
+        index_search.setSpacing(spacing("xs"))
         index_search.addWidget(w.file_index_query, 1)
         index_search.addWidget(w.btn_file_index_search)
         index_search.addWidget(w.btn_file_index_export)
@@ -270,7 +273,7 @@ class PlaybooksPage(PageScroll):
         runbooks_view = QWidget()
         runbooks_layout = QVBoxLayout(runbooks_view)
         runbooks_layout.setContentsMargins(0, 0, 0, 0)
-        runbooks_layout.setSpacing(10)
+        runbooks_layout.setSpacing(spacing("md"))
         rb_controls = QHBoxLayout()
         w.rb_audience = QComboBox()
         w.rb_audience.addItems(["All Audiences", "home", "it"])
@@ -295,7 +298,7 @@ class PlaybooksPage(PageScroll):
         w.rb_feed.context_requested.connect(w._runbook_menu)
         rb_actions = QHBoxLayout()
         run_dry = SoftButton("Run Dry-Run")
-        run_live = SoftButton("Run")
+        run_live = SoftButton("Run Runbook")
         run_dry.clicked.connect(lambda: w.run_selected_runbook(True))
         run_live.clicked.connect(lambda: w.run_selected_runbook(False))
         rb_actions.addWidget(run_dry)

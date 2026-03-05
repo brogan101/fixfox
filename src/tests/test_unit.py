@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from src.core.diagnostics import quick_check
@@ -153,6 +154,67 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(low.ui_scale_pct, 90)
         self.assertEqual(high.ui_scale_pct, 125)
         self.assertEqual(ok.ui_scale_pct, 110)
+
+
+class OnboardingLaunchTests(unittest.TestCase):
+    def setUp(self) -> None:
+        os.environ["QT_QPA_PLATFORM"] = "offscreen"
+        os.environ["FIXFOX_FORCE_ONBOARDING"] = "1"
+        os.environ.pop("FIXFOX_SKIP_ONBOARDING", None)
+
+    def tearDown(self) -> None:
+        os.environ.pop("FIXFOX_FORCE_ONBOARDING", None)
+
+    def test_onboarding_shown_when_incomplete(self) -> None:
+        from PySide6.QtWidgets import QApplication, QDialog
+        from src.ui.main_window import MainWindow
+
+        calls: dict[str, int] = {"shown": 0}
+
+        class DummyOnboarding:
+            def __init__(self, *args, **kwargs) -> None:
+                del args, kwargs
+                calls["shown"] += 1
+                self.completed = True
+                self.result_action = "none"
+
+            def exec(self) -> int:
+                return QDialog.Accepted
+
+        with (
+            patch("src.ui.main_window_impl.load_settings", return_value=AppSettings(onboarding_completed=False)),
+            patch("src.ui.main_window_impl.save_settings"),
+            patch("src.ui.main_window_impl.OnboardingFlow", DummyOnboarding),
+        ):
+            app = QApplication.instance() or QApplication([])
+            window = MainWindow()
+            app.processEvents()
+            window.close()
+            app.processEvents()
+        self.assertEqual(calls["shown"], 1)
+
+    def test_onboarding_not_shown_when_completed(self) -> None:
+        from PySide6.QtWidgets import QApplication
+        from src.ui.main_window import MainWindow
+
+        calls: dict[str, int] = {"shown": 0}
+
+        class DummyOnboarding:
+            def __init__(self, *args, **kwargs) -> None:
+                del args, kwargs
+                calls["shown"] += 1
+
+        with (
+            patch("src.ui.main_window_impl.load_settings", return_value=AppSettings(onboarding_completed=True)),
+            patch("src.ui.main_window_impl.save_settings"),
+            patch("src.ui.main_window_impl.OnboardingFlow", DummyOnboarding),
+        ):
+            app = QApplication.instance() or QApplication([])
+            window = MainWindow()
+            app.processEvents()
+            window.close()
+            app.processEvents()
+        self.assertEqual(calls["shown"], 0)
 
 
 if __name__ == "__main__":

@@ -1,18 +1,20 @@
 # UI Polish QA Checklist
 
-1. Launch with `python -m src.app`.
-2. Open `Settings -> Appearance` and switch palette across `Fix Fox`, `Graphite`, and `High Contrast`.
-3. Switch `Mode` (`light`/`dark`) and `Density` (`comfortable`/`compact`) and verify the whole app updates immediately.
-4. Resize the window down to narrow widths:
-5. Confirm the top search collapses to a search icon.
-6. Confirm the top bar stays usable (no clipped/overlapping controls).
-7. Open `Top Bar -> More actions` and verify help/settings/command actions open.
-8. Use keyboard shortcuts:
-9. `Ctrl+K` opens command palette.
-10. `Ctrl+E` jumps to Reports.
-11. `Ctrl+R` opens ToolRunner.
-12. `Ctrl+\` toggles right panel.
-13. Navigate with keyboard focus through main nav and settings nav; selected/hover/focus states should be clear.
-14. In Settings, verify `Privacy & Safety` section shows local-only behavior and storage paths.
-15. Change page, settings subsection, window size/position, and splitter handles; close and relaunch.
-16. Confirm the app restores last page, last settings section, geometry, and splitter layout.
+1. Launch app: `python -m src.app`.
+2. Confirm shell layout: rail-only nav on left, top app bar, content center, side sheet hidden by default.
+3. Verify no duplicate main nav list exists (only `NavRail`).
+4. In app bar, confirm Fix Fox mark + wordmark + status pill are visible.
+5. Resize to `1024x768`, `1280x720`, `1600x900` and confirm no clipping/overlap.
+6. Verify search collapses to icon at narrow width and expands at larger width.
+7. Open overflow menu and validate grouped sections: Session, View, Help.
+8. Toggle Theme (`light/dark`), Density (`comfortable/compact`), and Palette (`Fix Fox/Graphite/High Contrast`) from overflow; confirm live restyle.
+9. Run `Run Quick Check` from app bar and verify:
+   - status pill changes to running
+   - quick check button enters busy state and disables
+   - completion toast includes finding count summary
+10. Select a finding/runbook/report item and verify side sheet opens; press `Esc` to close when unpinned.
+11. Use keyboard focus navigation and confirm visible focus ring on rail/buttons/inputs/lists.
+12. Open `About Fix Fox` from overflow and verify version/build/commit + local-only + logs/exports paths.
+13. Relaunch app and verify layout persistence (geometry, splitter, last page, settings subsection).
+14. Confirm startup log prints one-time UI audit lines (single NavRail, no legacy nav, side sheet default hidden).
+15. Confirm startup has no Qt font warnings and prints selected font once.
