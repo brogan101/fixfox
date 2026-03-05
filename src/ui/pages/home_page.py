@@ -45,13 +45,10 @@ class HomePage(PageScroll):
         hero_run.clicked.connect(lambda: w.run_quick_check("Quick Check"))
         hero_export = SoftButton("Export Pack")
         hero_export.clicked.connect(lambda: w.nav.setCurrentRow(w.NAV_ITEMS.index("Reports")))
-        hero_reports = SoftButton("Open Reports")
-        hero_reports.clicked.connect(lambda: w.nav.setCurrentRow(w.NAV_ITEMS.index("Reports")))
         hero_settings = SoftButton("Settings")
         hero_settings.clicked.connect(lambda: w.nav.setCurrentRow(w.NAV_ITEMS.index("Settings")))
         hero_actions_layout.addWidget(hero_run)
         hero_actions_layout.addWidget(hero_export)
-        hero_actions_layout.addWidget(hero_reports)
         hero_actions_layout.addWidget(hero_settings)
         hero_actions_layout.addStretch(1)
 

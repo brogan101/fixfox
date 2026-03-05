@@ -4,8 +4,9 @@ import os
 import time
 import unittest
 
-from PySide6.QtCore import QPoint
-from PySide6.QtWidgets import QAbstractButton, QApplication, QLabel, QWidget
+from PySide6.QtCore import QPoint, Qt
+from PySide6.QtTest import QTest
+from PySide6.QtWidgets import QAbstractButton, QApplication, QLabel, QSplitter, QWidget
 
 from src.ui.main_window import MainWindow
 
@@ -97,6 +98,29 @@ class UiLayoutSanityTests(unittest.TestCase):
             if w.__class__.__name__ in {"QListWidget", "QTreeView"} and w.objectName() in LEGACY_NAV_OBJECTS
         ]
         self.assertFalse(list_nav, "Legacy list/tree main navigation widgets are not allowed.")
+
+    def test_no_qsplitter_in_shell(self) -> None:
+        splitters = self.window.findChildren(QSplitter)
+        self.assertFalse(splitters, "QSplitter is not allowed in the app shell.")
+
+    def test_search_popup_persists_and_details_toggle_works(self) -> None:
+        self.window.top_search.setText("quick")
+        self.window._refresh_global_search_results()
+        self._drain_events(cycles=4)
+        self.assertTrue(self.window._search_popup.isVisible(), "Search popup should be visible after typing.")
+
+        time.sleep(0.15)
+        self._drain_events(cycles=3)
+        self.assertTrue(self.window._search_popup.isVisible(), "Search popup should remain open while typing.")
+
+        self.assertTrue(self.window.concierge.collapsed, "Details sheet should be collapsed by default.")
+        self.window.btn_panel_toggle.click()
+        self._drain_events(cycles=3)
+        self.assertFalse(self.window.concierge.collapsed, "Details sheet should open from app bar toggle.")
+
+        QTest.keyClick(self.window, Qt.Key_Escape)
+        self._drain_events(cycles=3)
+        self.assertTrue(self.window.concierge.collapsed, "Details sheet should close with ESC when unpinned.")
 
 
 if __name__ == "__main__":

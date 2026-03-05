@@ -383,3 +383,71 @@ src/ui/style/qss_builder.py         |  45 +++---
 ### Finalization Update
 - Final pushed commit hash: `be8c94aa90d4dee4a650fcf0b088dd09bc4d5bb3`
 - Follow-up docs-only commit finalized checklist/proof after primary UI overhaul commit.
+
+## 2026-03-05 Full UI/UX Rebuild Run (Branding Normalization + Audit + Proof)
+
+### Mandatory Branding Normalization (Completed)
+- Restored unintended tracked deletions under `assets/brand/*` before normalization.
+- Normalized source-of-truth logo to: `src/assets/brand/fixfox_logo_source.png`.
+- Added script: `scripts/build_brand_assets.py`.
+- Generated:
+  - `src/assets/brand/fixfox_mark.png`
+  - `src/assets/brand/fixfox_mark@2x.png`
+  - `src/assets/brand/fixfox_icon.ico`
+- Transparency proof check:
+  - corner alpha values: `[0, 0, 0, 0]`
+  - `has_transparency=True`
+- Archived competing runtime logo attempts:
+  - `archive/legacy_assets/branding/assets_brand/*`
+  - `archive/legacy_assets/branding/src_assets_branding/*`
+- Dedicated commit + push completed:
+  - commit: `000964824543dc74ee12b6a263432b76417fecd3`
+  - message: `Branding: normalize logo source + generate transparent mark/icon`
+
+### Shell/UI Normalization (Completed)
+- Added required shell component files:
+  - `src/ui/components/app_bar.py`
+  - `src/ui/components/side_sheet.py`
+- Rewired shell composition through:
+  - `src/ui/components/app_shell.py`
+  - `src/ui/components/nav.py`
+- Added compatibility shim:
+  - `src/ui/components/toolbar.py` -> re-exports app bar classes.
+- Removed duplicate Home hero action (`Open Reports`).
+
+### Icons (Completed)
+- Added required icon assets:
+  - `src/assets/icons/settings_gear.svg`
+  - `src/assets/icons/quick_check.svg`
+  - `src/assets/icons/details.svg`
+- Updated icon loader aliases/fallbacks in `src/ui/icons.py`.
+
+### Search / Side Sheet / Tests
+- Search behavior preserved with anchored dropdown + fuzzy ranking + keyboard nav.
+- Side sheet hidden by default; toggle + ESC behavior validated.
+- Added UI sanity tests in `src/tests/test_ui_layout_sanity.py`:
+  - no `QSplitter` in shell
+  - search popup persistence
+  - details toggle + ESC close
+
+### Automated Walkthrough
+- Added `scripts/ui_walkthrough.py` with:
+  - page navigation
+  - 3 resolution sweeps (1024x768, 1280x720, 1600x900)
+  - clipping detection (non-zero on failure)
+  - search dropdown persistence assertion
+  - details side sheet assertion
+  - Quick Check + Tool Runner screenshot capture
+- PASS run:
+  - `screenshots_dir=C:\Users\btheobald\Desktop\IT Core\docs\screenshots\20260305_141829`
+
+### Verification Runs
+- `\.venv\Scripts\python.exe scripts/ui_walkthrough.py` -> PASS
+- `\.venv\Scripts\python.exe -m src.tests.smoke` -> PASS
+- `\.venv\Scripts\python.exe -m src.tests.test_unit` -> PASS (14 tests)
+- `\.venv\Scripts\python.exe -m src.tests.test_ui_layout_sanity` -> PASS (4 tests)
+
+### Audit Docs
+- Created `docs/REPO_AUDIT.md`
+- Created `docs/REBUILD_VERIFICATION.md`
+- Refreshed tracked inventory: `docs/_tracked_files.txt`

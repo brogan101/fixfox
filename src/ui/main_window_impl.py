@@ -14,7 +14,7 @@ from functools import partial
 from typing import Any, Callable
 
 from PySide6.QtCore import QEvent, QPoint, QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QAction, QFontMetrics, QIcon, QKeySequence, QShortcut
+from PySide6.QtGui import QAction, QFontMetrics, QIcon, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -357,7 +357,7 @@ class MainWindow(QMainWindow):
         "Fixes": "fixes",
         "Reports": "reports",
         "History": "history",
-        "Settings": "settings",
+        "Settings": "settings_gear",
     }
 
     def __init__(self) -> None:
@@ -489,7 +489,6 @@ class MainWindow(QMainWindow):
         self.concierge.collapsed_changed.connect(self._on_concierge)
         self.btn_cancel_task.clicked.connect(self._cancel_task)
         QShortcut(QKeySequence("Ctrl+K"), self, self._focus_top_search)
-        QShortcut(QKeySequence("Ctrl+Shift+K"), self, self.open_command_palette)
         QShortcut(QKeySequence("Ctrl+Shift+R"), self, lambda: self.run_quick_check("Quick Check"))
         QShortcut(QKeySequence("Ctrl+Alt+L"), self, self._toggle_layout_debug_overlay)
         QShortcut(QKeySequence("Ctrl+Alt+T"), self, self._run_ui_self_check)
@@ -737,7 +736,7 @@ class MainWindow(QMainWindow):
     def _activate_global_search_or_palette(self) -> None:
         if self._search_popup.activate_current():
             return
-        self.open_command_palette()
+        self._schedule_global_search()
 
     def _apply_global_search_result(self, payload: Any) -> None:
         if not isinstance(payload, dict):
@@ -1357,7 +1356,15 @@ class MainWindow(QMainWindow):
             f"Logs path: {local_paths['logs']}\n"
             f"Exports path: {local_paths['exports']}"
         )
-        QMessageBox.information(self, "About Fix Fox", text)
+        msg = QMessageBox(self)
+        msg.setWindowTitle("About Fix Fox")
+        msg.setText(text)
+        mark = QPixmap(resource_path("assets/brand/fixfox_mark.png")).scaled(48, 48, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        if not mark.isNull():
+            msg.setIconPixmap(mark)
+        else:
+            msg.setIcon(QMessageBox.Information)
+        msg.exec()
 
     def _open_header_overflow_menu(self) -> None:
         menu = QMenu(self)
@@ -1533,7 +1540,7 @@ class MainWindow(QMainWindow):
 
     def _open_profile_menu(self) -> None:
         m = QMenu(self)
-        a1 = QAction("Command Palette (Ctrl+K)", self); a1.triggered.connect(self.open_command_palette)
+        a1 = QAction("Focus Search (Ctrl+K)", self); a1.triggered.connect(self._focus_top_search)
         a2 = QAction("Settings", self); a2.triggered.connect(lambda: self.nav.setCurrentRow(self.NAV_ITEMS.index("Settings")))
         m.addAction(a1); m.addAction(a2)
         sender = self.sender()
