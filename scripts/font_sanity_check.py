@@ -5,16 +5,16 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-REPORT_PATH = REPO_ROOT / "docs" / "qss_sanity_report.txt"
+REPORT_PATH = REPO_ROOT / "docs" / "font_sanity_report.txt"
 
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from src.core.diagnostics.qss_sanity import run_qss_sanity
+from src.core.diagnostics.font_sanity import run_font_sanity
 
 
 def main() -> int:
-    result = run_qss_sanity(report_path=REPORT_PATH, verbose=True)
+    result = run_font_sanity(report_path=REPORT_PATH, verbose=True)
     return 0 if result.ok else 1
 
 

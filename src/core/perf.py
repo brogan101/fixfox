@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import threading
 import time
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from statistics import fmean
 from typing import Any
@@ -64,7 +64,7 @@ class PerfRecorder:
                 "max_ms": round(max(values), 3),
             }
         return {
-            "generated_utc": datetime.utcnow().isoformat() + "Z",
+            "generated_utc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             "uptime_ms": round((time.perf_counter() - started) * 1000.0, 3),
             "metadata": metadata,
             "metrics": metrics,

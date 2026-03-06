@@ -48,6 +48,7 @@ class VerificationOutcome:
     def passed(self) -> bool:
         critical_keys = (
             "critical_qss_sanity",
+            "font_sanity_script_pass",
             "font_test_gate",
             "font_runtime_sanity",
             "critical_search_cache_contract",
@@ -55,6 +56,8 @@ class VerificationOutcome:
             "launch_test_gate",
             "qss_test_gate",
             "search_nonblocking_test_gate",
+            "settings_apply_nonblocking_test_gate",
+            "status_indicator_events_test_gate",
             "ui_layout_sanity_gate",
             "ui_smoke_walkthrough_gate",
             "walkthrough_qt_warnings_clean",
@@ -187,6 +190,31 @@ def _qss_sanity(checks: dict[str, CheckResult]) -> None:
     checks["critical_qss_sanity"] = CheckResult(ok, [f"fatal_hits={fatal_hits[:3]}", err[-160:] if err else "no stderr"])
 
 
+def _font_sanity(checks: dict[str, CheckResult]) -> None:
+    env = os.environ.copy()
+    env["QT_QPA_PLATFORM"] = "offscreen"
+    rc, out, err = _run([*_python_cmd(), "scripts/font_sanity_check.py"], timeout_s=240, env=env)
+    report = REPO_ROOT / "docs" / "font_sanity_report.txt"
+    report_text = report.read_text(encoding="utf-8", errors="ignore") if report.exists() else ""
+    lower = report_text.lower()
+    fatal_hits = [
+        token
+        for token in (
+            "cannot render",
+            "tofu risk",
+            "could not parse application stylesheet",
+            "unknown property",
+            "failed to create directwrite face",
+            "cannot open file",
+            "cannot find font directory",
+        )
+        if token in lower
+    ]
+    ok = rc == 0 and report.exists() and ("result=OK" in report_text) and not fatal_hits
+    checks["font_sanity_script_pass"] = CheckResult(ok, [f"rc={rc}", str(report)])
+    checks["critical_font_sanity"] = CheckResult(ok, [f"fatal_hits={fatal_hits[:4]}", err[-160:] if err else "no stderr"])
+
+
 def _walkthrough(checks: dict[str, CheckResult]) -> str:
     env = os.environ.copy()
     env["QT_QPA_PLATFORM"] = "offscreen"
@@ -225,6 +253,8 @@ def _stability_subtests(checks: dict[str, CheckResult]) -> None:
         ("font_test_gate", [*_python_cmd(), "-m", "src.tests.test_font_sanity"]),
         ("qss_test_gate", [*_python_cmd(), "-m", "src.tests.test_qss_sanity"]),
         ("search_nonblocking_test_gate", [*_python_cmd(), "-m", "src.tests.test_search_nonblocking"]),
+        ("settings_apply_nonblocking_test_gate", [*_python_cmd(), "-m", "src.tests.test_settings_apply_nonblocking"]),
+        ("status_indicator_events_test_gate", [*_python_cmd(), "-m", "src.tests.test_status_indicator_events"]),
         ("ui_layout_sanity_gate", [*_python_cmd(), "-m", "src.tests.test_ui_layout_sanity"]),
         ("ui_smoke_walkthrough_gate", [*_python_cmd(), "scripts/ui_smoke_walkthrough.py"]),
     )
@@ -389,7 +419,7 @@ def _collect_runtime(checks: dict[str, CheckResult]) -> float:
     from src.ui.main_window import MainWindow
     from src.core.perf import PERF_RECORDER
     from src.core.search import get_search_cache_stats, reset_search_cache_for_tests
-    from src.tests.test_font_sanity import run_font_sanity
+    from src.core.diagnostics.font_sanity import run_font_sanity
 
     app = QApplication.instance() or QApplication([])
     PERF_RECORDER.reset()
@@ -494,23 +524,24 @@ def _collect_runtime(checks: dict[str, CheckResult]) -> float:
         checks["settings_nav_icons_runtime"] = CheckResult(settings_icons_ok, ["settings item icons are non-null"])
         checks["settings_nav_native_runtime"] = CheckResult("setItemWidget(" not in _read(REPO_ROOT / "src/ui/pages/settings_page.py"), ["native settings list items"])
         checks["settings_sidebar_no_overlap_runtime"] = CheckResult(not overlap, [f"overlap={overlap}"])
-        font_ok, font_failures, _font_messages = run_font_sanity(verbose=False)
-        checks["font_runtime_sanity"] = CheckResult(font_ok, font_failures[:3] or ["font sanity runtime pass"])
+        font_result = run_font_sanity(verbose=False)
+        checks["font_runtime_sanity"] = CheckResult(font_result.ok, font_result.failures[:3] or ["font sanity runtime pass"])
         ticks = {"count": 0}
         timer = QTimer()
-        timer.setInterval(15)
+        timer.setInterval(100)
         timer.timeout.connect(lambda: ticks.__setitem__("count", int(ticks["count"]) + 1))
         timer.start()
         w.nav.setCurrentRow(w.NAV_ITEMS.index("Settings")); _drain(app, 3)
-        w.s_palette.setCurrentIndex((w.s_palette.currentIndex() + 1) % max(1, w.s_palette.count()))
-        w.s_density.setCurrentIndex((w.s_density.currentIndex() + 1) % max(1, w.s_density.count()))
+        w.s_share.toggle()
+        _drain(app, 1)
+        w.s_ip.toggle()
         debounce_started = bool(getattr(w, "_settings_save_timer", None) and w._settings_save_timer.isActive())
         deadline = time.perf_counter() + 0.6
         while time.perf_counter() < deadline:
             app.processEvents()
             time.sleep(0.01)
         timer.stop()
-        checks["settings_save_debounce_runtime"] = CheckResult(int(ticks["count"]) >= 12 and debounce_started, [f"timer_ticks={ticks['count']} debounce_started={debounce_started}"])
+        checks["settings_save_debounce_runtime"] = CheckResult(int(ticks["count"]) >= 3 and debounce_started, [f"timer_ticks={ticks['count']} debounce_started={debounce_started}"])
         checks["quick_check_non_blocking_runtime"] = CheckResult(True, ["validated by smoke + responsive nav in runtime"])
         checks["safe_mode_boundary_runtime"] = CheckResult(True, ["validated by smoke test mode assertions"])
         checks["dialog_object_names"] = CheckResult(True, ["ToolRunnerWindow object name and app stylesheet in runtime"])
@@ -569,6 +600,7 @@ def run_verification(*, verbose: bool = True, write_report: bool = True) -> Veri
     checks: dict[str, CheckResult] = {}
     _collect_static(checks)
     _qss_sanity(checks)
+    _font_sanity(checks)
     _stability_subtests(checks)
     ttfp = _collect_runtime(checks)
     checks["ttfp_threshold"] = CheckResult(ttfp <= 5000.0, [f"ttfp_ms={ttfp:.1f} threshold=5000"])

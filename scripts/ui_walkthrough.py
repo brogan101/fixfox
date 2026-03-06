@@ -7,7 +7,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import QPoint, Qt, QtMsgType, qInstallMessageHandler
+from PySide6.QtCore import QPoint, Qt
 from PySide6.QtGui import QPainter, QPixmap
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QAbstractButton, QApplication, QLabel, QToolButton, QWidget
@@ -17,8 +17,10 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from src.core.diagnostics.font_sanity import run_font_sanity
+from src.core.diagnostics.qt_warnings import install_qt_message_handler, read_qt_warnings
+from src.core.qt_runtime import ensure_qt_runtime_env, is_fatal_qt_warning, is_font_warning, is_qss_warning
 from src.ui.main_window import MainWindow
-from src.tests.test_font_sanity import run_font_sanity
 
 
 def _drain(app: QApplication, cycles: int = 5, delay: float = 0.05) -> None:
@@ -40,10 +42,7 @@ def _capture_shell(window: MainWindow, path: Path, include_popup: bool = False) 
 
     screen = QApplication.primaryScreen()
     pix = QPixmap()
-    if (
-        screen is not None
-        and os.environ.get("QT_QPA_PLATFORM", "").strip().lower() not in {"offscreen", "minimal"}
-    ):
+    if screen is not None and os.environ.get("QT_QPA_PLATFORM", "").strip().lower() not in {"offscreen", "minimal"}:
         pix = screen.grabWindow(0, region.x(), region.y(), region.width(), region.height())
     else:
         base = window.grab()
@@ -61,18 +60,11 @@ def _capture_shell(window: MainWindow, path: Path, include_popup: bool = False) 
     pix.save(str(path), "PNG")
 
 
-def _msg_type_name(msg_type: QtMsgType) -> str:
-    if msg_type == QtMsgType.QtDebugMsg:
-        return "DEBUG"
-    if msg_type == QtMsgType.QtInfoMsg:
-        return "INFO"
-    if msg_type == QtMsgType.QtWarningMsg:
-        return "WARNING"
-    if msg_type == QtMsgType.QtCriticalMsg:
-        return "CRITICAL"
-    if msg_type == QtMsgType.QtFatalMsg:
-        return "FATAL"
-    return "UNKNOWN"
+def _measure_content(window: MainWindow) -> tuple[int, int]:
+    pages = getattr(window, "pages", None)
+    if pages is None:
+        return (0, 0)
+    return (pages.width(), pages.height())
 
 
 def _detect_clipping(window: MainWindow) -> list[str]:
@@ -164,29 +156,90 @@ def _icon_runtime_issues(window: MainWindow) -> list[str]:
     return issues
 
 
+def _record_issues(
+    *,
+    window: MainWindow,
+    page: str,
+    size_label: str,
+    failures: list[str],
+    clipping_issues: list[str],
+) -> None:
+    issues = _detect_clipping(window)
+    if page == "Settings":
+        issues.extend(_settings_nav_issues(window))
+    if issues:
+        clipping_issues.extend([f"{size_label}:{page}:{issue}" for issue in issues])
+        failures.append(f"text/layout clipping at {size_label} page={page}: {', '.join(issues[:4])}")
+
+
+def _write_outputs(
+    *,
+    out_dir: Path,
+    manifest: dict[str, object],
+    clipping_issues: list[str],
+    qt_warnings: list[str],
+) -> None:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "MANIFEST.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    clipping_text = "\n".join(clipping_issues) + "\n" if clipping_issues else "OK: no clipping issues detected.\n"
+    (out_dir / "clipping_report.txt").write_text(clipping_text, encoding="utf-8")
+    warnings_text = "\n".join(qt_warnings) + ("\n" if qt_warnings else "OK: no Qt warnings detected.\n")
+    (out_dir / "qt_warnings.txt").write_text(warnings_text, encoding="utf-8")
+
+
 def main() -> int:
     os.environ.setdefault("FIXFOX_SKIP_ONBOARDING", "1")
-    from src.core.qt_runtime import ensure_qt_runtime_env, is_fatal_qt_warning, is_font_warning, is_qss_warning
-
-    qt_messages: list[str] = []
-
-    def _handler(msg_type: QtMsgType, context: object, message: str) -> None:
-        del context
-        qt_messages.append(f"[{_msg_type_name(msg_type)}] {message}")
-
-    prev = qInstallMessageHandler(_handler)
-    ensure_qt_runtime_env()
-    app = QApplication.instance() or QApplication([])
-    window = None
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     out_dir = REPO_ROOT / "docs" / "screenshots" / ts
+    qt_warning_path = out_dir / "qt_warnings.txt"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
     failures: list[str] = []
     clipping_issues: list[str] = []
     captured: list[str] = []
     sizes = [(1024, 768), (1280, 720), (1600, 900)]
     search_visible_ms = 0
-    maximized_growth = {"before": (0, 0), "after": (0, 0)}
+    normal_page_sizes: dict[str, tuple[int, int]] = {}
+    maximized_growth: dict[str, dict[str, list[int]]] = {}
 
+    font_result = run_font_sanity(
+        report_path=out_dir / "font_sanity_report.txt",
+        warning_log_path=qt_warning_path,
+        verbose=False,
+    )
+    if not font_result.ok:
+        failures.extend(font_result.failures)
+        qt_warnings = read_qt_warnings(qt_warning_path)
+        manifest = {
+            "timestamp": ts,
+            "sizes": [f"{width}x{height}" for width, height in sizes],
+            "pages": [],
+            "screenshots": captured,
+            "search_dropdown_visible_ms": search_visible_ms,
+            "clipping_issue_count": len(clipping_issues),
+            "qt_warning_count": len(qt_warnings),
+            "fatal_qt_warning_count": len(qt_warnings),
+            "font_sanity_ok": False,
+            "font_sanity_failures": font_result.failures,
+            "maximized_growth": maximized_growth,
+            "failure_count": len(failures),
+            "failures": failures,
+        }
+        _write_outputs(out_dir=out_dir, manifest=manifest, clipping_issues=clipping_issues, qt_warnings=qt_warnings)
+        print("UI walkthrough: FAIL")
+        for row in failures:
+            print(f"- {row}")
+        print(f"- screenshots_dir={out_dir}")
+        print(f"- manifest={out_dir / 'MANIFEST.json'}")
+        print(f"- clipping_report={out_dir / 'clipping_report.txt'}")
+        print(f"- qt_warnings={out_dir / 'qt_warnings.txt'}")
+        return 1
+
+    ensure_qt_runtime_env()
+    cleanup = install_qt_message_handler(str(qt_warning_path))
+    app = QApplication.instance() or QApplication([])
+    window: MainWindow | None = None
     try:
         window = MainWindow()
         window.show()
@@ -197,10 +250,6 @@ def main() -> int:
         if "QTreeWidget::branch:closed:has-children" not in style_sheet:
             failures.append("Global stylesheet missing custom tree expander override.")
 
-        font_ok, font_failures, _font_messages = run_font_sanity(verbose=False)
-        if not font_ok:
-            failures.extend(font_failures)
-
         for width, height in sizes:
             window.resize(width, height)
             _drain(app, cycles=6)
@@ -210,48 +259,61 @@ def main() -> int:
                 if hasattr(window, "pages") and window.pages.currentIndex() != idx:
                     failures.append(f"page failed to load: {page} at {width}x{height}")
                     continue
-                shot = out_dir / f"{width}x{height}_{idx+1}_{_slug(page)}.png"
+                if width == 1024 and height == 768:
+                    normal_page_sizes[page] = _measure_content(window)
+                shot = out_dir / f"{width}x{height}_{idx + 1}_{_slug(page)}.png"
                 _capture_shell(window, shot)
                 captured.append(str(shot.relative_to(REPO_ROOT)).replace("\\", "/"))
-                issues = _detect_clipping(window)
-                if page == "Settings":
-                    issues.extend(_settings_nav_issues(window))
-                if issues:
-                    clipping_issues.extend([f"{width}x{height}:{page}:{issue}" for issue in issues])
-                    failures.append(f"text/layout clipping at {width}x{height} page={page}: {', '.join(issues[:4])}")
-                    break
+                _record_issues(
+                    window=window,
+                    page=page,
+                    size_label=f"{width}x{height}",
+                    failures=failures,
+                    clipping_issues=clipping_issues,
+                )
 
         icon_issues = _icon_runtime_issues(window)
         if icon_issues:
             failures.append(f"icon runtime failures: {', '.join(icon_issues[:4])}")
 
-        window.resize(1024, 768)
-        _drain(app, cycles=4)
-        maximized_growth["before"] = (window.pages.width(), window.pages.height())
         screen = QApplication.primaryScreen()
         if screen is not None:
-            offscreen_platform = os.environ.get("QT_QPA_PLATFORM", "").strip().lower() in {"offscreen", "minimal"}
-            if offscreen_platform:
-                available = screen.availableGeometry().size()
-                window.resize(max(1280, available.width()), max(820, available.height()))
+            available = screen.availableGeometry().size()
+            target_width = max(available.width(), window.width() + 240, 1680)
+            target_height = max(available.height(), window.height() + 160, 980)
+            if os.environ.get("QT_QPA_PLATFORM", "").strip().lower() in {"offscreen", "minimal"}:
+                window.showNormal()
+                window.resize(target_width, target_height)
             else:
                 window.showMaximized()
-            _drain(app, cycles=8)
-            maximized_growth["after"] = (window.pages.width(), window.pages.height())
-            growth_w = maximized_growth["after"][0] - maximized_growth["before"][0]
-            growth_h = maximized_growth["after"][1] - maximized_growth["before"][1]
-            if (not offscreen_platform) and (growth_w < 120 or growth_h < 60):
-                failures.append(
-                    f"Maximized content failed to expand meaningfully: before={maximized_growth['before']} after={maximized_growth['after']}"
+            _drain(app, cycles=10)
+            for idx, page in enumerate(getattr(window, "NAV_ITEMS", ())):
+                window.nav.setCurrentRow(idx)
+                _drain(app, cycles=4)
+                before = normal_page_sizes.get(page, (0, 0))
+                after = _measure_content(window)
+                maximized_growth[page] = {"before": [before[0], before[1]], "after": [after[0], after[1]]}
+                growth_w = after[0] - before[0]
+                growth_h = after[1] - before[1]
+                if growth_w < 120 or growth_h < 60:
+                    failures.append(
+                        f"Maximized content failed to expand for {page}: before={before} after={after}"
+                    )
+                shot = out_dir / f"maximized_{idx + 1}_{_slug(page)}.png"
+                _capture_shell(window, shot)
+                captured.append(str(shot.relative_to(REPO_ROOT)).replace("\\", "/"))
+                _record_issues(
+                    window=window,
+                    page=page,
+                    size_label="maximized",
+                    failures=failures,
+                    clipping_issues=clipping_issues,
                 )
-            window.nav.setCurrentRow(0)
-            _drain(app, cycles=3)
-            max_shot = out_dir / "maximized_home.png"
-            _capture_shell(window, max_shot)
-            captured.append(str(max_shot.relative_to(REPO_ROOT)).replace("\\", "/"))
             window.showNormal()
             window.resize(1024, 768)
             _drain(app, cycles=5)
+        else:
+            failures.append("No primary screen available for maximize/fullscreen resize validation.")
 
         window._focus_top_search()
         window.top_search.setText("quick")
@@ -310,10 +372,11 @@ def main() -> int:
         if window is not None:
             window.close()
             _drain(app, cycles=2)
-        qInstallMessageHandler(prev)
+        cleanup()
 
+    qt_warnings = read_qt_warnings(qt_warning_path)
     fatal_qt_warnings = []
-    for line in qt_messages:
+    for line in qt_warnings:
         message = line.split("] ", 1)[1] if "] " in line else line
         if is_qss_warning(message) or is_font_warning(message) or is_fatal_qt_warning(message):
             fatal_qt_warnings.append(line)
@@ -327,22 +390,15 @@ def main() -> int:
         "screenshots": captured,
         "search_dropdown_visible_ms": search_visible_ms,
         "clipping_issue_count": len(clipping_issues),
-        "qt_warning_count": len(qt_messages),
+        "qt_warning_count": len(qt_warnings),
         "fatal_qt_warning_count": len(fatal_qt_warnings),
-        "maximized_content_before": list(maximized_growth["before"]),
-        "maximized_content_after": list(maximized_growth["after"]),
+        "font_sanity_ok": font_result.ok,
+        "font_sanity_failures": font_result.failures,
+        "maximized_growth": maximized_growth,
         "failure_count": len(failures),
         "failures": failures,
     }
-    out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "MANIFEST.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-    if clipping_issues:
-        clipping_text = "\n".join(clipping_issues) + "\n"
-    else:
-        clipping_text = "OK: no clipping issues detected.\n"
-    (out_dir / "clipping_report.txt").write_text(clipping_text, encoding="utf-8")
-    warnings_text = "\n".join(qt_messages) + ("\n" if qt_messages else "OK: no Qt warnings detected.\n")
-    (out_dir / "qt_warnings.txt").write_text(warnings_text, encoding="utf-8")
+    _write_outputs(out_dir=out_dir, manifest=manifest, clipping_issues=clipping_issues, qt_warnings=qt_warnings)
 
     if failures:
         print("UI walkthrough: FAIL")

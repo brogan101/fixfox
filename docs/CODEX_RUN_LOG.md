@@ -626,3 +626,39 @@ src/ui/style/qss_builder.py         |  45 +++---
   - `src/ui/pages/settings_page.py`
   - `src/ui/style/qss_builder.py`
   - `src/ui/style/tokens.py`
+
+## 2026-03-06 12:40:00 -05:00 - QA Hardening + Settings/Resize/Status Contract Pass
+- Starting commit: bb30a8d80001c1309dc8f621a4b4ff47b4c43ac5
+- Proof harness:
+  - `git fetch --all`
+  - `git status --porcelain`
+  - `git status`
+  - `git rev-parse HEAD`
+  - `python --version` failed because the Windows Store shim on PATH is broken.
+  - `pip --version` failed because `pip` is not on PATH.
+  - Current gates captured with the working interpreter before edits:
+    - `scripts/verify_requirements.py`
+    - `scripts/ui_walkthrough.py`
+- Goals:
+  - move Qt warning capture into a shared utility and make QSS/font checks consume the same warning stream
+  - split font sanity into a dedicated script/helper so walkthrough and verifier fail before unreadable UI can slip through
+  - harden maximize/fullscreen walkthrough checks so PASS requires measurable shell expansion
+  - tighten debounced settings apply scope and add a nonblocking privacy-toggle contract
+  - make the status pill follow task lifecycle events directly, including Needs attention and Error states without polling
+  - remove any still-tracked generated logs and keep screenshot/log outputs ignored
+- Planned files touched:
+  - `src/core/diagnostics/__init__.py`
+  - `src/core/diagnostics/qt_warnings.py`
+  - `src/core/diagnostics/font_sanity.py`
+  - `src/core/diagnostics/qss_sanity.py`
+  - `scripts/font_sanity_check.py`
+  - `scripts/qss_sanity_check.py`
+  - `scripts/ui_walkthrough.py`
+  - `scripts/verify_requirements.py`
+  - `src/tests/test_font_sanity.py`
+  - `src/tests/test_qss_sanity.py`
+  - `src/tests/test_settings_apply_nonblocking.py`
+  - `src/tests/test_status_indicator_events.py`
+  - `src/ui/main_window_impl.py`
+  - `docs/CODEX_RUN_LOG.md`
+  - `docs/REPO_CLEANUP_NOTES.md`

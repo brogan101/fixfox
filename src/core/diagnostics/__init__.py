@@ -10,9 +10,9 @@ from typing import Any
 
 import psutil
 
-from .command_runner import run_command
-from .settings import AppSettings
-from .utils import is_windows
+from ..command_runner import run_command
+from ..settings import AppSettings
+from ..utils import is_windows
 
 
 @dataclass

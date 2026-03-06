@@ -47,6 +47,17 @@ Validation:
 - Removed tracked screenshot artifact folders from git, including the reported failure bundle:
   - `docs/screenshots/20260306_104950`
   - all other timestamped `docs/screenshots/*/` walkthrough/stability/launch-recovery outputs that had been committed previously
+- Removed tracked runtime logs from git:
+  - `logs/launch_debug_20260306_084930.txt`
+  - `logs/launch_debug_20260306_090401.txt`
+  - `logs/launch_debug_20260306_092015.txt`
+  - `logs/launch_debug_20260306_092618.txt`
+  - `logs/launch_debug_20260306_094548.txt`
+  - `logs/launch_debug_20260306_095048.txt`
+  - `logs/launch_watchdog_20260306_094549.txt`
+  - `logs/launch_watchdog_20260306_095048.txt`
+  - `logs/perf_20260306_094556.json`
+  - `logs/perf_20260306_095056.json`
 - Added ignore protections:
   - `docs/screenshots/*/`
   - `logs/`
