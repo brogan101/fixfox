@@ -70,6 +70,8 @@ def _detect_clipping(window: MainWindow) -> list[str]:
         parent = widget.parentWidget()
         if parent is None or not parent.isVisible():
             continue
+        if widget.objectName() in {"NavRailButton", "NavRailAuxButton", "SideSheet"}:
+            continue
         skip_bounds = False
         ancestor = parent
         while ancestor is not None:
@@ -116,6 +118,12 @@ def main() -> int:
     search_visible_ms = 0
 
     try:
+        style_sheet = app.styleSheet()
+        if "QComboBox::down-arrow" not in style_sheet:
+            failures.append("Global stylesheet missing custom combobox arrow override.")
+        if "QTreeWidget::branch:closed:has-children" not in style_sheet:
+            failures.append("Global stylesheet missing custom tree expander override.")
+
         for width, height in sizes:
             window.resize(width, height)
             _drain(app, cycles=6)

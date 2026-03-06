@@ -13,7 +13,7 @@ from datetime import datetime
 from functools import partial
 from typing import Any, Callable
 
-from PySide6.QtCore import QEvent, QPoint, QSize, Qt, QTimer, Signal
+from PySide6.QtCore import QEasingCurve, QEvent, QPoint, QSize, Qt, QTimer, Signal, QPropertyAnimation
 from PySide6.QtGui import QAction, QFontMetrics, QIcon, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
@@ -106,6 +106,7 @@ from .components.tool_runner import ToolRunnerWindow
 from .components.global_search import GlobalSearchPopup
 from .components.app_shell import AppShellFrame
 from .components.onboarding import OnboardingFlow
+from .components.motion import animate_opacity
 from .icons import clear_icon_cache, get_icon
 from .layout_guardrails import (
     MIN_NAV_WIDTH,
@@ -490,6 +491,7 @@ class MainWindow(QMainWindow):
         self._search_popup = GlobalSearchPopup(self)
         self._search_popup.result_activated.connect(self._apply_global_search_result)
         self._search_dispatch_started: dict[int, float] = {}
+        self._page_motion_refs: list[QPropertyAnimation] = []
         self._persist_concierge_events = True
         self._auto_concierge_collapse = False
         self._startup_warmup_active = True
@@ -744,6 +746,10 @@ class MainWindow(QMainWindow):
                     return True
                 if key == Qt.Key_Escape:
                     self._search_popup.hide_popup()
+                    if hasattr(self, "concierge") and (not self.concierge.collapsed) and (not self.concierge.pinned):
+                        self._set_concierge_collapsed(True, persist=True)
+                    if hasattr(self, "app_shell") and self.top_search_stack.currentIndex() == 0 and self.width() < 1120:
+                        self.app_shell.toolbar.collapse_search(animate=True)
                     return True
             if not self._search_popup.isVisible():
                 return super().eventFilter(watched, event)
@@ -773,6 +779,16 @@ class MainWindow(QMainWindow):
         if event.key() == Qt.Key_Escape and hasattr(self, "concierge"):
             if not self.concierge.collapsed:
                 self._set_concierge_collapsed(True, persist=True)
+                if self._search_popup.isVisible():
+                    self._search_popup.hide_popup()
+                event.accept()
+                return
+            if self._search_popup.isVisible():
+                self._search_popup.hide_popup()
+                event.accept()
+                return
+            if hasattr(self, "app_shell") and self.top_search_stack.currentIndex() == 0 and self.width() < 1120:
+                self.app_shell.toolbar.collapse_search(animate=True)
                 event.accept()
                 return
         super().keyPressEvent(event)
@@ -1126,15 +1142,20 @@ class MainWindow(QMainWindow):
         if hasattr(self, "run_status_chip"):
             status = str(title or "").strip().lower()
             kind = "info"
+            chip_text = "Idle"
             if "fail" in status or "error" in status:
                 kind = "crit"
-            elif "warn" in status:
+                chip_text = "Error"
+            elif "warn" in status or "partial" in status:
                 kind = "warn"
+                chip_text = "Needs attention"
             elif "run" in status:
                 kind = "info"
-            elif "success" in status or "ready" in status or "done" in status:
+                chip_text = "Running"
+            elif "success" in status or "ready" in status or "done" in status or "idle" in status:
                 kind = "ok"
-            self.run_status_chip.setText(title if len(title) <= 16 else title[:15] + ".")
+                chip_text = "Idle"
+            self.run_status_chip.setText(chip_text)
             self.run_status_chip.setProperty("kind", kind)
             self.run_status_chip.style().unpolish(self.run_status_chip)
             self.run_status_chip.style().polish(self.run_status_chip)
@@ -1156,10 +1177,17 @@ class MainWindow(QMainWindow):
         if self.active_worker is None:
             self._set_quick_check_busy(False)
             detail = self._last_run_line[:120].strip()
-            if detail:
-                self._set_run_status("Ready", f"{self._last_run_status}: {detail}")
+            last = str(self._last_run_status or "").strip().lower()
+            if "fail" in last or "error" in last:
+                title = "Error"
+            elif "partial" in last or "cancel" in last:
+                title = "Needs attention"
             else:
-                self._set_run_status("Ready", self._last_run_status)
+                title = "Idle"
+            if detail:
+                self._set_run_status(title, f"{self._last_run_status}: {detail}")
+            else:
+                self._set_run_status(title, self._last_run_status)
             return
         self._status_spinner_index = (self._status_spinner_index + 1) % len(self._status_spinner_frames)
         spinner = self._status_spinner_frames[self._status_spinner_index]
@@ -1795,6 +1823,9 @@ class MainWindow(QMainWindow):
         if idx < 0 or idx >= len(self.NAV_ITEMS):
             return
         self.pages.setCurrentIndex(idx)
+        page = self.pages.currentWidget()
+        if isinstance(page, QWidget):
+            self._animate_page_enter(page)
         page_name = self.NAV_ITEMS[idx]
         self.settings_state.last_page = page_name
         if page_name in {"History", "Reports"}:
@@ -1821,6 +1852,19 @@ class MainWindow(QMainWindow):
             PERF_RECORDER.record("ui.open_settings_ms", elapsed_ms)
         elif page_name == "Playbooks":
             PERF_RECORDER.record("ui.open_playbooks_ms", elapsed_ms)
+
+    def _animate_page_enter(self, page: QWidget) -> None:
+        effect_anim = animate_opacity(page, start=0.0, end=1.0, duration_ms=190)
+        self._page_motion_refs.append(effect_anim)
+        start_pos = page.pos() + QPoint(8, 0)
+        end_pos = page.pos()
+        slide = QPropertyAnimation(page, b"pos", page)
+        slide.setDuration(190)
+        slide.setEasingCurve(QEasingCurve.OutCubic)
+        slide.setStartValue(start_pos)
+        slide.setEndValue(end_pos)
+        slide.start()
+        self._page_motion_refs.append(slide)
 
     def _on_nav_collapsed_changed(self, collapsed: bool) -> None:
         self.settings_state.nav_collapsed = True
@@ -2267,6 +2311,7 @@ class MainWindow(QMainWindow):
         self.tool_runner.show()
         self.toasts.show_toast(f"{name}: running...")
         self.btn_cancel_task.setEnabled(True)
+        self.app_shell.toolbar.set_task_running(True, progress=None)
         worker = TaskWorker(fn, config=WorkerConfig(timeout_s=timeout_s))
         self.active_worker = worker
         worker.signals.progress.connect(lambda p, t: self._on_run_progress(resolved_run_id, name, p, t))
@@ -2283,6 +2328,7 @@ class MainWindow(QMainWindow):
         return resolved_run_id
 
     def _on_run_progress(self, run_id: str, name: str, pct: int, text: str) -> None:
+        self.app_shell.toolbar.set_task_running(True, progress=max(0, min(100, int(pct))))
         if text:
             self._last_run_line = str(text).strip()
         self.run_event_bus.publish(
@@ -2314,6 +2360,7 @@ class MainWindow(QMainWindow):
         self.run_event_bus.publish(run_id, RunEventType.STDOUT, message=text)
 
     def _on_run_result_event(self, run_id: str, payload: Any) -> None:
+        self.app_shell.toolbar.set_task_running(True, progress=100)
         data = payload if isinstance(payload, dict) else {"payload": str(payload)}
         if isinstance(data, dict) and "code" in data:
             code = int(data.get("code", 0))
@@ -2382,6 +2429,7 @@ class MainWindow(QMainWindow):
             ]
         )
         self.toasts.show_toast(plain)
+        self._set_run_status("Error", reason)
         page = self.NAV_ITEMS[self.nav.currentRow()] if self.nav.currentRow() >= 0 else "Home"
         self._show_page_callout(page, f"{name} failed", reason, level="error")
         self._last_run_status = "Failed"
@@ -2410,6 +2458,7 @@ class MainWindow(QMainWindow):
         self.active_run_name = ""
         self.active_run_started = 0.0
         self.btn_cancel_task.setEnabled(False)
+        self.app_shell.toolbar.set_task_running(False)
         self._set_quick_check_busy(False)
         self._unsubscribe_run_status_events()
         self._update_run_status_indicator()
@@ -3434,14 +3483,17 @@ class MainWindow(QMainWindow):
         category_filter = "" if selected == "all categories" else self._tool_category_key(selected)
         allow_safe = not hasattr(self, "pb_chip_safe") or self.pb_chip_safe.isChecked()
         allow_admin = not hasattr(self, "pb_chip_admin") or self.pb_chip_admin.isChecked()
-        allow_advanced = not hasattr(self, "pb_chip_advanced") or self.pb_chip_advanced.isChecked()
+        allow_restart = not hasattr(self, "pb_chip_restart") or self.pb_chip_restart.isChecked()
+        allow_long = not hasattr(self, "pb_chip_time") or self.pb_chip_time.isChecked()
 
         def _risk_bucket(tool_id: str) -> str:
             key = str(tool_id or "").strip().lower()
             if "cmd_admin" in key:
                 return "admin"
-            if any(token in key for token in ("feedback", "get_help")):
-                return "advanced"
+            if any(token in key for token in ("reboot", "reset", "update_reset", "winsock", "network_reset")):
+                return "restart"
+            if any(token in key for token in ("full_scan", "index", "eventlog", "collect", "bundle", "repair")):
+                return "long"
             return "safe"
 
         def _is_allowed(tool_id: str) -> bool:
@@ -3450,7 +3502,9 @@ class MainWindow(QMainWindow):
                 return allow_safe
             if bucket == "admin":
                 return allow_admin
-            return allow_advanced
+            if bucket == "restart":
+                return allow_restart
+            return allow_long
 
         visible_tool_ids = self._visible_ids_for_prefix("tool.")
         top_adapters = [

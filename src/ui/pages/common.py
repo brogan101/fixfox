@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QScrollArea, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QScrollArea, QWidget
 
-from ..components.rows import IconButton
-from ..style import spacing
+from ..components.page_primitives import PageHeader
 
 
 class PageScroll(QScrollArea):
@@ -28,26 +26,10 @@ def build_page_header(
     help_text: str = "",
     on_help: Callable[[str, str], None] | None = None,
 ) -> QWidget:
-    widget = QWidget()
-    layout = QVBoxLayout(widget)
-    layout.setContentsMargins(0, 0, 0, 0)
-    layout.setSpacing(spacing("sm"))
-    top = QHBoxLayout()
-    labels = QVBoxLayout()
-    labels.setContentsMargins(0, 0, 0, 0)
-    labels.setSpacing(spacing("xs"))
-    title_label = QLabel(title)
-    title_label.setObjectName("Title")
-    subtitle_label = QLabel(subtitle)
-    subtitle_label.setObjectName("SubTitle")
-    labels.addWidget(title_label)
-    labels.addWidget(subtitle_label)
-    top.addLayout(labels, 1)
-    help_btn = IconButton("help", widget, f"{title} help")
-    if on_help is not None:
-        help_btn.clicked.connect(lambda: on_help(title, help_text or subtitle))
-    top.addWidget(help_btn, 0, Qt.AlignTop)
-    if cta is not None:
-        top.addWidget(cta, 0, Qt.AlignRight | Qt.AlignTop)
-    layout.addLayout(top)
-    return widget
+    return PageHeader(
+        title=title,
+        subtitle=subtitle,
+        cta=cta,
+        help_text=help_text,
+        on_help=on_help,
+    )

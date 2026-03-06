@@ -80,6 +80,7 @@ class ToolRunnerWindow(QDialog):
         self._spinner_index = 0
         self._running_hint = "Running... waiting for live output."
         self._pending_output_lines: list[str] = []
+        self._technical_visible = False
 
         root = QVBoxLayout(self)
         root.setContentsMargins(spacing("sm"), spacing("sm"), spacing("sm"), spacing("sm"))
@@ -112,36 +113,63 @@ class ToolRunnerWindow(QDialog):
         self.txt_overview.setReadOnly(True)
         self.txt_overview.setPlainText(self._running_overview())
 
+        self.txt_issues = QTextEdit()
+        self.txt_issues.setReadOnly(True)
+        self.txt_issues.setPlainText(details_text or "No issues detected yet.")
+
+        self.txt_activity = QTextEdit()
+        self.txt_activity.setReadOnly(True)
+        self.txt_activity.setPlainText("Activity timeline will populate as the run progresses.")
+
         self.txt_output = QPlainTextEdit()
         self.txt_output.setReadOnly(True)
         mono = safe_copy_font(QFont("Consolas"), default_ps=10)
         self.txt_output.setFont(mono)
         self.txt_output.setPlaceholderText(self._running_hint)
         self.txt_output.verticalScrollBar().valueChanged.connect(self._on_output_scroll)
+        self.txt_output.hide()
+        self.btn_toggle_technical = SoftButton("Show Technical Output")
+        self.btn_toggle_technical.clicked.connect(self._toggle_technical_output)
 
-        self.txt_details = QTextEdit()
-        self.txt_details.setReadOnly(True)
-        self.txt_details.setPlainText(details_text)
-
-        self.txt_next = QTextEdit()
-        self.txt_next.setReadOnly(True)
-        self.txt_next.setPlainText(next_steps or "Review result, then export a support pack if needed.")
+        self.txt_details = self.txt_issues
+        self.txt_next = self.txt_activity
+        self.txt_next.setPlainText("Waiting for run completion to compute next steps.")
         self.next_actions = QWidget()
         next_actions_layout = QHBoxLayout(self.next_actions)
         next_actions_layout.setContentsMargins(0, 0, 0, 0)
         next_actions_layout.setSpacing(spacing("xs"))
         next_actions_layout.addStretch(1)
 
-        self.tabs.addTab(self.txt_overview, "Overview")
-        self.tabs.addTab(self.txt_output, "Live Output")
-        self.tabs.addTab(self.txt_details, "Details")
-        next_tab = QWidget()
-        next_tab_layout = QVBoxLayout(next_tab)
-        next_tab_layout.setContentsMargins(0, 0, 0, 0)
-        next_tab_layout.setSpacing(tight_spacing("comfortable"))
-        next_tab_layout.addWidget(self.txt_next, 1)
-        next_tab_layout.addWidget(self.next_actions, 0)
-        self.tabs.addTab(next_tab, "Next Steps")
+        summary_tab = QWidget()
+        summary_layout = QVBoxLayout(summary_tab)
+        summary_layout.setContentsMargins(0, 0, 0, 0)
+        summary_layout.setSpacing(tight_spacing("comfortable"))
+        summary_layout.addWidget(self.txt_overview, 1)
+        self.tabs.addTab(summary_tab, "Summary")
+
+        issues_tab = QWidget()
+        issues_layout = QVBoxLayout(issues_tab)
+        issues_layout.setContentsMargins(0, 0, 0, 0)
+        issues_layout.setSpacing(tight_spacing("comfortable"))
+        issues_layout.addWidget(self.txt_issues, 1)
+        self.tabs.addTab(issues_tab, "Issues")
+
+        activity_tab = QWidget()
+        activity_layout = QVBoxLayout(activity_tab)
+        activity_layout.setContentsMargins(0, 0, 0, 0)
+        activity_layout.setSpacing(tight_spacing("comfortable"))
+        activity_layout.addWidget(self.txt_activity, 1)
+        activity_layout.addWidget(self.next_actions, 0)
+        self.tabs.addTab(activity_tab, "Activity")
+
+        technical_tab = QWidget()
+        technical_layout = QVBoxLayout(technical_tab)
+        technical_layout.setContentsMargins(0, 0, 0, 0)
+        technical_layout.setSpacing(tight_spacing("comfortable"))
+        technical_layout.addWidget(self.btn_toggle_technical, 0)
+        technical_layout.addWidget(self.txt_output, 1)
+        self.tabs.addTab(technical_tab, "Technical")
+        self.tabs.setCurrentIndex(0)
         root.addWidget(self.tabs, 1)
 
         controls = QHBoxLayout()
@@ -300,7 +328,27 @@ class ToolRunnerWindow(QDialog):
     def _queue_output_line(self, line: str, kind: str = "stdout") -> None:
         if not line:
             return
+        self._append_activity_line(line, kind)
         self.append_output_requested.emit(line, kind)
+
+    def _append_activity_line(self, line: str, kind: str) -> None:
+        text = str(line or "").strip()
+        if not text:
+            return
+        prefix = {
+            "progress": "Progress",
+            "status": "Status",
+            "stderr": "Error",
+            "error": "Error",
+            "warn": "Warning",
+            "artifact": "Artifact",
+        }.get(str(kind or "").lower(), "Log")
+        self.txt_activity.append(f"- {prefix}: {text}")
+
+    def _toggle_technical_output(self) -> None:
+        self._technical_visible = not self._technical_visible
+        self.txt_output.setVisible(self._technical_visible)
+        self.btn_toggle_technical.setText("Hide Technical Output" if self._technical_visible else "Show Technical Output")
 
     def _append_output_line(self, line: str, _kind: str = "stdout") -> None:
         if not line:
@@ -366,6 +414,15 @@ class ToolRunnerWindow(QDialog):
         self._set_status_chip("Partial")
         if isinstance(payload, dict):
             self._queue_output_line("[partial] " + json.dumps(payload, ensure_ascii=False)[:1400], "status")
+            self.txt_issues.setPlainText(
+                "\n".join(
+                    [
+                        "Severity: warning",
+                        "Why it matters: the action returned partial output and may need follow-up.",
+                        "What to do next: review Activity and run a safe follow-up action.",
+                    ]
+                )
+            )
 
     def on_result(self, payload: dict[str, Any]) -> None:
         self._drain_event_bus()
@@ -419,6 +476,20 @@ class ToolRunnerWindow(QDialog):
         next_steps = self._extract_next_steps()
         self.txt_overview.setPlainText(self._build_overview(findings_count, artifacts, next_steps))
         self.txt_next.setPlainText("\n".join([f"- {row}" for row in next_steps]))
+        if self._last_status in {"Failed", "Partial", "Cancelled"}:
+            issue_reason = reason or "One or more checks did not complete cleanly."
+            self.txt_issues.setPlainText(
+                "\n".join(
+                    [
+                        f"Severity: {'critical' if self._last_status == 'Failed' else 'warning'}",
+                        f"Why it matters: {issue_reason}",
+                        "Recommended action:",
+                        *[f"- {row}" for row in next_steps[:3]],
+                    ]
+                )
+            )
+        else:
+            self.txt_issues.setPlainText("No blocking issues detected.")
         self._rebuild_next_action_buttons(next_steps)
         self._queue_output_line(f"[done] {self._last_status}.", "status")
         self._drain_event_bus()
@@ -446,6 +517,16 @@ class ToolRunnerWindow(QDialog):
         )
         self._rebuild_next_action_buttons(steps)
         self.txt_next.setPlainText("\n".join([f"- {row}" for row in steps]))
+        self.txt_issues.setPlainText(
+            "\n".join(
+                [
+                    "Severity: critical",
+                    f"Why it matters: {reason}",
+                    "Recommended action:",
+                    *[f"- {row}" for row in steps[:3]],
+                ]
+            )
+        )
         self._drain_event_bus()
 
     def on_cancelled(self) -> None:
@@ -485,9 +566,11 @@ class ToolRunnerWindow(QDialog):
         QApplication.clipboard().setText(text)
 
     def copy_technical_appendix(self) -> None:
-        detail = self.txt_details.toPlainText().strip()
-        if not detail and isinstance(self._result_payload, dict):
+        detail = ""
+        if isinstance(self._result_payload, dict):
             detail = str(self._result_payload.get("technical_message", "")).strip()
+        if not detail:
+            detail = self.txt_output.toPlainText().strip()[:12000]
         if not detail:
             detail = "No technical appendix is available for this run."
         if self._mask_fn is not None:
@@ -625,8 +708,9 @@ class ToolRunnerWindow(QDialog):
                 "What we found:\n- Task is currently running.",
                 "What changed:\n- No confirmed changes yet.",
                 "What to do next:",
-                "- Watch Live Output for streaming logs.",
-                "- Review Details for technical context.",
+                "- Watch Activity for progress updates.",
+                "- Check Issues for risk context.",
+                "- Open Technical only when raw logs are needed.",
                 "- Cancel if this is not the intended action.",
             ]
         )

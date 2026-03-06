@@ -39,6 +39,8 @@ def build_qss(tokens: ThemeTokens, mode: str, density: str) -> str:
     disabled_bg = _alpha(tokens.panel2, 0.48)
     disabled_text = _alpha(tokens.text_muted, 0.74)
     combo_arrow_url = _qss_file_url("assets/icons/chevron_down.svg")
+    tree_arrow_right_url = _qss_file_url("assets/icons/chevron_right.svg")
+    tree_arrow_down_url = _qss_file_url("assets/icons/chevron_down.svg")
 
     return f"""
 QWidget {{
@@ -65,6 +67,16 @@ QFrame#TopAppBar {{
   background: {_alpha(tokens.panel, 0.96)};
   border: 0;
   border-radius: {d.corner_radius + 6}px;
+}}
+QProgressBar#AppBarProgress {{
+  background: transparent;
+  border: 0;
+  min-height: 3px;
+  max-height: 3px;
+}}
+QProgressBar#AppBarProgress::chunk {{
+  background: {_alpha(tokens.accent, 0.90)};
+  border-radius: 1px;
 }}
 
 QFrame#StartupWarmupBanner {{
@@ -571,6 +583,14 @@ QTreeWidget::item,
 QTreeView::item {{
   min-height: {max(24, d.list_row_height - 26)}px;
   padding: 2px 4px;
+}}
+QTreeWidget::branch:closed:has-children,
+QTreeView::branch:closed:has-children {{
+  image: url("{tree_arrow_right_url}");
+}}
+QTreeWidget::branch:open:has-children,
+QTreeView::branch:open:has-children {{
+  image: url("{tree_arrow_down_url}");
 }}
 QHeaderView::section {{
   background: {tokens.panel2};

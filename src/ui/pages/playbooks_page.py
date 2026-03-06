@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -9,6 +10,8 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QSpinBox,
     QStackedWidget,
     QTextEdit,
@@ -37,8 +40,8 @@ class PlaybooksPage(PageScroll):
         layout.addWidget(
             build_page_header(
                 "Playbooks",
-                "Tools and runbooks are separated into clean directories.",
-                help_text="Use Tools for one-off actions and Runbooks for guided sequences.",
+                "Catalog of fix plays with clear risk, timing, and run controls.",
+                help_text="Use filters and category facets to find the right play quickly.",
                 on_help=w._show_page_help,
             )
         )
@@ -93,10 +96,8 @@ class PlaybooksPage(PageScroll):
         pro_layout.setContentsMargins(0, 0, 0, 0)
         pro_layout.setSpacing(spacing("md"))
 
-        controls_shell = QWidget()
-        controls_outer = QVBoxLayout(controls_shell)
-        controls_outer.setContentsMargins(0, 0, 0, 0)
-        controls_outer.setSpacing(spacing("xs"))
+        controls_shell = Card("Catalog Filters", "Search and facet the play catalog.")
+        controls_outer = controls_shell.body_layout()
         controls_row1 = QHBoxLayout()
         controls_row1.setContentsMargins(0, 0, 0, 0)
         controls_row1.setSpacing(spacing("sm"))
@@ -105,7 +106,7 @@ class PlaybooksPage(PageScroll):
         controls_row2.setSpacing(spacing("sm"))
         w.tb_search = QLineEdit()
         w.tb_search.setObjectName("SearchInput")
-        w.tb_search.setPlaceholderText("Search tools, script tasks, and runbooks")
+        w.tb_search.setPlaceholderText("Search playbooks, tools, and runbooks")
         w.tb_search.textChanged.connect(w._refresh_toolbox)
         w.pb_segment = QComboBox()
         w.pb_segment.addItems(["Tools", "Runbooks"])
@@ -114,9 +115,11 @@ class PlaybooksPage(PageScroll):
         w.pb_chip_safe.setChecked(True)
         w.pb_chip_admin = QCheckBox("Admin")
         w.pb_chip_admin.setChecked(True)
-        w.pb_chip_advanced = QCheckBox("Advanced")
-        w.pb_chip_advanced.setChecked(True)
-        for chip in (w.pb_chip_safe, w.pb_chip_admin, w.pb_chip_advanced):
+        w.pb_chip_restart = QCheckBox("Restart")
+        w.pb_chip_restart.setChecked(True)
+        w.pb_chip_time = QCheckBox("Long")
+        w.pb_chip_time.setChecked(True)
+        for chip in (w.pb_chip_safe, w.pb_chip_admin, w.pb_chip_restart, w.pb_chip_time):
             chip.stateChanged.connect(w._refresh_toolbox)
         w.pb_advanced_toggle = SoftButton("Show advanced script tasks")
         w.pb_advanced_toggle.clicked.connect(w._toggle_advanced_script_tasks)
@@ -124,7 +127,8 @@ class PlaybooksPage(PageScroll):
         controls_row1.addWidget(w.pb_segment, 0)
         controls_row2.addWidget(w.pb_chip_safe, 0)
         controls_row2.addWidget(w.pb_chip_admin, 0)
-        controls_row2.addWidget(w.pb_chip_advanced, 0)
+        controls_row2.addWidget(w.pb_chip_restart, 0)
+        controls_row2.addWidget(w.pb_chip_time, 0)
         controls_row2.addStretch(1)
         controls_row2.addWidget(w.pb_advanced_toggle, 0)
         controls_outer.addLayout(controls_row1)
@@ -142,6 +146,31 @@ class PlaybooksPage(PageScroll):
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(spacing("md"))
+        categories_card = Card("Categories", "Single-select category facet.")
+        w.pb_category_list = QListWidget()
+        w.pb_category_list.setObjectName("PlaybookCategoryList")
+        for label in (
+            "All Categories",
+            "Network",
+            "Updates",
+            "Printer",
+            "Integrity",
+            "Browser",
+            "Audio",
+            "Privacy",
+            "Cloud",
+            "Devices",
+            "Office",
+            "Services",
+            "Security",
+            "WMI",
+        ):
+            w.pb_category_list.addItem(QListWidgetItem(label))
+        w.pb_category_list.setCurrentRow(0)
+        w.pb_category_list.currentTextChanged.connect(lambda text: w.tb_filter.setCurrentText(str(text or "All Categories")))
+        categories_card.body_layout().addWidget(w.pb_category_list)
+        left_layout.addWidget(categories_card, 1)
+
         w.tb_filter = QComboBox()
         w.tb_filter.addItems(
             [
@@ -164,11 +193,21 @@ class PlaybooksPage(PageScroll):
             ]
         )
         w.tb_filter.currentTextChanged.connect(w._refresh_toolbox)
+        def _sync_category_list(text: str) -> None:
+            if not hasattr(w, "pb_category_list"):
+                return
+            matches = w.pb_category_list.findItems(str(text or ""), Qt.MatchExactly)
+            if not matches:
+                return
+            row = w.pb_category_list.row(matches[0])
+            if row >= 0 and w.pb_category_list.currentRow() != row:
+                w.pb_category_list.setCurrentRow(row)
+        w.tb_filter.currentTextChanged.connect(_sync_category_list)
         w.tb_top = FeedRenderer(w._make_tool_row, density=w.settings_state.density, empty_icon="tool", empty_message="No top tools.")
         w.tb_top.item_activated.connect(lambda tid: w._launch_tool_payload(str(tid)))
         w.tb_top.item_selected.connect(lambda tid: w._set_selected_tool(str(tid)))
         w.tb_top.context_requested.connect(w._tool_menu)
-        pinned = Card("Pinned", "Top tools and favorites.")
+        pinned = Card("Recommended", "Fast actions and pinned tools.")
         pinned.body_layout().addWidget(w.tb_filter)
         pinned.body_layout().addWidget(QLabel("Top tools"))
         pinned.body_layout().addWidget(w.tb_top, 1)
@@ -185,7 +224,7 @@ class PlaybooksPage(PageScroll):
         w.tb_all.item_activated.connect(lambda tid: w._launch_tool_payload(str(tid)))
         w.tb_all.item_selected.connect(lambda tid: w._set_selected_tool(str(tid)))
         w.tb_all.context_requested.connect(w._tool_menu)
-        directory = Card("Tool Directory", "Browse with search and category filters.")
+        directory = Card("Playbook Catalog", "Rows include risk badges, timing hints, and run actions.")
         directory.body_layout().addWidget(w.tb_all)
         left_layout.addWidget(directory, 2)
 

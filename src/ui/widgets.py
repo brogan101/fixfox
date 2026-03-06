@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QTimer, Qt
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
+    QGraphicsDropShadowEffect,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -14,6 +16,8 @@ from PySide6.QtWidgets import (
 
 from .style import control_height, spacing, tight_spacing
 from .theme import ELEVATION_SCALE, resolve_density_tokens
+from .icons import get_icon
+from .components.motion import animate_opacity
 
 
 class Card(QFrame):
@@ -35,6 +39,15 @@ class Card(QFrame):
         self.layout_main.setContentsMargins(spacing("lg"), spacing("md"), spacing("lg"), spacing("md"))
         self.layout_main.setSpacing(spacing("sm"))
         self.set_density(density)
+        self._hovered = False
+        self._shadow = QGraphicsDropShadowEffect(self)
+        self._shadow.setOffset(0, 2)
+        self._shadow.setBlurRadius(10 if int(elevation) > 0 else 0)
+        self._shadow.setColor(QColor(9, 16, 28, 42))
+        self.setGraphicsEffect(self._shadow)
+        self._shadow_anim = QPropertyAnimation(self._shadow, b"blurRadius", self)
+        self._shadow_anim.setDuration(130)
+        self._shadow_anim.setEasingCurve(QEasingCurve.OutCubic)
 
         top = QHBoxLayout()
         self.title = QLabel(title)
@@ -59,6 +72,28 @@ class Card(QFrame):
         self.layout_main.setContentsMargins(d.card_padding_h, d.card_padding_v, d.card_padding_h, d.card_padding_v)
         self.layout_main.setSpacing(tight_spacing(density))
         self.update()
+
+    def enterEvent(self, event) -> None:  # type: ignore[override]
+        self._hovered = True
+        self.setProperty("hovered", "true")
+        self.style().unpolish(self)
+        self.style().polish(self)
+        self._shadow_anim.stop()
+        self._shadow_anim.setStartValue(self._shadow.blurRadius())
+        self._shadow_anim.setEndValue(18.0)
+        self._shadow_anim.start()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event) -> None:  # type: ignore[override]
+        self._hovered = False
+        self.setProperty("hovered", "false")
+        self.style().unpolish(self)
+        self.style().polish(self)
+        self._shadow_anim.stop()
+        self._shadow_anim.setStartValue(self._shadow.blurRadius())
+        self._shadow_anim.setEndValue(10.0)
+        self._shadow_anim.start()
+        super().leaveEvent(event)
 
 
 class Pill(QLabel):
@@ -180,25 +215,56 @@ class ToastHost(QWidget):
         self.layout_main.setSpacing(spacing("sm"))
         self.layout_main.addStretch(1)
         self.setMaximumWidth(360)
+        self._toast_anims: list[QPropertyAnimation] = []
 
     def show_toast(self, text: str, timeout_ms: int = 2600) -> None:
         frame = QFrame()
         frame.setObjectName("Toast")
+        frame.setMaximumHeight(0)
         lay = QHBoxLayout(frame)
         lay.setContentsMargins(spacing("sm"), spacing("xs"), spacing("sm"), spacing("xs"))
         label = QLabel(text)
         label.setWordWrap(True)
         lay.addWidget(label)
-        self.layout_main.addWidget(frame)
-        QTimer.singleShot(timeout_ms, frame.deleteLater)
+        self.layout_main.insertWidget(max(0, self.layout_main.count() - 1), frame)
+        open_height = max(28, frame.sizeHint().height() + 2)
+        height_anim = QPropertyAnimation(frame, b"maximumHeight", frame)
+        height_anim.setDuration(180)
+        height_anim.setEasingCurve(QEasingCurve.OutCubic)
+        height_anim.setStartValue(0)
+        height_anim.setEndValue(open_height)
+        height_anim.start()
+        self._toast_anims.append(height_anim)
+        fade_in = animate_opacity(frame, start=0.0, end=1.0, duration_ms=170)
+        self._toast_anims.append(fade_in)
+        QTimer.singleShot(timeout_ms, lambda ref=frame: self._dismiss_toast(ref))
+
+    def _dismiss_toast(self, frame: QFrame) -> None:
+        if frame is None or not frame.isVisible():
+            return
+        fade_out = animate_opacity(frame, start=1.0, end=0.0, duration_ms=170)
+        self._toast_anims.append(fade_out)
+        close_anim = QPropertyAnimation(frame, b"maximumHeight", frame)
+        close_anim.setDuration(170)
+        close_anim.setEasingCurve(QEasingCurve.InCubic)
+        close_anim.setStartValue(max(18, frame.height()))
+        close_anim.setEndValue(0)
+        close_anim.finished.connect(frame.deleteLater)
+        close_anim.start()
+        self._toast_anims.append(close_anim)
 
 
 class EmptyState(Card):
     def __init__(self, title: str, subtitle: str, cta: QWidget | None = None, icon: str = "i"):
         super().__init__(title, subtitle, right_widget=cta, object_name="EmptyState")
-        badge = QLabel(icon)
-        badge.setObjectName("CardTitle")
+        badge = QLabel()
         badge.setAlignment(Qt.AlignHCenter)
+        pix = get_icon(icon, self, size=22).pixmap(22, 22)
+        if not pix.isNull():
+            badge.setPixmap(pix)
+        else:
+            badge.setText(str(icon or ""))
+            badge.setObjectName("CardTitle")
         self.layout_main.insertWidget(0, badge)
 
 

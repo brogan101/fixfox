@@ -1,22 +1,31 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from PySide6.QtCore import QByteArray, Qt
 from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
-from PySide6.QtWidgets import QApplication, QStyle, QWidget
+from PySide6.QtWidgets import QApplication, QWidget
 
 from ..core.utils import resource_path
 
 _ICON_DIR = Path(resource_path("assets/icons"))
 _ICON_CACHE: dict[tuple[str, str, int], QIcon] = {}
+LOGGER = logging.getLogger("fixfox.ui.icons")
 
 _ICON_ALIASES: dict[str, str] = {
     "home": "home",
     "playbooks": "open_book",
     "open_book": "open_book",
     "toolbox": "playbooks",
+    "tool": "playbooks",
+    "book": "open_book",
+    "task": "run",
+    "star": "quick_check",
+    "i": "info",
+    "?": "info",
+    "!": "info",
     "diagnose": "diagnose",
     "fixes": "wrench",
     "wrench": "wrench",
@@ -46,33 +55,13 @@ _ICON_ALIASES: dict[str, str] = {
     "privacy": "privacy",
     "shield": "shield",
     "preview": "preview",
+    "chevron_down": "chevron_down",
+    "chevron_right": "chevron_right",
+    "chevron_left": "chevron_left",
+    "next": "chevron_right",
+    "back": "chevron_left",
+    "check_circle": "check_circle",
 }
-
-_FALLBACK_STYLE: dict[str, QStyle.StandardPixmap] = {
-    "home": QStyle.SP_DirHomeIcon,
-    "open_book": QStyle.SP_DirOpenIcon,
-    "diagnose": QStyle.SP_FileDialogDetailedView,
-    "fixes": QStyle.SP_BrowserReload,
-    "wrench": QStyle.SP_BrowserReload,
-    "reports": QStyle.SP_DialogSaveButton,
-    "history": QStyle.SP_FileDialogListView,
-    "settings": QStyle.SP_ComputerIcon,
-    "gear": QStyle.SP_ComputerIcon,
-    "settings_gear": QStyle.SP_ComputerIcon,
-    "search": QStyle.SP_FileDialogContentsView,
-    "quick_check": QStyle.SP_MediaPlay,
-    "export": QStyle.SP_DialogSaveButton,
-    "help": QStyle.SP_DialogHelpButton,
-    "menu": QStyle.SP_TitleBarMenuButton,
-    "panel_open": QStyle.SP_TitleBarShadeButton,
-    "panel_closed": QStyle.SP_TitleBarUnshadeButton,
-    "details": QStyle.SP_TitleBarShadeButton,
-    "run": QStyle.SP_MediaPlay,
-    "play": QStyle.SP_MediaPlay,
-    "preview": QStyle.SP_FileDialogInfoView,
-    "close": QStyle.SP_TitleBarCloseButton,
-}
-
 
 def _icon_color(widget: QWidget | None) -> QColor:
     if widget is not None:
@@ -164,15 +153,10 @@ def get_icon(name: str, widget: QWidget | None = None, size: int = 20) -> QIcon:
             if not icon.isNull():
                 _ICON_CACHE[cache_key] = icon
                 return icon
-
-    style_key = _FALLBACK_STYLE.get(icon_name, QStyle.SP_FileIcon)
-    if widget is not None:
-        icon = widget.style().standardIcon(style_key)
-    else:
-        app = QApplication.instance()
-        icon = app.style().standardIcon(style_key) if app is not None else QIcon()
-    _ICON_CACHE[cache_key] = icon
-    return icon
+    LOGGER.error("missing_or_invalid_icon_asset name=%s icon_dir=%s", icon_name, _ICON_DIR)
+    empty = QIcon()
+    _ICON_CACHE[cache_key] = empty
+    return empty
 
 
 def clear_icon_cache() -> None:

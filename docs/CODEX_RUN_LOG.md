@@ -563,3 +563,33 @@ src/ui/style/qss_builder.py         |  45 +++---
   - src/tests/test_search_nonblocking.py
   - docs/STABILIZATION_REPORT.md
   - docs/qt_warnings_policy.md
+
+## 2026-03-06 09:54:20 -05:00 - Next Level Polish Pass
+- Starting commit: 0beb2f94de390770ea94e1b0924ced9fa97a50f9
+- Goals:
+  1) Design token system and enforcement
+  2) Replace text arrows/steps with real components
+  3) Pro animations (search, side sheet, toasts, hover, page transition)
+  4) Typography + spacing cleanup with shared page components
+  5) Alive feedback loop (status pill/progress line/instant feedback)
+  6) Icon quality pass (replace default arrows/icons)
+  7) Playbooks catalog UX redesign
+  8) Tool Runner default plain-language UX
+  9) Strict QA gates for arrows/icons/QSS/layout/perf
+- Planned files touched:
+  - src/ui/style/tokens2.py
+  - src/ui/style/qss_builder.py
+  - src/ui/components/motion.py
+  - src/ui/components/stepper.py
+  - src/ui/components/page_primitives.py
+  - src/ui/components/app_bar.py
+  - src/ui/components/tool_runner.py
+  - src/ui/pages/playbooks_page.py
+  - src/ui/main_window_impl.py
+  - src/ui/icons.py
+  - src/assets/icons/*
+  - scripts/verify_requirements.py
+  - scripts/ui_walkthrough.py
+  - src/tests/test_qss_sanity.py
+  - src/tests/test_ui_layout_sanity.py
+  - docs/DESIGN_TOKENS.md

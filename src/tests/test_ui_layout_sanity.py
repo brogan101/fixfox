@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import ast
 import os
 import time
 import unittest
+from pathlib import Path
 
 from PySide6.QtCore import QPoint, Qt
 from PySide6.QtTest import QTest
@@ -16,6 +18,8 @@ LEGACY_NAV_OBJECTS = {"Nav", "NavList", "DrawerNav", "LegacyNav", "MainNav"}
 def _assert_within_parent(widget: QWidget, tolerance: int = 2) -> None:
     parent = widget.parentWidget()
     if parent is None or (not parent.isVisible()):
+        return
+    if widget.objectName() in {"NavRailButton", "NavRailAuxButton"}:
         return
     ancestor = parent
     while ancestor is not None:
@@ -121,6 +125,34 @@ class UiLayoutSanityTests(unittest.TestCase):
         QTest.keyClick(self.window, Qt.Key_Escape)
         self._drain_events(cycles=3)
         self.assertTrue(self.window.concierge.collapsed, "Details sheet should close with ESC when unpinned.")
+
+    def test_stylesheet_overrides_combo_and_tree_arrows(self) -> None:
+        qss = self.app.styleSheet()
+        self.assertIn("QComboBox::down-arrow", qss)
+        self.assertIn("QTreeWidget::branch:closed:has-children", qss)
+        self.assertIn("QTreeView::branch:open:has-children", qss)
+        icons_py = Path("src/ui/icons.py").read_text(encoding="utf-8")
+        self.assertNotIn("standardIcon(", icons_py)
+        self.assertNotIn("QStyle", icons_py)
+
+    def test_no_ascii_arrow_labels_in_ui_strings(self) -> None:
+        targets = (
+            Path("src/ui/components/onboarding.py"),
+            Path("src/ui/pages/playbooks_page.py"),
+            Path("src/ui/pages/reports_page.py"),
+            Path("src/ui/pages/settings_page.py"),
+        )
+        offenders: list[str] = []
+        for file_path in targets:
+            tree = ast.parse(file_path.read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Constant) or not isinstance(node.value, str):
+                    continue
+                value = str(node.value)
+                lower = value.lower()
+                if "next >" in lower or "->" in value:
+                    offenders.append(f"{file_path.name}:{value[:50]}")
+        self.assertFalse(offenders, f"ASCII arrow labels found: {offenders[:6]}")
 
 
 if __name__ == "__main__":

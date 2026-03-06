@@ -32,6 +32,19 @@ from .theme import (
     spacing_multiplier,
     ui_scale_percent,
 )
+from .tokens2 import (
+    ELEVATION_V2,
+    FONT_WEIGHTS_QT,
+    RADII_V2,
+    SPACING_SCALE_V2,
+    TYPOGRAPHY_PT_V2,
+    SemanticColorsV2,
+    semantic_colors_from_theme,
+    token_radius,
+    token_spacing,
+    token_typography,
+    token_weight,
+)
 
 __all__ = [
     "BASE_FONT_FAMILY",
@@ -62,6 +75,17 @@ __all__ = [
     "set_ui_scale_percent",
     "spacing_multiplier",
     "spacing",
+    "SPACING_SCALE_V2",
+    "RADII_V2",
+    "TYPOGRAPHY_PT_V2",
+    "FONT_WEIGHTS_QT",
+    "ELEVATION_V2",
+    "SemanticColorsV2",
+    "semantic_colors_from_theme",
+    "token_spacing",
+    "token_radius",
+    "token_typography",
+    "token_weight",
     "tight_spacing",
     "ui_scale_percent",
 ]

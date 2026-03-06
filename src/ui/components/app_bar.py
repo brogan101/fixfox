@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from PySide6.QtCore import QEasingCurve, QPropertyAnimation, Qt, Signal
 from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QLineEdit, QStackedWidget, QToolButton, QVBoxLayout
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QLineEdit, QProgressBar, QStackedWidget, QToolButton, QVBoxLayout
 
 from ...core.brand import APP_DISPLAY_NAME
 from ...core.utils import resource_path
 from ..icons import get_icon
+from .motion import animate_opacity, ensure_opacity_effect
 from ..style import spacing
 from ..widgets import PrimaryButton, SoftButton
 
@@ -25,8 +26,13 @@ class AppToolbar(QFrame):
     def __init__(self) -> None:
         super().__init__()
         self.setObjectName("TopAppBar")
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(spacing("md"), spacing("md"), spacing("md"), spacing("md"))
+        self._active_anims: list[QPropertyAnimation] = []
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(spacing("md"), spacing("md"), spacing("md"), spacing("sm"))
+        root.setSpacing(spacing("xs"))
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(spacing("md"))
 
         self.run_status_panel = RunStatusPanel()
@@ -74,6 +80,7 @@ class AppToolbar(QFrame):
         self.search_stack.setObjectName("HeaderSearchStack")
         self.search_stack.addWidget(self.top_search)
         self.search_stack.addWidget(self.compact_search_btn)
+        ensure_opacity_effect(self.top_search)
         self._search_expand_anim = QPropertyAnimation(self.top_search, b"maximumWidth", self)
         self._search_expand_anim.setDuration(180)
         self._search_expand_anim.setEasingCurve(QEasingCurve.OutCubic)
@@ -117,6 +124,15 @@ class AppToolbar(QFrame):
         layout.addWidget(self.btn_panel_toggle, 0)
         layout.addWidget(self.btn_export, 0)
         layout.addWidget(self.btn_overflow, 0)
+        root.addLayout(layout, 1)
+
+        self.task_progress = QProgressBar()
+        self.task_progress.setObjectName("AppBarProgress")
+        self.task_progress.setTextVisible(False)
+        self.task_progress.setFixedHeight(3)
+        self.task_progress.setRange(0, 0)
+        self.task_progress.hide()
+        root.addWidget(self.task_progress, 0)
 
         self.set_details_open(False)
 
@@ -142,19 +158,25 @@ class AppToolbar(QFrame):
             self.top_search.setMaximumWidth(16777215)
             self._search_expand_anim.stop()
             self.search_stack.setCurrentIndex(1 if collapsed else 0)
+            effect = ensure_opacity_effect(self.top_search)
+            effect.setOpacity(1.0)
             return
         if collapsed:
-            self.top_search.setMaximumWidth(16777215)
             self._search_expand_anim.stop()
-            self.search_stack.setCurrentIndex(1)
+            fade = animate_opacity(self.top_search, start=1.0, end=0.0, duration_ms=140)
+            self._active_anims.append(fade)
+            fade.finished.connect(lambda: self.search_stack.setCurrentIndex(1))
             return
         self.search_stack.setCurrentIndex(0)
         self.top_search.setMaximumWidth(1)
+        ensure_opacity_effect(self.top_search).setOpacity(0.0)
         self._search_expand_anim.stop()
         target_width = max(280, self.search_stack.width() or 320)
         self._search_expand_anim.setStartValue(1)
         self._search_expand_anim.setEndValue(target_width)
         self._search_expand_anim.start()
+        fade = animate_opacity(self.top_search, start=0.0, end=1.0, duration_ms=170)
+        self._active_anims.append(fade)
 
     def expand_search(self, *, animate: bool = True) -> None:
         self.set_search_collapsed(False, animate=animate)
@@ -169,3 +191,15 @@ class AppToolbar(QFrame):
         self.btn_export.setIcon(get_icon("export", self.btn_export))
         self.btn_overflow.setIcon(get_icon("overflow", self.btn_overflow))
         self.set_details_open(self.btn_panel_toggle.isChecked())
+
+    def set_task_running(self, running: bool, *, progress: int | None = None) -> None:
+        if not running:
+            self.task_progress.hide()
+            self.task_progress.setRange(0, 0)
+            return
+        self.task_progress.show()
+        if progress is None or progress < 0:
+            self.task_progress.setRange(0, 0)
+        else:
+            self.task_progress.setRange(0, 100)
+            self.task_progress.setValue(max(0, min(100, int(progress))))

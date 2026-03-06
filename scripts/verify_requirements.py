@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import time
+import ast
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -52,7 +53,11 @@ class VerificationOutcome:
             "launch_test_gate",
             "qss_test_gate",
             "search_nonblocking_test_gate",
+            "ui_layout_sanity_gate",
             "ui_smoke_walkthrough_gate",
+            "no_qt_standard_icon_fallback",
+            "tree_expander_override",
+            "ascii_arrow_labels_forbidden",
             "ttfp_threshold",
         )
         critical_ok = all(self.checks.get(key, CheckResult(False)).passed for key in critical_keys)
@@ -210,6 +215,7 @@ def _stability_subtests(checks: dict[str, CheckResult]) -> None:
         ("launch_test_gate", [*_python_cmd(), "-m", "src.tests.test_app_launch"]),
         ("qss_test_gate", [*_python_cmd(), "-m", "src.tests.test_qss_sanity"]),
         ("search_nonblocking_test_gate", [*_python_cmd(), "-m", "src.tests.test_search_nonblocking"]),
+        ("ui_layout_sanity_gate", [*_python_cmd(), "-m", "src.tests.test_ui_layout_sanity"]),
         ("ui_smoke_walkthrough_gate", [*_python_cmd(), "scripts/ui_smoke_walkthrough.py"]),
     )
     for key, cmd in gates:
@@ -229,6 +235,8 @@ def _collect_static(checks: dict[str, CheckResult]) -> None:
     startup_watchdog = _read(REPO_ROOT / "src/core/startup_watchdog.py")
     freeze_detector = _read(REPO_ROOT / "src/core/ui_freeze_detector.py")
     perf_module = _read(REPO_ROOT / "src/core/perf.py")
+    tool_runner_py = _read(REPO_ROOT / "src/ui/components/tool_runner.py")
+    playbooks_py = _read(REPO_ROOT / "src/ui/pages/playbooks_page.py")
     readme = _read(REPO_ROOT / "README.md")
     build_exe = _read(REPO_ROOT / "scripts/build_exe.ps1")
     make_icons = _read(REPO_ROOT / "tools/make_icons.py")
@@ -268,6 +276,47 @@ def _collect_static(checks: dict[str, CheckResult]) -> None:
     checks["task_runner_cancel_timeout"] = CheckResult("cancel_event" in script_tasks and "timeout_s" in script_tasks, ["cancel + timeout fields present"])
     checks["qss_dialog_hooks"] = CheckResult("QDialog#ToolRunnerWindow" in qss, ["ToolRunnerWindow selector"])
     checks["combo_arrow_override"] = CheckResult("QComboBox::down-arrow" in qss and "chevron_down.svg" in qss, ["global combo arrow"])
+    checks["tree_expander_override"] = CheckResult(
+        ("QTreeWidget::branch:closed:has-children" in qss) and ("QTreeView::branch:open:has-children" in qss),
+        ["tree branch chevrons in qss"],
+    )
+    checks["no_qt_standard_icon_fallback"] = CheckResult(
+        ("standardIcon(" not in icons) and ("QStyle" not in icons),
+        ["icons.py has no Qt standard icon fallback"],
+    )
+    checks["tool_runner_summary_first"] = CheckResult(
+        tool_runner_py.find('self.tabs.addTab(summary_tab, "Summary")') >= 0
+        and tool_runner_py.find('self.tabs.addTab(summary_tab, "Summary")')
+        < tool_runner_py.find('self.tabs.addTab(technical_tab, "Technical")'),
+        ["ToolRunner tab order starts with Summary"],
+    )
+    checks["playbooks_catalog_layout"] = CheckResult(
+        all(token in playbooks_py for token in ("Catalog Filters", "PlaybookCategoryList", "Playbook Catalog")),
+        ["playbooks catalog scaffold"],
+    )
+    forbidden_hits: list[str] = []
+    for file_path in (
+        REPO_ROOT / "src/ui/components/onboarding.py",
+        REPO_ROOT / "src/ui/pages/playbooks_page.py",
+        REPO_ROOT / "src/ui/pages/reports_page.py",
+        REPO_ROOT / "src/ui/pages/settings_page.py",
+    ):
+        try:
+            tree = ast.parse(_read(file_path))
+        except Exception:
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Constant) or not isinstance(node.value, str):
+                continue
+            text = str(node.value)
+            lower = text.lower().strip()
+            if not lower:
+                continue
+            if "next >" in lower or re.search(r"step\s*\d+\s*>", lower):
+                forbidden_hits.append(f"{file_path.name}:{text[:60]}")
+            elif ("->" in text) and ("[tool]" not in lower):
+                forbidden_hits.append(f"{file_path.name}:{text[:60]}")
+    checks["ascii_arrow_labels_forbidden"] = CheckResult(len(forbidden_hits) == 0, forbidden_hits[:6] or ["none"])
     checks["no_duplicate_open_reports_static"] = CheckResult(len(re.findall(r"Open Reports", main)) <= 4, ["Open Reports static count"])
     checks["no_about_qt"] = CheckResult(("About Qt" not in main) and ("aboutQt" not in main), ["About Qt absent"])
     checks["no_qsplitter_static"] = CheckResult("QSplitter" not in main, ["no QSplitter in main window"])
@@ -333,6 +382,15 @@ def _collect_runtime(checks: dict[str, CheckResult]) -> float:
         checks["single_nav_runtime"] = CheckResult(len(nav_btns) >= max(1, len(w.NAV_ITEMS) - 1), [f"buttons={len(nav_btns)}"])
         checks["required_nav_icon_runtime"] = CheckResult(mapping.get("Settings") == "gear" and mapping.get("Fixes") == "wrench" and mapping.get("Playbooks") == "open_book", [str(mapping)])
         checks["top_app_bar_contract"] = CheckResult(w.btn_quick_check.isVisible() and w.btn_export.isVisible() and w.btn_overflow.isVisible(), ["primary app-bar controls visible"])
+        style_qss = app.styleSheet()
+        checks["combo_indicator_runtime_customized"] = CheckResult(
+            "QComboBox::down-arrow" in style_qss,
+            ["QComboBox::down-arrow present in runtime stylesheet"],
+        )
+        checks["tree_expander_runtime_customized"] = CheckResult(
+            "QTreeWidget::branch:closed:has-children" in style_qss and "QTreeView::branch:open:has-children" in style_qss,
+            ["tree branch override present in runtime stylesheet"],
+        )
         checks["details_hidden_default_runtime"] = CheckResult(w.concierge.collapsed, [f"collapsed={w.concierge.collapsed}"])
         checks["details_toggle_visible_runtime"] = CheckResult(w.btn_panel_toggle.isVisible(), ["panel toggle visible"])
         w.btn_panel_toggle.click(); _drain(app, 3)
@@ -410,6 +468,10 @@ def _collect_runtime(checks: dict[str, CheckResult]) -> float:
         checks["home_live_metrics_contract"] = CheckResult(all(hasattr(w, x) for x in ["p_cpu", "p_mem", "p_disk", "home_last"]), ["home metric widgets"])
         checks["home_next_action_contract"] = CheckResult(all(hasattr(w, x) for x in ["home_recommended", "home_changes"]), ["home next action widgets"])
         checks["playbooks_catalog_contract"] = CheckResult(all(hasattr(w, x) for x in ["pb_segment", "tb_filter", "rb_audience"]), ["playbooks catalog widgets"])
+        checks["playbooks_catalog_runtime"] = CheckResult(
+            all(hasattr(w, x) for x in ["pb_category_list", "pb_chip_restart", "pb_chip_time", "tb_all"]),
+            ["category list + filter chips + catalog feed present"],
+        )
         checks["diagnose_contract"] = CheckResult(checks.get("diagnose_contract", CheckResult(False)).passed or hasattr(w, "diag_empty_state"), ["diagnose page contract"])
         checks["reports_flow_contract"] = CheckResult(all(hasattr(w, x) for x in ["rep_steps", "rep_generate", "rep_tree"]), ["reports widgets"])
         checks["history_contract"] = CheckResult(checks.get("history_contract", CheckResult(False)).passed or all(hasattr(w, x) for x in ["hist_query", "hist_scope"]), ["history page contract"])

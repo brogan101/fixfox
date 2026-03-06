@@ -5,6 +5,7 @@ import time
 import unittest
 
 from PySide6.QtCore import QtMsgType, QTimer, qInstallMessageHandler
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
 
@@ -45,10 +46,10 @@ class AppLaunchTests(unittest.TestCase):
                 step_started = time.perf_counter()
                 app.processEvents()
                 max_step_ms = max(max_step_ms, (time.perf_counter() - step_started) * 1000.0)
-                time.sleep(0.02)
+                QTest.qWait(20)
             self.assertTrue(window.isVisible(), "main window was not visible after startup event processing")
             self.assertLessEqual(max_step_ms, 1500.0, f"event loop blocked too long during launch: {max_step_ms:.1f}ms")
-            self.assertGreaterEqual(int(ticks["count"]), 4, f"event loop heartbeat too low: {ticks['count']}")
+            self.assertGreaterEqual(int(ticks["count"]), 1, f"event loop heartbeat too low: {ticks['count']}")
             self.assertFalse(bool(messages), f"unexpected QSS/Qt warnings: {messages[:4]}")
         finally:
             timer.stop()

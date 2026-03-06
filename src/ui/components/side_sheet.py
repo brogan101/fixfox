@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QEasingCurve, QPropertyAnimation, Signal
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QScrollArea, QTextEdit, QToolButton, QVBoxLayout, QWidget
 
 from ..icons import get_icon
+from .motion import animate_opacity
 from ..style import spacing
 
 
@@ -17,8 +18,13 @@ class SideSheet(QFrame):
         self._pinned = False
         self._collapsed = False
         self._preferred_width = 340
-        self.setMinimumWidth(300)
+        self.setMinimumWidth(0)
         self.setMaximumWidth(520)
+        self._collapse_anim = QPropertyAnimation(self, b"maximumWidth", self)
+        self._collapse_anim.setDuration(210)
+        self._collapse_anim.setEasingCurve(QEasingCurve.OutCubic)
+        self._collapse_anim.finished.connect(self._on_anim_finished)
+        self._collapse_target_hidden = False
 
         shell = QVBoxLayout(self)
         shell.setContentsMargins(spacing("sm"), spacing("sm"), spacing("sm"), spacing("sm"))
@@ -82,9 +88,11 @@ class SideSheet(QFrame):
         return self._preferred_width
 
     def set_preferred_width(self, width: int) -> None:
-        target = max(self.minimumWidth(), min(self.maximumWidth(), int(width)))
+        target = max(300, min(self.maximumWidth(), int(width)))
         self._preferred_width = target
-        self.setFixedWidth(target)
+        if not self._collapsed:
+            self.setMinimumWidth(target)
+            self.setMaximumWidth(target)
 
     def clear_widgets(self) -> None:
         while self.content_layout.count():
@@ -106,8 +114,33 @@ class SideSheet(QFrame):
         if self._collapsed == next_state:
             return
         self._collapsed = next_state
-        self.setVisible(not next_state)
+        self._collapse_anim.stop()
+        self._collapse_target_hidden = next_state
+        if next_state:
+            self.setMinimumWidth(0)
+            animate_opacity(self, start=1.0, end=0.0, duration_ms=180)
+            self._collapse_anim.setStartValue(max(1, self.width()))
+            self._collapse_anim.setEndValue(1)
+            self._collapse_anim.start()
+        else:
+            self.setVisible(True)
+            self.setMaximumWidth(1)
+            self.setMinimumWidth(0)
+            animate_opacity(self, start=0.0, end=1.0, duration_ms=190)
+            self._collapse_anim.setStartValue(1)
+            self._collapse_anim.setEndValue(self._preferred_width)
+            self._collapse_anim.start()
         self.collapsed_changed.emit(next_state)
+
+    def _on_anim_finished(self) -> None:
+        if self._collapse_target_hidden:
+            self.setVisible(False)
+            self.setMinimumWidth(0)
+            self.setMaximumWidth(self._preferred_width)
+            return
+        self.setVisible(True)
+        self.setMinimumWidth(self._preferred_width)
+        self.setMaximumWidth(self._preferred_width)
 
     def set_pinned(self, pinned: bool) -> None:
         self.pin_btn.setChecked(bool(pinned))

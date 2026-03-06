@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QComboBox, QDialog, QGridLayout, QHBoxLayout, QLab
 from ...core.brand import APP_DISPLAY_NAME
 from ...core.utils import resource_path
 from ..icons import get_icon
+from .stepper import StepIndicator
 from ..style import spacing
 from ..widgets import Card, PrimaryButton, SoftButton
 
@@ -40,11 +41,7 @@ class OnboardingFlow(QDialog):
         root.setSpacing(spacing("md"))
 
         header = Card("Welcome", "Set essentials in under a minute.", object_name="OnboardingCard")
-        self.step_indicator = QLabel()
-        self.step_indicator.setObjectName("SubTitle")
-        self.stepper = QLabel()
-        self.stepper.setObjectName("SubTitle")
-        header.body_layout().addWidget(self.step_indicator)
+        self.stepper = StepIndicator(self._STEP_TITLES, self)
         header.body_layout().addWidget(self.stepper)
         root.addWidget(header, 0)
 
@@ -68,6 +65,8 @@ class OnboardingFlow(QDialog):
         self.next_btn = SoftButton("Next")
         self.skip_btn = SoftButton("Skip")
         self.finish_btn = PrimaryButton("Finish")
+        self.back_btn.setIcon(get_icon("back", self.back_btn))
+        self.next_btn.setIcon(get_icon("next", self.next_btn))
         controls.addWidget(self.back_btn, 0)
         controls.addWidget(self.next_btn, 0)
         controls.addStretch(1)
@@ -221,11 +220,7 @@ class OnboardingFlow(QDialog):
         self.back_btn.setEnabled(index > 0)
         self.next_btn.setEnabled(index < 3)
         self.finish_btn.setEnabled(index == 3)
-        self.step_indicator.setText(f"Step {index + 1} of 4")
-        labels = []
-        for idx, title in enumerate(self._STEP_TITLES, start=1):
-            labels.append(f"[{title}]" if idx - 1 == index else title)
-        self.stepper.setText(" -> ".join(labels))
+        self.stepper.set_current_step(index)
 
     def _apply_live_preferences(self) -> None:
         if self.apply_preferences is None:

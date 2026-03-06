@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from ..theme import SPACING_SCALE, resolve_density_tokens, spacing_multiplier
+from ..theme import resolve_density_tokens, spacing_multiplier
+from .tokens2 import SPACING_SCALE_V2
 
 
 def spacing(key: str) -> int:
-    base = int(SPACING_SCALE.get(key, SPACING_SCALE["sm"]))
+    base = int(SPACING_SCALE_V2.get(key, SPACING_SCALE_V2["sm"]))
     return max(2, int(round(base * spacing_multiplier())))
 
 
