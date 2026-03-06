@@ -531,3 +531,12 @@ src/ui/style/qss_builder.py         |  45 +++---
 - Scope: verifier + tests + UI shell/search/nav icon mapping + play contract metadata.
 - Files touched: src/ui/main_window_impl.py, src/ui/icons.py, src/core/search.py, src/core/script_tasks.py, src/ui/components/tool_runner.py, src/ui/pages/playbooks_page.py, src/core/route_registry.py, src/core/play_registry.py, src/core/evidence_model.py, src/ui/components/guided_wizard.py, scripts/verify_requirements.py, src/tests/test_requirements_gate.py, src/tests/test_unit.py, docs/REQUIREMENTS.json, docs/play_capability_matrix.md, docs/release_checklist.md.
 - Gates: python scripts/verify_requirements.py PASS; smoke PASS; unit PASS; requirements gate PASS.
+
+## 2026-03-06 09:07:20 - Launch Recovery Pass
+- Starting commit: da612b8f1434b1081ad0a305b02841a3da6aed30
+- Goals:
+  - Reproduce and fix "app won't open" startup hang behavior.
+  - Add startup watchdog + Qt message handler with stall diagnostics.
+  - Remove startup UI-thread blocking and confirm first paint < 5s.
+  - Eliminate runtime QSS parse warnings and enforce with tests/gates.
+  - Add launch regression test and rerun smoke/unit/walkthrough gates.

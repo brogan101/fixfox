@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 from PySide6.QtCore import QtMsgType, qInstallMessageHandler
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QComboBox, QWidget
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 REPORT_PATH = REPO_ROOT / "docs" / "qss_sanity_report.txt"
@@ -65,6 +65,14 @@ def run_qss_sanity(*, report_path: Path = REPORT_PATH, verbose: bool = True) -> 
         if not str(qss).strip():
             failures.append("QSS builder returned empty stylesheet.")
         app.setStyleSheet(qss)
+        probe = QWidget()
+        combo = QComboBox(probe)
+        combo.addItems(["One", "Two"])
+        probe.show()
+        combo.show()
+        app.processEvents()
+        app.processEvents()
+        probe.close()
         app.processEvents()
         ok = len(failures) == 0
     except Exception as exc:

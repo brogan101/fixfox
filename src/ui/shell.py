@@ -14,8 +14,8 @@ class AppShell(MainWindow):
 
     SHELL_ID = "fixfox_app_shell"
 
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, *, startup_phase_cb=None) -> None:
+        super().__init__(startup_phase_cb=startup_phase_cb)
         self.setObjectName("AppShellWindow")
         self.setProperty("shell_id", self.SHELL_ID)
 

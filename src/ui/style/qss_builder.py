@@ -485,7 +485,7 @@ QComboBox::drop-down {{
   padding-right: 8px;
 }}
 QComboBox::down-arrow {{
-  image: url({combo_arrow_url});
+  image: url("{combo_arrow_url}");
   width: 12px;
   height: 12px;
 }}

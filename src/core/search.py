@@ -40,6 +40,7 @@ class _IndexedRow:
 _STATIC_LOCK = threading.Lock()
 _STATIC_ROWS: list[_IndexedRow] | None = None
 _STATIC_BUILD_COUNT = 0
+_STATIC_WARM_INFLIGHT = False
 
 _DYNAMIC_LOCK = threading.Lock()
 _DYNAMIC_ROWS: list[_IndexedRow] = []
@@ -94,6 +95,26 @@ def _ensure_static_rows() -> list[_IndexedRow]:
             _STATIC_ROWS = _build_static_rows()
             _STATIC_BUILD_COUNT += 1
         return list(_STATIC_ROWS)
+
+
+def _static_warm_worker() -> None:
+    global _STATIC_WARM_INFLIGHT
+    try:
+        _ensure_static_rows()
+    finally:
+        with _STATIC_LOCK:
+            _STATIC_WARM_INFLIGHT = False
+
+
+def warm_static_index_async() -> bool:
+    global _STATIC_WARM_INFLIGHT
+    with _STATIC_LOCK:
+        if _STATIC_ROWS is not None or _STATIC_WARM_INFLIGHT:
+            return False
+        _STATIC_WARM_INFLIGHT = True
+    thread = threading.Thread(target=_static_warm_worker, daemon=True, name="fixfox-search-static-warm")
+    thread.start()
+    return True
 
 
 def _build_dynamic_rows() -> list[_IndexedRow]:
@@ -289,13 +310,13 @@ def get_search_cache_stats() -> dict[str, float]:
 
 
 def reset_search_cache_for_tests() -> None:
-    global _STATIC_ROWS, _STATIC_BUILD_COUNT, _DYNAMIC_ROWS, _DYNAMIC_UPDATED_AT, _DYNAMIC_BUILD_COUNT, _DYNAMIC_REFRESH_INFLIGHT
+    global _STATIC_ROWS, _STATIC_BUILD_COUNT, _STATIC_WARM_INFLIGHT, _DYNAMIC_ROWS, _DYNAMIC_UPDATED_AT, _DYNAMIC_BUILD_COUNT, _DYNAMIC_REFRESH_INFLIGHT
     with _STATIC_LOCK:
         _STATIC_ROWS = None
         _STATIC_BUILD_COUNT = 0
+        _STATIC_WARM_INFLIGHT = False
     with _DYNAMIC_LOCK:
         _DYNAMIC_ROWS = []
         _DYNAMIC_UPDATED_AT = 0.0
         _DYNAMIC_BUILD_COUNT = 0
         _DYNAMIC_REFRESH_INFLIGHT = False
-

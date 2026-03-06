@@ -63,6 +63,7 @@ def _load_runtime_imports():
         from .core.brand_assets import ensure_logo_on_desktop
         from .core.db import initialize_db
         from .core.logging_setup import configure_logging, install_global_exception_handler
+        from .core.startup_watchdog import install_startup_watchdog
         from .core.settings import load_settings
         from .core.utils import resource_path
         from .ui.app_qss import build_qss
@@ -75,6 +76,7 @@ def _load_runtime_imports():
         from src.core.brand_assets import ensure_logo_on_desktop
         from src.core.db import initialize_db
         from src.core.logging_setup import configure_logging, install_global_exception_handler
+        from src.core.startup_watchdog import install_startup_watchdog
         from src.core.settings import load_settings
         from src.core.utils import resource_path
         from src.ui.app_qss import build_qss
@@ -91,6 +93,7 @@ def _load_runtime_imports():
         initialize_db,
         configure_logging,
         install_global_exception_handler,
+        install_startup_watchdog,
         load_settings,
         resource_path,
         build_qss,
@@ -179,6 +182,7 @@ def main():
             initialize_db,
             configure_logging,
             install_global_exception_handler,
+            install_startup_watchdog,
             load_settings,
             resource_path,
             build_qss,
@@ -195,32 +199,45 @@ def main():
 
     logger = configure_logging()
     install_global_exception_handler(logger)
+    startup_watchdog = install_startup_watchdog()
+    startup_watchdog.set_phase("logging_ready")
     logger.info("Starting %s", APP_NAME)
     try:
+        startup_watchdog.set_phase("initialize_db")
         initialize_db()
     except Exception as exc:
         logger.warning("DB initialization warning: %s", exc)
 
     from PySide6.QtCore import QTimer, Qt
 
+    startup_watchdog.set_phase("create_qapplication")
     QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
     app = QApplication(sys.argv)
+    startup_watchdog.start()
     app.setApplicationName(APP_NAME)
+    startup_watchdog.set_phase("load_icons")
     icon_path = resource_path(ICON_ICO)
     app_icon = QIcon(icon_path)
     if app_icon.isNull():
         app_icon = QIcon(resource_path(ICON_PNG))
     app.setWindowIcon(app_icon)
+    startup_watchdog.set_phase("load_font")
     _load_bundled_font(logger, font_asset_candidates)
     try:
+        startup_watchdog.set_phase("ensure_desktop_logo")
         ensure_logo_on_desktop(overwrite=False)
     except Exception as exc:
         logger.warning("Desktop logo setup skipped: %s", exc)
+    startup_watchdog.set_phase("load_settings")
     settings = load_settings()
     set_ui_scale_percent(getattr(settings, "ui_scale_pct", 100))
     tokens = resolve_theme_tokens(settings.theme_palette, settings.theme_mode)
+    startup_watchdog.set_phase("apply_stylesheet")
     app.setStyleSheet(build_qss(tokens, settings.theme_mode, settings.density))
-    w = AppShell()
+    startup_watchdog.set_phase("build_main_window")
+    w = AppShell(startup_phase_cb=startup_watchdog.set_phase)
+    startup_watchdog.attach_window(w)
+    startup_watchdog.set_phase("show_window")
     w.show()
     QTimer.singleShot(0, lambda: _apply_windows11_corner_hint(w))
     if hasattr(signal, "SIGINT"):
@@ -232,11 +249,16 @@ def main():
     if auto_exit_ms > 0:
         QTimer.singleShot(max(200, auto_exit_ms), app.quit)
     try:
-        return app.exec()
+        startup_watchdog.set_phase("enter_event_loop")
+        result = app.exec()
+        startup_watchdog.set_phase("event_loop_exit")
+        return result
     except KeyboardInterrupt:
         logger.info("KeyboardInterrupt received, exiting cleanly.")
         app.quit()
         return 130
+    finally:
+        startup_watchdog.stop()
 
 if __name__ == "__main__":
     raise SystemExit(main())

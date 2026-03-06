@@ -16,7 +16,13 @@ BACKUP_COUNT = 4
 
 
 def _log_file() -> Path:
-    return ensure_dirs()["logs"] / "app.log"
+    return ensure_dirs()["logs"] / "fixfox.log"
+
+
+def _dev_log_file() -> Path:
+    path = Path.cwd() / "logs" / "fixfox.log"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 def _crash_file() -> Path:
@@ -36,7 +42,21 @@ def configure_logging() -> logging.Logger:
     )
     formatter = logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s")
     handler.setFormatter(formatter)
+    dev_path = _dev_log_file()
+    if dev_path != _log_file():
+        dev_handler = RotatingFileHandler(
+            dev_path,
+            maxBytes=MAX_LOG_BYTES,
+            backupCount=BACKUP_COUNT,
+            encoding="utf-8",
+        )
+        dev_handler.setFormatter(formatter)
+        logger.addHandler(dev_handler)
+    stream = logging.StreamHandler(sys.stdout)
+    stream.setFormatter(formatter)
     logger.addHandler(handler)
+    logger.addHandler(stream)
+    logger.propagate = False
     return logger
 
 

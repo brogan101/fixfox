@@ -79,7 +79,7 @@ from ..core.registry import get_visible_capabilities
 from ..core.runbooks import RUNBOOKS, execute_runbook, runbook_map
 from ..core.run_events import RunEventBus, RunEventType, get_run_event_bus
 from ..core.safety import policy_from_settings
-from ..core.search import SearchItem, get_search_cache_stats, query_index, refresh_dynamic_index_async
+from ..core.search import SearchItem, get_search_cache_stats, query_index, refresh_dynamic_index_async, warm_static_index_async
 from ..core.sessions import (
     SessionMeta,
     add_or_update_meta,
@@ -437,8 +437,11 @@ class MainWindow(QMainWindow):
         "Settings": "gear",
     }
 
-    def __init__(self) -> None:
+    def __init__(self, *, startup_phase_cb: Callable[[str], None] | None = None) -> None:
         super().__init__()
+        self._startup_phase_cb = startup_phase_cb
+        self._event_filter_reentrant = False
+        self._mark_startup_phase("mainwindow:init_begin")
         ensure_dirs()
         self.settings_state = load_settings()
         set_ui_scale_percent(getattr(self.settings_state, "ui_scale_pct", 100))
@@ -486,6 +489,7 @@ class MainWindow(QMainWindow):
         self._search_popup.result_activated.connect(self._apply_global_search_result)
         self._persist_concierge_events = True
         self._auto_concierge_collapse = False
+        self._startup_warmup_active = True
         self.layout_overlay: LayoutDebugOverlay | None = None
         self.run_bus_event.connect(self._handle_run_bus_event)
         self._run_status_subscription_id = self.run_event_bus.subscribe_global(
@@ -562,6 +566,7 @@ class MainWindow(QMainWindow):
 
         details_width = int((self.settings_state.splitter_sizes or [0, 0, 340])[2])
         self.app_shell.set_details_width(max(MIN_RIGHT_PANEL_WIDTH, details_width))
+        self._mark_startup_phase("mainwindow:build_nav_pages")
         self._build_nav()
         self._build_pages()
 
@@ -576,28 +581,35 @@ class MainWindow(QMainWindow):
             app.installEventFilter(self)
 
         self._sync_settings_ui()
+        self._mark_startup_phase("mainwindow:restore_layout")
         self._restore_layout_state()
-        self._apply_theme()
+        self._mark_startup_phase("mainwindow:apply_theme_deferred")
+        QTimer.singleShot(0, lambda: self._apply_theme(refresh_data=False))
+        self._mark_startup_phase("mainwindow:apply_button_guardrails")
         apply_button_guardrails(self, self.settings_state.density)
         default_open = False
+        self._mark_startup_phase("mainwindow:set_concierge_initial")
         self._set_concierge_collapsed(not default_open, persist=False)
+        self._mark_startup_phase("mainwindow:responsive_layout_pass")
         self._apply_responsive_concierge()
         self._apply_responsive_header()
         self.layout_overlay = LayoutDebugOverlay(self)
-
-        self._refresh_home_history(); self._refresh_history(); self._refresh_run_center(); self._refresh_fixes(); self._refresh_toolbox(); self._refresh_runbooks(); self._refresh_home_favorites()
-        self._update_status_strip(); self._update_weekly_status(); self._update_context_labels(); self._update_redaction_preview(); self._refresh_evidence_items(); self._update_diagnose_context({}); self._update_concierge()
+        self._mark_startup_phase("mainwindow:schedule_warmup")
+        self._schedule_startup_warmup()
         self._sync_shell_status_bar()
         self._refresh_db_info_label()
         self._sync_ui_mode_controls()
         self._apply_mode_visibility()
         self.settings_state.right_panel_open = False
         self._set_concierge_collapsed(True, persist=False)
+        # Keep startup deterministic: side sheet must remain hidden until user explicitly opens it.
+        QTimer.singleShot(250, lambda: self._set_concierge_collapsed(True, persist=False))
         self._status_tick_timer = QTimer(self)
         self._status_tick_timer.timeout.connect(self._update_run_status_indicator)
         self._status_tick_timer.start(250)
-        self._show_onboarding_if_needed()
+        QTimer.singleShot(0, self._show_onboarding_if_needed)
         self._run_ui_structure_audit_once()
+        self._mark_startup_phase("mainwindow:init_complete")
 
     def resizeEvent(self, event: Any) -> None:
         super().resizeEvent(event)
@@ -645,32 +657,79 @@ class MainWindow(QMainWindow):
         l.addWidget(self.ctx_full)
         return f
 
+    def _mark_startup_phase(self, phase: str) -> None:
+        cb = getattr(self, "_startup_phase_cb", None)
+        if callable(cb):
+            try:
+                cb(str(phase))
+            except Exception:
+                LOGGER.debug("startup_phase_callback_failed phase=%s", phase)
+
+    def _schedule_startup_warmup(self) -> None:
+        # Keep first paint fast: defer expensive data refresh into staged warmup tasks.
+        QTimer.singleShot(0, self._startup_warmup_stage_one)
+
+    def _startup_warmup_stage_one(self) -> None:
+        self._mark_startup_phase("mainwindow:warmup_stage_one")
+        warm_static_index_async()
+        refresh_dynamic_index_async(force=False)
+        self._update_status_strip()
+        self._update_weekly_status()
+        self._update_context_labels()
+        self._update_redaction_preview()
+        self._update_diagnose_context({})
+        self._update_concierge()
+        QTimer.singleShot(0, self._startup_warmup_stage_two)
+
+    def _startup_warmup_stage_two(self) -> None:
+        self._mark_startup_phase("mainwindow:warmup_stage_two")
+        self._refresh_home_history()
+        self._refresh_history()
+        self._refresh_run_center()
+        QTimer.singleShot(0, self._startup_warmup_stage_three)
+
+    def _startup_warmup_stage_three(self) -> None:
+        self._mark_startup_phase("mainwindow:warmup_stage_three")
+        self._refresh_fixes()
+        self._refresh_toolbox()
+        self._refresh_runbooks()
+        self._refresh_home_favorites()
+        self._refresh_evidence_items()
+        self._startup_warmup_active = False
+        self._mark_startup_phase("mainwindow:warmup_complete")
+
     def eventFilter(self, watched: Any, event: Any) -> bool:  # type: ignore[override]
-        if watched is self.top_search and event.type() == QEvent.KeyPress:
-            key = event.key()
-            if key == Qt.Key_Down:
-                self._search_popup.move_selection(1)
-                return True
-            if key == Qt.Key_Up:
-                self._search_popup.move_selection(-1)
-                return True
-            if key in {Qt.Key_Return, Qt.Key_Enter} and self._search_popup.activate_current():
-                return True
-            if key == Qt.Key_Escape:
-                self._search_popup.hide_popup()
-                return True
-        if (
-            self._search_popup.isVisible()
-            and event.type() == QEvent.MouseButtonPress
-            and isinstance(watched, QWidget)
-            and os.environ.get("QT_QPA_PLATFORM", "").strip().lower() != "offscreen"
-        ):
-            in_popup = watched is self._search_popup or self._search_popup.isAncestorOf(watched)
-            in_search = watched is self.top_search or self.top_search.isAncestorOf(watched)
-            in_compact = watched is self.compact_search_btn or self.compact_search_btn.isAncestorOf(watched)
-            if not any((in_popup, in_search, in_compact)):
-                self._search_popup.hide_popup()
-        return super().eventFilter(watched, event)
+        if self._event_filter_reentrant:
+            return super().eventFilter(watched, event)
+        self._event_filter_reentrant = True
+        try:
+            if watched is self.top_search and event.type() == QEvent.KeyPress:
+                key = event.key()
+                if key == Qt.Key_Down:
+                    self._search_popup.move_selection(1)
+                    return True
+                if key == Qt.Key_Up:
+                    self._search_popup.move_selection(-1)
+                    return True
+                if key in {Qt.Key_Return, Qt.Key_Enter} and self._search_popup.activate_current():
+                    return True
+                if key == Qt.Key_Escape:
+                    self._search_popup.hide_popup()
+                    return True
+            if (
+                self._search_popup.isVisible()
+                and event.type() == QEvent.MouseButtonPress
+                and isinstance(watched, QWidget)
+                and os.environ.get("QT_QPA_PLATFORM", "").strip().lower() != "offscreen"
+            ):
+                in_popup = watched is self._search_popup or self._search_popup.isAncestorOf(watched)
+                in_search = watched is self.top_search or self.top_search.isAncestorOf(watched)
+                in_compact = watched is self.compact_search_btn or self.compact_search_btn.isAncestorOf(watched)
+                if not any((in_popup, in_search, in_compact)):
+                    self._search_popup.hide_popup()
+            return super().eventFilter(watched, event)
+        finally:
+            self._event_filter_reentrant = False
 
     def _focus_top_search(self) -> None:
         if hasattr(self, "top_search_stack"):
@@ -1347,7 +1406,7 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             self.toasts.show_toast(f"Clear file index failed: {exc}")
 
-    def _apply_theme(self) -> None:
+    def _apply_theme(self, *, refresh_data: bool = True) -> None:
         started = time.perf_counter()
         palette = normalize_palette(self.settings_state.theme_palette)
         mode = normalize_mode(self.settings_state.theme_mode)
@@ -1362,6 +1421,18 @@ class MainWindow(QMainWindow):
         app = QApplication.instance()
         if app is not None:
             app.setStyleSheet(build_qss(resolve_theme_tokens(palette, mode), mode, density))
+        if refresh_data:
+            self._refresh_theme_icons()
+        else:
+            QTimer.singleShot(0, self._refresh_theme_icons)
+        if refresh_data:
+            self._apply_density(refresh_data=True)
+        else:
+            QTimer.singleShot(0, lambda: self._apply_density(refresh_data=False))
+        self._sync_panel_toggle_icon()
+        LOGGER.debug("theme_apply_ms=%.2f palette=%s mode=%s density=%s scale=%s", (time.perf_counter() - started) * 1000.0, palette, mode, density, scale_pct)
+
+    def _refresh_theme_icons(self) -> None:
         clear_icon_cache()
         if hasattr(self.app_shell, "toolbar") and hasattr(self.app_shell.toolbar, "refresh_icons"):
             self.app_shell.toolbar.refresh_icons()
@@ -1369,9 +1440,6 @@ class MainWindow(QMainWindow):
             self.side_sheet.refresh_icons()
         if hasattr(self, "nav_shell") and hasattr(self.nav_shell, "refresh_icons"):
             self.nav_shell.refresh_icons()
-        self._apply_density()
-        self._sync_panel_toggle_icon()
-        LOGGER.debug("theme_apply_ms=%.2f palette=%s mode=%s density=%s scale=%s", (time.perf_counter() - started) * 1000.0, palette, mode, density, scale_pct)
 
     def _on_ui_scale_value_changed(self, value: int) -> None:
         pct = clamp_ui_scale(value)
@@ -1396,8 +1464,9 @@ class MainWindow(QMainWindow):
         save_settings(self.settings_state)
         self.toasts.show_toast(f"UI scale set to {self.settings_state.ui_scale_pct}%.")
 
-    def _apply_density(self) -> None:
+    def _apply_density(self, *, refresh_data: bool = True) -> None:
         started = time.perf_counter()
+        self._mark_startup_phase("mainwindow:apply_density_start")
         density = self.settings_state.density
         current_nav = self.nav.currentRow()
         for widget in self.findChildren(QWidget):
@@ -1415,7 +1484,9 @@ class MainWindow(QMainWindow):
         if current_nav >= 0:
             self.nav.setCurrentRow(min(current_nav, len(self.NAV_ITEMS) - 1))
         self._apply_mode_visibility()
-        self._refresh_home_history(); self._refresh_history(); self._refresh_run_center(); self._refresh_fixes(); self._refresh_toolbox(); self._refresh_runbooks(); self._refresh_home_favorites(); self._rebuild_diagnose_sections(self.current_session.get("findings", []))
+        if refresh_data:
+            self._refresh_home_history(); self._refresh_history(); self._refresh_run_center(); self._refresh_fixes(); self._refresh_toolbox(); self._refresh_runbooks(); self._refresh_home_favorites(); self._rebuild_diagnose_sections(self.current_session.get("findings", []))
+        self._mark_startup_phase("mainwindow:apply_density_done")
         LOGGER.debug("density_apply_ms=%.2f density=%s", (time.perf_counter() - started) * 1000.0, density)
 
     def _open_help_menu(self) -> None:
@@ -3149,7 +3220,7 @@ class MainWindow(QMainWindow):
 
     def _make_runbook_row(self, item: FeedItemAdapter, density: str) -> QWidget:
         row = ToolRow(item.title, item.category or "runbook", item.subtitle, payload=item.payload, density=density)
-        row.open_clicked.connect(lambda payload: self._set_runbook_selection(str(payload)))
+        row.open_clicked.connect(lambda payload: self._set_runbook_selection(str(payload), open_details=True))
         return row
 
     def _make_run_center_row(self, item: FeedItemAdapter, density: str) -> QWidget:
@@ -3673,11 +3744,11 @@ class MainWindow(QMainWindow):
         if (not self.rb_selected_id) and adapters and not guided_basic:
             self.rb_selected_id = adapters[0].key
         if self.rb_selected_id and not guided_basic:
-            self._set_runbook_selection(self.rb_selected_id)
+            self._set_runbook_selection(self.rb_selected_id, open_details=not self._startup_warmup_active)
         if guided_basic and adapters:
             self.rb_selected_id = ""
 
-    def _set_runbook_selection(self, rid: str) -> None:
+    def _set_runbook_selection(self, rid: str, *, open_details: bool = False) -> None:
         if not rid:
             return
         self.rb_selected_id = rid
@@ -3690,7 +3761,8 @@ class MainWindow(QMainWindow):
                 )
             if hasattr(self, "rb_steps"):
                 self.rb_steps.set_text("\n".join([f"{step.title} ({step.task_id})" for step in selected.steps]))
-        self._set_concierge_collapsed(False, persist=True)
+        if open_details:
+            self._set_concierge_collapsed(False, persist=True)
         self._update_concierge()
 
     def _launch_tool_payload(self, tid: str) -> None:
@@ -4307,7 +4379,7 @@ class MainWindow(QMainWindow):
         for i in range(lw.count()):
             it = lw.item(i)
             if str(it.data(Qt.UserRole)) == rid:
-                lw.setCurrentItem(it); lw.scrollToItem(it); self._set_runbook_selection(rid); break
+                lw.setCurrentItem(it); lw.scrollToItem(it); self._set_runbook_selection(rid, open_details=True); break
 
     def _select_script_task(self, task_id: str) -> None:
         if hasattr(self, "pb_segment"):
@@ -4418,10 +4490,10 @@ class MainWindow(QMainWindow):
         if rb is None:
             return
         actions = [
-            ContextAction("Preview", lambda: self._set_runbook_selection(rid)),
-            ContextAction("Run dry-run", lambda: (self._set_runbook_selection(rid), self.run_selected_runbook(True))),
-            ContextAction("Run", lambda: (self._set_runbook_selection(rid), self.run_selected_runbook(False))),
-            ContextAction("Run with Tool Runner", lambda: (self._set_runbook_selection(rid), self.run_selected_runbook(False))),
+            ContextAction("Preview", lambda: self._set_runbook_selection(rid, open_details=True)),
+            ContextAction("Run dry-run", lambda: (self._set_runbook_selection(rid, open_details=True), self.run_selected_runbook(True))),
+            ContextAction("Run", lambda: (self._set_runbook_selection(rid, open_details=True), self.run_selected_runbook(False))),
+            ContextAction("Run with Tool Runner", lambda: (self._set_runbook_selection(rid, open_details=True), self.run_selected_runbook(False))),
             ContextAction("Export-only", lambda: self._runbook_export_only(rid)),
             ContextAction("Copy what it does", lambda: self._copy_runbook_summary(rid)),
         ]
@@ -4433,7 +4505,7 @@ class MainWindow(QMainWindow):
         show_context_menu(self, lw, pos, actions)
 
     def _runbook_export_only(self, rid: str) -> None:
-        self._set_runbook_selection(rid)
+        self._set_runbook_selection(rid, open_details=True)
         if not self.current_session:
             self.toasts.show_toast("No active session to export.")
             return
@@ -4586,7 +4658,7 @@ class MainWindow(QMainWindow):
             if f"runbook.{key}" not in visible:
                 self.toasts.show_toast("This runbook is available in Pro mode.")
                 return
-            self._set_runbook_selection(key)
+            self._set_runbook_selection(key, open_details=True)
             self.run_selected_runbook(True)
 
     def _update_weekly_status(self) -> None:
