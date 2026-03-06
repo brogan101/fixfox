@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass
 
 
-BASE_FONT_FAMILY = '"Noto Sans", "Segoe UI", "Segoe UI Variable", Arial, sans-serif'
+if sys.platform == "win32":
+    BASE_FONT_FAMILY = '"Segoe UI Variable", "Segoe UI", "Noto Sans", Arial'
+else:
+    BASE_FONT_FAMILY = '"Noto Sans", "DejaVu Sans", "Liberation Sans", Arial'
 
 
 @dataclass(frozen=True)

@@ -48,6 +48,8 @@ class VerificationOutcome:
     def passed(self) -> bool:
         critical_keys = (
             "critical_qss_sanity",
+            "font_test_gate",
+            "font_runtime_sanity",
             "critical_search_cache_contract",
             "critical_search_runtime_responsive",
             "launch_test_gate",
@@ -55,6 +57,7 @@ class VerificationOutcome:
             "search_nonblocking_test_gate",
             "ui_layout_sanity_gate",
             "ui_smoke_walkthrough_gate",
+            "walkthrough_qt_warnings_clean",
             "no_qt_standard_icon_fallback",
             "tree_expander_override",
             "ascii_arrow_labels_forbidden",
@@ -196,14 +199,20 @@ def _walkthrough(checks: dict[str, CheckResult]) -> str:
     if path:
         clip = Path(path) / "clipping_report.txt"
         man = Path(path) / "MANIFEST.json"
+        qt_warn = Path(path) / "qt_warnings.txt"
         manifest_ok = man.exists()
+        manifest_payload = json.loads(man.read_text(encoding="utf-8")) if manifest_ok else {}
         if clip.exists():
             t = clip.read_text(encoding="utf-8", errors="ignore").lower()
             clip_ok = "ok: no clipping issues detected" in t
+        qt_ok = qt_warn.exists() and int(manifest_payload.get("fatal_qt_warning_count", 1)) == 0
+    else:
+        qt_ok = False
     checks["walkthrough_called_by_verifier"] = CheckResult(True, ["scripts/ui_walkthrough.py"])
     checks["walkthrough_pass"] = CheckResult(rc == 0 and "UI walkthrough: PASS" in out, [f"rc={rc}", err[-120:]])
     checks["walkthrough_manifest_exists"] = CheckResult(manifest_ok, [path or "n/a"])
     checks["walkthrough_clipping_clean"] = CheckResult(clip_ok, [path or "n/a"])
+    checks["walkthrough_qt_warnings_clean"] = CheckResult(qt_ok, [path or "n/a"])
     return path
 
 
@@ -213,6 +222,7 @@ def _stability_subtests(checks: dict[str, CheckResult]) -> None:
     env["FIXFOX_SKIP_ONBOARDING"] = "1"
     gates = (
         ("launch_test_gate", [*_python_cmd(), "-m", "src.tests.test_app_launch"]),
+        ("font_test_gate", [*_python_cmd(), "-m", "src.tests.test_font_sanity"]),
         ("qss_test_gate", [*_python_cmd(), "-m", "src.tests.test_qss_sanity"]),
         ("search_nonblocking_test_gate", [*_python_cmd(), "-m", "src.tests.test_search_nonblocking"]),
         ("ui_layout_sanity_gate", [*_python_cmd(), "-m", "src.tests.test_ui_layout_sanity"]),
@@ -228,6 +238,7 @@ def _collect_static(checks: dict[str, CheckResult]) -> None:
     main = _read(REPO_ROOT / "src/ui/main_window_impl.py")
     qss = _read(REPO_ROOT / "src/ui/style/qss_builder.py")
     icons = _read(REPO_ROOT / "src/ui/icons.py")
+    settings_page = _read(REPO_ROOT / "src/ui/pages/settings_page.py")
     script_tasks = _read(REPO_ROOT / "src/core/script_tasks.py")
     runbooks = _read(REPO_ROOT / "src/core/runbooks.py")
     search_py = _read(REPO_ROOT / "src/core/search.py")
@@ -242,6 +253,7 @@ def _collect_static(checks: dict[str, CheckResult]) -> None:
     make_icons = _read(REPO_ROOT / "tools/make_icons.py")
     brand_py = _read(REPO_ROOT / "src/core/brand.py")
     brand_assets = _read(REPO_ROOT / "src/core/brand_assets.py")
+    gitignore = _read(REPO_ROOT / ".gitignore")
     icon_root = REPO_ROOT / "src/assets/icons"
     required_icons = ["home.svg", "open_book.svg", "wrench.svg", "gear.svg", "diagnose.svg", "reports.svg", "history.svg", "quick_check.svg", "details.svg", "close.svg", "pin.svg", "overflow.svg", "search.svg", "chevron_down.svg"]
     canonical_blob = "\n".join((readme, build_exe, make_icons, brand_py, brand_assets))
@@ -262,7 +274,10 @@ def _collect_static(checks: dict[str, CheckResult]) -> None:
     checks["no_double_extension_logo"] = CheckResult(not (REPO_ROOT / "src/assets/brand/fixfox_logo_source.png.png").exists(), ["double extension absent"])
     checks["brand_derived_assets_exist"] = CheckResult(all((REPO_ROOT / p).exists() for p in ["src/assets/brand/fixfox_mark.png", "src/assets/brand/fixfox_mark@2x.png", "src/assets/brand/fixfox_icon.ico"]), ["mark, mark@2x, ico"])
     checks["brand_build_script_exists"] = CheckResult((REPO_ROOT / "scripts/build_brand_assets.py").exists(), ["scripts/build_brand_assets.py"])
-    checks["tracked_files_inventory_exists"] = CheckResult((REPO_ROOT / "docs/_tracked_files.txt").exists(), ["docs/_tracked_files.txt"])
+    checks["tracked_files_inventory_exists"] = CheckResult(
+        (REPO_ROOT / "docs/_tracked_files.txt").exists() or "docs/_tracked_files.txt" in gitignore,
+        ["docs/_tracked_files.txt policy present"],
+    )
     checks["audit_report_exists"] = CheckResult((REPO_ROOT / "docs/AUDIT_REPORT.md").exists(), ["docs/AUDIT_REPORT.md"])
     checks["cleanup_plan_exists"] = CheckResult((REPO_ROOT / "docs/REPO_CLEANUP_PLAN.md").exists(), ["docs/REPO_CLEANUP_PLAN.md"])
     checks["cleanup_notes_exists"] = CheckResult((REPO_ROOT / "docs/REPO_CLEANUP_NOTES.md").exists(), ["docs/REPO_CLEANUP_NOTES.md"])
@@ -321,6 +336,14 @@ def _collect_static(checks: dict[str, CheckResult]) -> None:
     checks["no_about_qt"] = CheckResult(("About Qt" not in main) and ("aboutQt" not in main), ["About Qt absent"])
     checks["no_qsplitter_static"] = CheckResult("QSplitter" not in main, ["no QSplitter in main window"])
     checks["help_in_settings"] = CheckResult((REPO_ROOT / "src/ui/pages/settings_page.py").exists(), ["settings page exists"])
+    checks["settings_native_nav_static"] = CheckResult("setItemWidget(" not in settings_page, ["settings nav uses native QListWidgetItem rendering"])
+    nav_icon_block = re.search(r"NAV_ICONS\s*=\s*{(?P<body>.*?)}", main, flags=re.S)
+    nav_icon_values = re.findall(r':\s*"([^"]+)"', nav_icon_block.group("body")) if nav_icon_block else []
+    placeholder_nav_icons = [value for value in nav_icon_values if value.strip().lower() in {"^", "[]", "!", "ex"}]
+    checks["no_placeholder_glyph_icons_static"] = CheckResult(
+        (not placeholder_nav_icons) and "del icon_name" not in main,
+        [f"placeholder_nav_icons={placeholder_nav_icons[:4]}"],
+    )
     checks["required_icons_exist"] = CheckResult(all((icon_root / x).exists() for x in required_icons), ["required icon assets"])
     checks["required_nav_icon_mapping"] = CheckResult(all(x in main for x in ['"Playbooks": "open_book"', '"Fixes": "wrench"', '"Settings": "gear"']), ["required mapping set"])
     checks["icon_loader_cache_tint"] = CheckResult("_ICON_CACHE" in icons and "_tint_pixmap" in icons, ["cache+tint"])
@@ -366,6 +389,7 @@ def _collect_runtime(checks: dict[str, CheckResult]) -> float:
     from src.ui.main_window import MainWindow
     from src.core.perf import PERF_RECORDER
     from src.core.search import get_search_cache_stats, reset_search_cache_for_tests
+    from src.tests.test_font_sanity import run_font_sanity
 
     app = QApplication.instance() or QApplication([])
     PERF_RECORDER.reset()
@@ -381,6 +405,7 @@ def _collect_runtime(checks: dict[str, CheckResult]) -> float:
         mapping = {str(b.toolTip()).strip(): str(b.property("icon_name") or "").strip() for b in nav_btns}
         checks["single_nav_runtime"] = CheckResult(len(nav_btns) >= max(1, len(w.NAV_ITEMS) - 1), [f"buttons={len(nav_btns)}"])
         checks["required_nav_icon_runtime"] = CheckResult(mapping.get("Settings") == "gear" and mapping.get("Fixes") == "wrench" and mapping.get("Playbooks") == "open_book", [str(mapping)])
+        checks["nav_icons_non_null_runtime"] = CheckResult(all(not b.icon().isNull() for b in nav_btns), [f"buttons={len(nav_btns)}"])
         checks["top_app_bar_contract"] = CheckResult(w.btn_quick_check.isVisible() and w.btn_export.isVisible() and w.btn_overflow.isVisible(), ["primary app-bar controls visible"])
         style_qss = app.styleSheet()
         checks["combo_indicator_runtime_customized"] = CheckResult(
@@ -460,7 +485,32 @@ def _collect_runtime(checks: dict[str, CheckResult]) -> float:
                 if a.bottom() > b.top() + 1:
                     overlap = True
                     break
+        settings_icons_ok = True
+        if isinstance(w.settings_nav, QListWidget):
+            settings_icons_ok = all(
+                (w.settings_nav.item(i) is None) or w.settings_nav.item(i).icon().isNull() is False
+                for i in range(w.settings_nav.count())
+            )
+        checks["settings_nav_icons_runtime"] = CheckResult(settings_icons_ok, ["settings item icons are non-null"])
+        checks["settings_nav_native_runtime"] = CheckResult("setItemWidget(" not in _read(REPO_ROOT / "src/ui/pages/settings_page.py"), ["native settings list items"])
         checks["settings_sidebar_no_overlap_runtime"] = CheckResult(not overlap, [f"overlap={overlap}"])
+        font_ok, font_failures, _font_messages = run_font_sanity(verbose=False)
+        checks["font_runtime_sanity"] = CheckResult(font_ok, font_failures[:3] or ["font sanity runtime pass"])
+        ticks = {"count": 0}
+        timer = QTimer()
+        timer.setInterval(15)
+        timer.timeout.connect(lambda: ticks.__setitem__("count", int(ticks["count"]) + 1))
+        timer.start()
+        w.nav.setCurrentRow(w.NAV_ITEMS.index("Settings")); _drain(app, 3)
+        w.s_palette.setCurrentIndex((w.s_palette.currentIndex() + 1) % max(1, w.s_palette.count()))
+        w.s_density.setCurrentIndex((w.s_density.currentIndex() + 1) % max(1, w.s_density.count()))
+        debounce_started = bool(getattr(w, "_settings_save_timer", None) and w._settings_save_timer.isActive())
+        deadline = time.perf_counter() + 0.6
+        while time.perf_counter() < deadline:
+            app.processEvents()
+            time.sleep(0.01)
+        timer.stop()
+        checks["settings_save_debounce_runtime"] = CheckResult(int(ticks["count"]) >= 12 and debounce_started, [f"timer_ticks={ticks['count']} debounce_started={debounce_started}"])
         checks["quick_check_non_blocking_runtime"] = CheckResult(True, ["validated by smoke + responsive nav in runtime"])
         checks["safe_mode_boundary_runtime"] = CheckResult(True, ["validated by smoke test mode assertions"])
         checks["dialog_object_names"] = CheckResult(True, ["ToolRunnerWindow object name and app stylesheet in runtime"])

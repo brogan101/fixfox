@@ -214,6 +214,7 @@ QListWidget#SettingsNav {{
 QListWidget#SettingsNav::item {{
   height: {max(d.nav_item_height + 2, d.input_height + 10)}px;
   border-radius: {d.corner_radius}px;
+  padding: 0 12px;
 }}
 QListWidget#SettingsNav::item:selected {{
   background: {accent_tint};

@@ -593,3 +593,36 @@ src/ui/style/qss_builder.py         |  45 +++---
   - src/tests/test_qss_sanity.py
   - src/tests/test_ui_layout_sanity.py
   - docs/DESIGN_TOKENS.md
+
+## 2026-03-06 12:13:00 -05:00 - Stabilization + Regression Repair Pass
+- Starting commit: f778ad3e57303cc77d5aa3f6fb134ed4efd0835e
+- Proof harness:
+  - `git fetch --all`
+  - `git status --porcelain`
+  - `git status`
+  - `git rev-parse HEAD`
+  - `python --version` failed because the Windows Store shim on PATH is broken.
+  - `pip --version` failed because `pip` is not on PATH.
+  - Resolved interpreter used for execution: `C:\Users\btheobald\AppData\Local\Python\pythoncore-3.14-64\python.exe`
+- Goals:
+  - rebuild the settings sidebar with native items and stop overlap at 1024x768
+  - replace timer-polled status updates with event-driven updates and running-only animation
+  - debounce resize-driven layout mutation and harden font/bootstrap behavior
+  - fail walkthrough/verifier/tests on font/QSS/Qt warning regressions
+  - remove generated screenshots/log artifacts from git and keep future runs ignored
+- Files touched:
+  - `.gitignore`
+  - `docs/CODEX_RUN_LOG.md`
+  - `docs/REPO_CLEANUP_NOTES.md`
+  - `docs/STABILIZATION_REPAIR_REPORT.md`
+  - `scripts/qss_sanity_check.py`
+  - `scripts/ui_walkthrough.py`
+  - `scripts/verify_requirements.py`
+  - `src/app.py`
+  - `src/core/qt_runtime.py`
+  - `src/tests/test_font_sanity.py`
+  - `src/ui/components/motion.py`
+  - `src/ui/main_window_impl.py`
+  - `src/ui/pages/settings_page.py`
+  - `src/ui/style/qss_builder.py`
+  - `src/ui/style/tokens.py`

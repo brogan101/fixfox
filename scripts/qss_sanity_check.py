@@ -51,7 +51,7 @@ def run_qss_sanity(*, report_path: Path = REPORT_PATH, verbose: bool = True) -> 
     prev = qInstallMessageHandler(_handler)
     ok = False
     try:
-        from src.core.qt_runtime import ensure_qt_runtime_env, is_fatal_qt_warning
+        from src.core.qt_runtime import ensure_qt_runtime_env, is_fatal_qt_warning, is_font_warning
         from src.core.settings import load_settings
         from src.ui.app_qss import build_qss
         from src.ui.theme import resolve_theme_tokens
@@ -77,7 +77,7 @@ def run_qss_sanity(*, report_path: Path = REPORT_PATH, verbose: bool = True) -> 
             msg = line.split("] ", 1)[1] if "] " in line else line
             if _is_whitelisted_unknown_property(msg):
                 continue
-            if is_fatal_qt_warning(msg):
+            if is_fatal_qt_warning(msg) or is_font_warning(msg):
                 failures.append(line)
         failures = list(dict.fromkeys(failures))
         ok = len(failures) == 0

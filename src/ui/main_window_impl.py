@@ -467,9 +467,11 @@ class MainWindow(QMainWindow):
         self._status_spinner_frames = ("|", "/", "-", "\\")
         self._status_spinner_index = 0
         self._last_run_status = "Ready"
+        self._last_run_name = ""
         self._last_run_line = "Ready."
         self._last_run_log_line = ""
         self._run_status_detail_raw = "No active run."
+        self._run_status_chip_kind = ""
         self.selected_finding: dict[str, Any] = {}
         self.selected_fix_key = ""
         self.selected_tool_id = ""
@@ -488,6 +490,19 @@ class MainWindow(QMainWindow):
         self._scale_apply_timer.setInterval(80)
         self._scale_apply_timer.timeout.connect(self._apply_pending_ui_scale)
         self._pending_ui_scale_pct = int(getattr(self.settings_state, "ui_scale_pct", 100))
+        self._settings_save_timer = QTimer(self)
+        self._settings_save_timer.setSingleShot(True)
+        self._settings_save_timer.setInterval(200)
+        self._settings_save_timer.timeout.connect(self._flush_settings_changes)
+        self._pending_settings_refresh_flags: set[str] = set()
+        self._status_animation_timer = QTimer(self)
+        self._status_animation_timer.setInterval(333)
+        self._status_animation_timer.timeout.connect(self._advance_status_animation)
+        self._resize_debounce_timer = QTimer(self)
+        self._resize_debounce_timer.setSingleShot(True)
+        self._resize_debounce_timer.setInterval(50)
+        self._resize_debounce_timer.timeout.connect(self._apply_responsive_layout)
+        self._in_responsive_apply = False
         self._search_popup = GlobalSearchPopup(self)
         self._search_popup.result_activated.connect(self._apply_global_search_result)
         self._search_dispatch_started: dict[int, float] = {}
@@ -614,8 +629,7 @@ class MainWindow(QMainWindow):
         self._mark_startup_phase("mainwindow:set_concierge_initial")
         self._set_concierge_collapsed(not default_open, persist=False)
         self._mark_startup_phase("mainwindow:responsive_layout_pass")
-        self._apply_responsive_concierge()
-        self._apply_responsive_header()
+        self._apply_responsive_layout()
         self.layout_overlay = LayoutDebugOverlay(self)
         self._mark_startup_phase("mainwindow:schedule_warmup")
         self._schedule_startup_warmup()
@@ -627,23 +641,13 @@ class MainWindow(QMainWindow):
         self._set_concierge_collapsed(True, persist=False)
         # Keep startup deterministic: side sheet must remain hidden until user explicitly opens it.
         QTimer.singleShot(250, lambda: self._set_concierge_collapsed(True, persist=False))
-        self._status_tick_timer = QTimer(self)
-        self._status_tick_timer.timeout.connect(self._update_run_status_indicator)
-        self._status_tick_timer.start(250)
         QTimer.singleShot(0, self._show_onboarding_if_needed)
         self._run_ui_structure_audit_once()
         self._mark_startup_phase("mainwindow:init_complete")
 
     def resizeEvent(self, event: Any) -> None:
         super().resizeEvent(event)
-        self._apply_responsive_concierge()
-        self._apply_responsive_header()
-        self._search_popup.sync_anchor()
-        self._clamp_concierge_card_widths()
-        if hasattr(self, "run_status_title") and hasattr(self, "run_status_detail"):
-            self._set_run_status(self.run_status_title.text(), self._run_status_detail_raw)
-        if self.layout_overlay is not None and self.layout_overlay.isVisible():
-            self.layout_overlay.sync_geometry()
+        self._resize_debounce_timer.start()
 
     def _build_nav(self) -> None:
         nav_height = resolve_density_tokens(self.settings_state.density).nav_item_height
@@ -1130,6 +1134,73 @@ class MainWindow(QMainWindow):
             return "0s"
         return f"{int(max(0.0, time.monotonic() - self.active_run_started))}s"
 
+    def _icon_for_settings_section(self, icon_name: str) -> QIcon:
+        if not hasattr(self, "settings_nav"):
+            return QIcon()
+        return get_icon(icon_name, self.settings_nav, size=18)
+
+    def _apply_responsive_layout(self) -> None:
+        if self._in_responsive_apply:
+            return
+        self._in_responsive_apply = True
+        try:
+            self._apply_responsive_concierge()
+            self._apply_responsive_header()
+            self._search_popup.sync_anchor()
+            self._clamp_concierge_card_widths()
+            self._refresh_run_status_ui()
+            if self.layout_overlay is not None and self.layout_overlay.isVisible():
+                self.layout_overlay.sync_geometry()
+        finally:
+            self._in_responsive_apply = False
+
+    def _run_status_visual_state(self) -> tuple[str, str]:
+        status = str(self._last_run_status or "").strip().lower()
+        if self.active_worker is not None:
+            return ("info", "Running")
+        if "fail" in status or "error" in status:
+            return ("crit", "Error")
+        if "warn" in status or "partial" in status or "cancel" in status:
+            return ("warn", "Needs attention")
+        return ("ok", "Idle")
+
+    def _refresh_run_status_ui(self) -> None:
+        if not hasattr(self, "run_status_title"):
+            return
+        if self.active_worker is not None:
+            title = self.active_run_name or "Task in progress"
+            line = self._last_run_log_line[:120].strip() or self._last_run_line[:120].strip() or "Working..."
+            spinner = self._status_spinner_frames[self._status_spinner_index]
+            detail = f"{spinner} {line} | {self._status_elapsed_text()}"
+        else:
+            status = str(self._last_run_status or "").strip().lower()
+            if "fail" in status or "error" in status:
+                title = "Last run failed"
+            elif "cancel" in status or "partial" in status:
+                title = "Needs attention"
+            elif "success" in status or "ready" in status:
+                title = "Ready"
+            else:
+                title = "Idle"
+            detail_line = self._last_run_line[:120].strip() or "No active task."
+            if self._last_run_name:
+                detail = f"{self._last_run_name}: {detail_line}"
+            else:
+                detail = detail_line
+        self._set_run_status(title, detail)
+        if self.active_worker is not None and "quick check" in str(self.active_run_name or "").strip().lower():
+            self._set_quick_check_busy(True, spinner=self._status_spinner_frames[self._status_spinner_index])
+        else:
+            self._set_quick_check_busy(False)
+
+    def _advance_status_animation(self) -> None:
+        if self.active_worker is None:
+            if self._status_animation_timer.isActive():
+                self._status_animation_timer.stop()
+            return
+        self._status_spinner_index = (self._status_spinner_index + 1) % len(self._status_spinner_frames)
+        self._refresh_run_status_ui()
+
     def _set_run_status(self, title: str, detail: str) -> None:
         self._run_status_detail_raw = str(detail or "").strip()
         if hasattr(self, "run_status_title"):
@@ -1140,25 +1211,14 @@ class MainWindow(QMainWindow):
             max_width = max(120, self.run_status_detail.width() - 8)
             self.run_status_detail.setText(metrics.elidedText(clean, Qt.ElideRight, max_width))
         if hasattr(self, "run_status_chip"):
-            status = str(title or "").strip().lower()
-            kind = "info"
-            chip_text = "Idle"
-            if "fail" in status or "error" in status:
-                kind = "crit"
-                chip_text = "Error"
-            elif "warn" in status or "partial" in status:
-                kind = "warn"
-                chip_text = "Needs attention"
-            elif "run" in status:
-                kind = "info"
-                chip_text = "Running"
-            elif "success" in status or "ready" in status or "done" in status or "idle" in status:
-                kind = "ok"
-                chip_text = "Idle"
-            self.run_status_chip.setText(chip_text)
-            self.run_status_chip.setProperty("kind", kind)
-            self.run_status_chip.style().unpolish(self.run_status_chip)
-            self.run_status_chip.style().polish(self.run_status_chip)
+            kind, chip_text = self._run_status_visual_state()
+            if self.run_status_chip.text() != chip_text:
+                self.run_status_chip.setText(chip_text)
+            if kind != self._run_status_chip_kind:
+                self._run_status_chip_kind = kind
+                self.run_status_chip.setProperty("kind", kind)
+                self.run_status_chip.style().unpolish(self.run_status_chip)
+                self.run_status_chip.style().polish(self.run_status_chip)
 
     def _set_quick_check_busy(self, busy: bool, spinner: str = "") -> None:
         if not hasattr(self, "btn_quick_check"):
@@ -1174,39 +1234,7 @@ class MainWindow(QMainWindow):
         self.btn_quick_check.style().polish(self.btn_quick_check)
 
     def _update_run_status_indicator(self) -> None:
-        if self.active_worker is None:
-            self._set_quick_check_busy(False)
-            detail = self._last_run_line[:120].strip()
-            last = str(self._last_run_status or "").strip().lower()
-            if "fail" in last or "error" in last:
-                title = "Error"
-            elif "partial" in last or "cancel" in last:
-                title = "Needs attention"
-            else:
-                title = "Idle"
-            if detail:
-                self._set_run_status(title, f"{self._last_run_status}: {detail}")
-            else:
-                self._set_run_status(title, self._last_run_status)
-            return
-        self._status_spinner_index = (self._status_spinner_index + 1) % len(self._status_spinner_frames)
-        spinner = self._status_spinner_frames[self._status_spinner_index]
-        elapsed = self._status_elapsed_text()
-        title = f"Running: {self.active_run_name or 'Task'}"
-        line = self._last_run_log_line[:120].strip() or self._last_run_line[:120].strip()
-        if not line and self.active_run_id:
-            try:
-                run_row = get_run(self.active_run_id)
-                if isinstance(run_row, dict):
-                    line = str(run_row.get("last_log_line", "")).strip()[:120]
-            except Exception:
-                line = ""
-        if not line:
-            line = "Running... waiting for live output."
-        detail = f"{spinner} {line} | {elapsed}"
-        self._set_run_status(title, detail)
-        if "quick check" in str(self.active_run_name or "").strip().lower():
-            self._set_quick_check_busy(True, spinner=spinner)
+        self._refresh_run_status_ui()
 
     def _subscribe_run_status_events(self, run_id: str) -> None:
         self.active_run_id = str(run_id or "").strip()
@@ -1225,21 +1253,25 @@ class MainWindow(QMainWindow):
             self._last_run_log_line = ""
             if message:
                 self._last_run_line = message
+            self._refresh_run_status_ui()
             return
         if kind in {RunEventType.PROGRESS, RunEventType.STATUS}:
             if message:
                 self._last_run_line = message
+            self._refresh_run_status_ui()
             return
         if kind in {RunEventType.STDOUT, RunEventType.STDERR, RunEventType.WARNING}:
             if message:
                 self._last_run_log_line = message
                 self._last_run_line = message
+            self._refresh_run_status_ui()
             return
         if kind == RunEventType.ERROR:
             self._last_run_status = "Failed"
             if message:
                 self._last_run_log_line = message
                 self._last_run_line = message
+            self._refresh_run_status_ui()
             return
         if kind != RunEventType.END:
             return
@@ -1256,6 +1288,7 @@ class MainWindow(QMainWindow):
             self._last_run_status = "Failed"
         if message:
             self._last_run_line = message
+        self._refresh_run_status_ui()
 
     def _show_page_help(self, title: str, text: str) -> None:
         dialog = HelpCenterDialog(f"{title} Help", text, self)
@@ -1272,24 +1305,6 @@ class MainWindow(QMainWindow):
         drawer.set_text(text)
         return drawer
 
-    def _settings_nav_item_widget(self, label: str, icon_name: str = "settings") -> QWidget:
-        row = QWidget()
-        row.setAttribute(Qt.WA_TransparentForMouseEvents, True)
-        lay = QHBoxLayout(row)
-        lay.setContentsMargins(8, 0, 8, 0)
-        lay.setSpacing(8)
-        icon = QLabel()
-        icon.setObjectName("SettingsNavIcon")
-        icon.setAttribute(Qt.WA_TransparentForMouseEvents, True)
-        icon.setPixmap(get_icon(icon_name, row, size=16).pixmap(16, 16))
-        icon.setFixedSize(18, 18)
-        text = QLabel(label)
-        text.setAttribute(Qt.WA_TransparentForMouseEvents, True)
-        text.setWordWrap(False)
-        lay.addWidget(icon, 0)
-        lay.addWidget(text, 1)
-        return row
-
     def _rebuild_settings_nav_items(self) -> None:
         if not hasattr(self, "settings_nav"):
             return
@@ -1297,10 +1312,13 @@ class MainWindow(QMainWindow):
         row_height = resolve_density_tokens(self.settings_state.density).nav_item_height
         for index in range(self.settings_nav.count()):
             item = self.settings_nav.item(index)
+            if item is None:
+                continue
             label = str(item.data(Qt.UserRole) or item.text())
             icon_name = str(item.data(Qt.UserRole + 1) or "settings")
             item.setSizeHint(QSize(0, row_height))
-            self.settings_nav.setItemWidget(item, self._settings_nav_item_widget(label, icon_name))
+            item.setText(label)
+            item.setIcon(self._icon_for_settings_section(icon_name))
         if current >= 0:
             self.settings_nav.setCurrentRow(current)
 
@@ -1504,6 +1522,7 @@ class MainWindow(QMainWindow):
             self.side_sheet.refresh_icons()
         if hasattr(self, "nav_shell") and hasattr(self.nav_shell, "refresh_icons"):
             self.nav_shell.refresh_icons()
+        self._rebuild_settings_nav_items()
 
     def _on_ui_scale_value_changed(self, value: int) -> None:
         pct = clamp_ui_scale(value)
@@ -1550,6 +1569,7 @@ class MainWindow(QMainWindow):
         self._apply_mode_visibility()
         if refresh_data:
             self._refresh_home_history(); self._refresh_history(); self._refresh_run_center(); self._refresh_fixes(); self._refresh_toolbox(); self._refresh_runbooks(); self._refresh_home_favorites(); self._rebuild_diagnose_sections(self.current_session.get("findings", []))
+        self._apply_responsive_layout()
         self._mark_startup_phase("mainwindow:apply_density_done")
         LOGGER.debug("density_apply_ms=%.2f density=%s", (time.perf_counter() - started) * 1000.0, density)
 
@@ -2278,6 +2298,7 @@ class MainWindow(QMainWindow):
             )
         self.active_run_id = resolved_run_id
         self.active_run_name = name
+        self._last_run_name = name
         self.active_run_started = time.monotonic()
         self._clear_page_callouts()
         self._last_run_status = "Running"
@@ -2285,9 +2306,10 @@ class MainWindow(QMainWindow):
         self._last_run_log_line = ""
         self._subscribe_run_status_events(resolved_run_id)
         self.run_event_bus.publish(resolved_run_id, RunEventType.STATUS, message=f"Running: {name}")
-        self._set_run_status(f"Running: {name}", "Starting... | 0s")
-        if "quick check" in str(name or "").strip().lower():
-            self._set_quick_check_busy(True)
+        self._status_spinner_index = 0
+        if not self._status_animation_timer.isActive():
+            self._status_animation_timer.start()
+        self._refresh_run_status_ui()
         self.tool_runner = ToolRunnerWindow(
             name,
             risk=risk,
@@ -2453,6 +2475,8 @@ class MainWindow(QMainWindow):
             self.toasts.show_toast("Cancellation requested.")
 
     def _finish_task(self) -> None:
+        if self._status_animation_timer.isActive():
+            self._status_animation_timer.stop()
         self.active_worker = None
         self.active_run_id = ""
         self.active_run_name = ""
@@ -2461,9 +2485,14 @@ class MainWindow(QMainWindow):
         self.app_shell.toolbar.set_task_running(False)
         self._set_quick_check_busy(False)
         self._unsubscribe_run_status_events()
-        self._update_run_status_indicator()
+        self._refresh_run_status_ui()
 
     def closeEvent(self, event: Any) -> None:  # type: ignore[override]
+        self._status_animation_timer.stop()
+        self._resize_debounce_timer.stop()
+        if self._settings_save_timer.isActive():
+            self._settings_save_timer.stop()
+            self._flush_settings_changes()
         self._unsubscribe_run_status_events()
         if self._run_status_subscription_id > 0:
             self.run_event_bus.unsubscribe(self._run_status_subscription_id)
@@ -4933,6 +4962,20 @@ class MainWindow(QMainWindow):
     def save_settings_from_ui(self) -> None:
         if self._syncing_settings:
             return
+        before = {
+            "safe_only_mode": self.settings_state.safe_only_mode,
+            "show_admin_tools": self.settings_state.show_admin_tools,
+            "show_advanced_tools": self.settings_state.show_advanced_tools,
+            "diagnostic_mode": self.settings_state.diagnostic_mode,
+            "share_safe_default": self.settings_state.share_safe_default,
+            "mask_ip_default": self.settings_state.mask_ip_default,
+            "weekly_reminder_enabled": self.settings_state.weekly_reminder_enabled,
+            "details_drawer_pinned": getattr(self.settings_state, "details_drawer_pinned", True),
+            "theme_palette": self.settings_state.theme_palette,
+            "theme_mode": self.settings_state.theme_mode,
+            "density": self.settings_state.density,
+            "ui_mode": self.settings_state.ui_mode,
+        }
         self.settings_state.safe_only_mode = self.s_safe.isChecked(); self.settings_state.show_admin_tools = self.s_admin.isChecked(); self.settings_state.show_advanced_tools = self.s_adv.isChecked(); self.settings_state.diagnostic_mode = self.s_diag.isChecked()
         self.settings_state.share_safe_default = self.s_share.isChecked(); self.settings_state.mask_ip_default = self.s_ip.isChecked(); self.settings_state.weekly_reminder_enabled = self.s_weekly.isChecked()
         self.settings_state.nav_collapsed = True
@@ -4961,18 +5004,59 @@ class MainWindow(QMainWindow):
             self.s_adv.blockSignals(True)
             self.s_adv.setChecked(False)
             self.s_adv.blockSignals(False)
+        after = {
+            "safe_only_mode": self.settings_state.safe_only_mode,
+            "show_admin_tools": self.settings_state.show_admin_tools,
+            "show_advanced_tools": self.settings_state.show_advanced_tools,
+            "diagnostic_mode": self.settings_state.diagnostic_mode,
+            "share_safe_default": self.settings_state.share_safe_default,
+            "mask_ip_default": self.settings_state.mask_ip_default,
+            "weekly_reminder_enabled": self.settings_state.weekly_reminder_enabled,
+            "details_drawer_pinned": getattr(self.settings_state, "details_drawer_pinned", True),
+            "theme_palette": self.settings_state.theme_palette,
+            "theme_mode": self.settings_state.theme_mode,
+            "density": self.settings_state.density,
+            "ui_mode": self.settings_state.ui_mode,
+        }
+        changed = {key for key, value in after.items() if before.get(key) != value}
+        if not changed:
+            return
+        if changed & {"theme_palette", "theme_mode", "density"}:
+            self._pending_settings_refresh_flags.add("theme")
+        if changed & {"safe_only_mode", "show_admin_tools", "show_advanced_tools", "diagnostic_mode", "ui_mode"}:
+            self._pending_settings_refresh_flags.update({"capabilities", "mode"})
+        if changed & {"share_safe_default", "mask_ip_default"}:
+            self._pending_settings_refresh_flags.add("privacy")
+        if changed & {"weekly_reminder_enabled"}:
+            self._pending_settings_refresh_flags.add("weekly")
+        if changed & {"details_drawer_pinned"}:
+            self._pending_settings_refresh_flags.add("drawer")
+        self._settings_save_timer.start()
+
+    def _flush_settings_changes(self) -> None:
+        flags = set(self._pending_settings_refresh_flags)
+        self._pending_settings_refresh_flags.clear()
+        if not flags:
+            return
         save_settings(self.settings_state)
         self.safety_policy = policy_from_settings(self.settings_state)
-        self._refresh_fixes()
-        self._refresh_toolbox()
-        self._refresh_runbooks()
-        self._refresh_home_favorites()
-        self._apply_mode_visibility()
-        self._apply_theme()
+        if "capabilities" in flags:
+            self._refresh_fixes()
+            self._refresh_toolbox()
+            self._refresh_runbooks()
+            self._refresh_home_favorites()
+        if "mode" in flags:
+            self._apply_mode_visibility()
+        if "theme" in flags:
+            self._apply_theme()
+        if "privacy" in flags:
+            self._update_redaction_preview()
+        if "weekly" in flags:
+            self._update_weekly_status()
+        if flags & {"drawer", "mode"}:
+            desired_open = self.settings_state.right_panel_open and self.layout_policy_state.right_panel_default_open
+            self._set_concierge_collapsed(not desired_open, persist=False)
         self._refresh_db_info_label()
-        desired_open = self.settings_state.right_panel_open and self.layout_policy_state.right_panel_default_open
-        self._set_concierge_collapsed(not desired_open, persist=False)
-        self._update_weekly_status()
         self._update_context_labels()
         self._sync_shell_status_bar()
         self.toasts.show_toast("Settings saved.")

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 
 from PySide6.QtCore import QEasingCurve, QPoint, QPropertyAnimation, QParallelAnimationGroup
@@ -10,6 +11,19 @@ from PySide6.QtWidgets import QGraphicsOpacityEffect, QWidget
 EASE_OUT = QEasingCurve.OutCubic
 EASE_SOFT = QEasingCurve.InOutCubic
 DEFAULT_DURATION_MS = 200
+
+
+def _animations_enabled() -> bool:
+    return os.environ.get("QT_QPA_PLATFORM", "").strip().lower() not in {"offscreen", "minimal"}
+
+
+def _noop_animation(widget: QWidget) -> QPropertyAnimation:
+    anim = QPropertyAnimation(widget, b"pos", widget)
+    anim.setDuration(0)
+    anim.setStartValue(widget.pos())
+    anim.setEndValue(widget.pos())
+    anim.start()
+    return anim
 
 
 def ensure_opacity_effect(widget: QWidget) -> QGraphicsOpacityEffect:
@@ -23,6 +37,8 @@ def ensure_opacity_effect(widget: QWidget) -> QGraphicsOpacityEffect:
 
 
 def animate_opacity(widget: QWidget, *, start: float, end: float, duration_ms: int = DEFAULT_DURATION_MS) -> QPropertyAnimation:
+    if not _animations_enabled():
+        return _noop_animation(widget)
     effect = ensure_opacity_effect(widget)
     anim = QPropertyAnimation(effect, b"opacity", widget)
     anim.setDuration(max(80, int(duration_ms)))
@@ -52,6 +68,11 @@ def animate_slide_fade(
     end_opacity: float,
     duration_ms: int = DEFAULT_DURATION_MS,
 ) -> QParallelAnimationGroup:
+    if not _animations_enabled():
+        widget.move(end_pos)
+        group = QParallelAnimationGroup(widget)
+        group.start()
+        return group
     group = QParallelAnimationGroup(widget)
     pos = QPropertyAnimation(widget, b"pos", group)
     pos.setDuration(max(90, int(duration_ms)))

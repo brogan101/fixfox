@@ -5,6 +5,7 @@ from typing import Any
 
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QCheckBox,
     QComboBox,
     QFormLayout,
@@ -91,12 +92,19 @@ class SettingsPage(PageScroll):
         w.settings_nav.setObjectName("SettingsNav")
         w.settings_nav.setMinimumWidth(240)
         w.settings_nav.setMaximumWidth(320)
+        w.settings_nav.setAlternatingRowColors(False)
+        w.settings_nav.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        w.settings_nav.setTextElideMode(Qt.ElideRight)
+        w.settings_nav.setUniformItemSizes(True)
+        w.settings_nav.setWordWrap(False)
+        w.settings_nav.setIconSize(QSize(18, 18))
+        w.settings_nav.setSelectionMode(QAbstractItemView.SingleSelection)
         settings_row_height = resolve_density_tokens(w.settings_state.density).nav_item_height
         settings_sections = (
             ("Safety", "shield"),
             ("Privacy", "privacy"),
-            ("Appearance", "settings"),
-            ("Advanced", "fixes"),
+            ("Appearance", "gear"),
+            ("Advanced", "wrench"),
             ("Feedback", "help"),
         )
         for name, icon_name in settings_sections:
@@ -104,8 +112,8 @@ class SettingsPage(PageScroll):
             item.setData(Qt.UserRole, name)
             item.setData(Qt.UserRole + 1, icon_name)
             item.setSizeHint(QSize(0, settings_row_height))
+            item.setIcon(w._icon_for_settings_section(icon_name))
             w.settings_nav.addItem(item)
-            w.settings_nav.setItemWidget(item, w._settings_nav_item_widget(name, icon_name))
         w.settings_stack = QStackedWidget()
         w.settings_nav.currentRowChanged.connect(lambda idx: w.settings_stack.setCurrentIndex(max(idx, 0)))
         w.settings_nav.currentRowChanged.connect(w._on_settings_section_changed)

@@ -129,6 +129,14 @@ def _load_bundled_font(logger, font_asset_candidates) -> str:
     if app is None:
         return "Segoe UI"
 
+    qpa_platform = os.environ.get("QT_QPA_PLATFORM", "").strip().lower()
+    if sys.platform == "win32" and qpa_platform not in {"offscreen", "minimal"}:
+        family = "Segoe UI"
+        app.setFont(QFont(family))
+        logger.info("Selected UI font: %s (system)", family)
+        print(f"[FixFox] UI font: {family}")
+        return family
+
     for path in font_asset_candidates("NotoSans-Regular.ttf"):
         try:
             if not path.exists():
