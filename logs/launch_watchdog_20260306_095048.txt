@@ -1,0 +1,31 @@
+startup_watchdog_initialized stall_threshold_s=5.00
+watchdog_log_path=C:\Users\btheobald\Desktop\IT Core\logs\launch_watchdog_20260306_095048.txt
+qt_log_path=C:\Users\btheobald\Desktop\IT Core\logs\fixfox_qt.log
+startup_phase=logging_ready elapsed_ms=6.8
+startup_phase=initialize_db elapsed_ms=8.6
+startup_phase=create_qapplication elapsed_ms=20.6
+startup_phase=watchdog_started elapsed_ms=41.1
+startup_phase=load_icons elapsed_ms=42.0
+startup_phase=load_font elapsed_ms=49.0
+startup_phase=ensure_desktop_logo elapsed_ms=54.4
+startup_phase=load_settings elapsed_ms=55.8
+startup_phase=apply_stylesheet elapsed_ms=58.1
+startup_phase=build_main_window elapsed_ms=59.5
+startup_phase=mainwindow:init_begin elapsed_ms=62.1
+startup_phase=mainwindow:build_nav_pages elapsed_ms=1439.6
+startup_phase=mainwindow:restore_layout elapsed_ms=2575.2
+startup_phase=mainwindow:apply_theme_deferred elapsed_ms=2576.9
+startup_phase=mainwindow:apply_button_guardrails elapsed_ms=2578.2
+startup_phase=mainwindow:set_concierge_initial elapsed_ms=2588.7
+startup_phase=mainwindow:responsive_layout_pass elapsed_ms=2591.9
+startup_phase=mainwindow:schedule_warmup elapsed_ms=2593.2
+startup_phase=mainwindow:init_complete elapsed_ms=2628.3
+startup_phase=show_window elapsed_ms=2632.6
+startup_first_paint_ms=2701.3 phase=show_window
+startup_phase=enter_event_loop elapsed_ms=2727.7
+startup_phase=mainwindow:warmup_stage_one elapsed_ms=7643.5
+ui_freeze_detector_started heartbeat_ms=100 threshold_ms=500
+startup_phase=mainwindow:warmup_stage_two elapsed_ms=7799.2
+startup_phase=event_loop_exit elapsed_ms=8003.8
+ui_freeze_detector_stopped freeze_count=0
+watchdog_stopped elapsed_ms=8006.7 first_paint_ms=2701.3

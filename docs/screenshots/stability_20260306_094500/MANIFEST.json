@@ -1,0 +1,13 @@
+{
+  "timestamp": "20260306_094500",
+  "search_dropdown_visible_ms": 708,
+  "screenshots": [
+    "docs/screenshots/stability_20260306_094500/home.png",
+    "docs/screenshots/stability_20260306_094500/settings.png",
+    "docs/screenshots/stability_20260306_094500/playbooks.png",
+    "docs/screenshots/stability_20260306_094500/reports.png",
+    "docs/screenshots/stability_20260306_094500/diagnose.png",
+    "docs/screenshots/stability_20260306_094500/search_dropdown.png"
+  ],
+  "failures": []
+}

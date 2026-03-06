@@ -29,10 +29,7 @@ def _msg_type_name(msg_type: QtMsgType) -> str:
 
 
 def _is_whitelisted_unknown_property(message: str) -> bool:
-    m = message.strip().lower()
-    if "qproperty-" in m:
-        return True
-    return False
+    return "unknown property qproperty-" in message.strip().lower()
 
 
 def run_qss_sanity(*, report_path: Path = REPORT_PATH, verbose: bool = True) -> tuple[bool, list[str], list[str]]:
@@ -54,10 +51,12 @@ def run_qss_sanity(*, report_path: Path = REPORT_PATH, verbose: bool = True) -> 
     prev = qInstallMessageHandler(_handler)
     ok = False
     try:
+        from src.core.qt_runtime import ensure_qt_runtime_env, is_fatal_qt_warning
         from src.core.settings import load_settings
         from src.ui.app_qss import build_qss
         from src.ui.theme import resolve_theme_tokens
 
+        ensure_qt_runtime_env()
         app = QApplication.instance() or QApplication([])
         settings = load_settings().normalized()
         tokens = resolve_theme_tokens(settings.theme_palette, settings.theme_mode)
@@ -74,6 +73,13 @@ def run_qss_sanity(*, report_path: Path = REPORT_PATH, verbose: bool = True) -> 
         app.processEvents()
         probe.close()
         app.processEvents()
+        for line in messages:
+            msg = line.split("] ", 1)[1] if "] " in line else line
+            if _is_whitelisted_unknown_property(msg):
+                continue
+            if is_fatal_qt_warning(msg):
+                failures.append(line)
+        failures = list(dict.fromkeys(failures))
         ok = len(failures) == 0
     except Exception as exc:
         failures.append(f"Exception while checking QSS: {exc}")

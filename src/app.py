@@ -63,7 +63,10 @@ def _load_runtime_imports():
         from .core.brand_assets import ensure_logo_on_desktop
         from .core.db import initialize_db
         from .core.logging_setup import configure_logging, install_global_exception_handler
+        from .core.perf import PERF_RECORDER
+        from .core.qt_runtime import ensure_qt_runtime_env
         from .core.startup_watchdog import install_startup_watchdog
+        from .core.ui_freeze_detector import UIFreezeDetector
         from .core.settings import load_settings
         from .core.utils import resource_path
         from .ui.app_qss import build_qss
@@ -76,7 +79,10 @@ def _load_runtime_imports():
         from src.core.brand_assets import ensure_logo_on_desktop
         from src.core.db import initialize_db
         from src.core.logging_setup import configure_logging, install_global_exception_handler
+        from src.core.perf import PERF_RECORDER
+        from src.core.qt_runtime import ensure_qt_runtime_env
         from src.core.startup_watchdog import install_startup_watchdog
+        from src.core.ui_freeze_detector import UIFreezeDetector
         from src.core.settings import load_settings
         from src.core.utils import resource_path
         from src.ui.app_qss import build_qss
@@ -93,7 +99,10 @@ def _load_runtime_imports():
         initialize_db,
         configure_logging,
         install_global_exception_handler,
+        PERF_RECORDER,
+        ensure_qt_runtime_env,
         install_startup_watchdog,
+        UIFreezeDetector,
         load_settings,
         resource_path,
         build_qss,
@@ -182,7 +191,10 @@ def main():
             initialize_db,
             configure_logging,
             install_global_exception_handler,
+            PERF_RECORDER,
+            ensure_qt_runtime_env,
             install_startup_watchdog,
+            UIFreezeDetector,
             load_settings,
             resource_path,
             build_qss,
@@ -199,46 +211,53 @@ def main():
 
     logger = configure_logging()
     install_global_exception_handler(logger)
+    PERF_RECORDER.reset()
+    PERF_RECORDER.set_meta("entrypoint", "src.app.main")
     startup_watchdog = install_startup_watchdog()
-    startup_watchdog.set_phase("logging_ready")
+    startup_watchdog.mark("logging_ready")
+    ensure_qt_runtime_env(logger)
+    PERF_RECORDER.set_meta("watchdog_log", str(startup_watchdog.watchdog_log_path))
+    PERF_RECORDER.set_meta("qt_log", str(startup_watchdog.qt_log_path))
     logger.info("Starting %s", APP_NAME)
     try:
-        startup_watchdog.set_phase("initialize_db")
+        startup_watchdog.mark("initialize_db")
         initialize_db()
     except Exception as exc:
         logger.warning("DB initialization warning: %s", exc)
 
     from PySide6.QtCore import QTimer, Qt
 
-    startup_watchdog.set_phase("create_qapplication")
+    startup_watchdog.mark("create_qapplication")
     QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
     app = QApplication(sys.argv)
     startup_watchdog.start()
     app.setApplicationName(APP_NAME)
-    startup_watchdog.set_phase("load_icons")
+    startup_watchdog.mark("load_icons")
     icon_path = resource_path(ICON_ICO)
     app_icon = QIcon(icon_path)
     if app_icon.isNull():
         app_icon = QIcon(resource_path(ICON_PNG))
     app.setWindowIcon(app_icon)
-    startup_watchdog.set_phase("load_font")
+    startup_watchdog.mark("load_font")
     _load_bundled_font(logger, font_asset_candidates)
     try:
-        startup_watchdog.set_phase("ensure_desktop_logo")
+        startup_watchdog.mark("ensure_desktop_logo")
         ensure_logo_on_desktop(overwrite=False)
     except Exception as exc:
         logger.warning("Desktop logo setup skipped: %s", exc)
-    startup_watchdog.set_phase("load_settings")
+    startup_watchdog.mark("load_settings")
     settings = load_settings()
     set_ui_scale_percent(getattr(settings, "ui_scale_pct", 100))
     tokens = resolve_theme_tokens(settings.theme_palette, settings.theme_mode)
-    startup_watchdog.set_phase("apply_stylesheet")
+    startup_watchdog.mark("apply_stylesheet")
     app.setStyleSheet(build_qss(tokens, settings.theme_mode, settings.density))
-    startup_watchdog.set_phase("build_main_window")
+    startup_watchdog.mark("build_main_window")
     w = AppShell(startup_phase_cb=startup_watchdog.set_phase)
     startup_watchdog.attach_window(w)
-    startup_watchdog.set_phase("show_window")
+    startup_watchdog.mark("show_window")
     w.show()
+    freeze_detector: UIFreezeDetector | None = UIFreezeDetector(watchdog_log_path=startup_watchdog.watchdog_log_path)
+    QTimer.singleShot(0, freeze_detector.start)
     QTimer.singleShot(0, lambda: _apply_windows11_corner_hint(w))
     if hasattr(signal, "SIGINT"):
         signal.signal(signal.SIGINT, lambda *_args: app.quit())
@@ -249,15 +268,27 @@ def main():
     if auto_exit_ms > 0:
         QTimer.singleShot(max(200, auto_exit_ms), app.quit)
     try:
-        startup_watchdog.set_phase("enter_event_loop")
+        startup_watchdog.mark("enter_event_loop")
         result = app.exec()
-        startup_watchdog.set_phase("event_loop_exit")
+        startup_watchdog.mark("event_loop_exit")
         return result
     except KeyboardInterrupt:
         logger.info("KeyboardInterrupt received, exiting cleanly.")
         app.quit()
         return 130
     finally:
+        try:
+            if freeze_detector is not None:
+                freeze_detector.stop()
+                PERF_RECORDER.set_meta("ui_freeze_count", freeze_detector.freeze_count)
+        except Exception:
+            pass
+        if startup_watchdog.first_paint_ms > 0:
+            PERF_RECORDER.record("startup.ttfp_ms", startup_watchdog.first_paint_ms)
+        if startup_watchdog.qt_fatal_lines:
+            PERF_RECORDER.set_meta("qt_fatal_warnings", startup_watchdog.qt_fatal_lines[:8])
+        report = PERF_RECORDER.write_report()
+        logger.info("perf_report=%s", report)
         startup_watchdog.stop()
 
 if __name__ == "__main__":

@@ -540,3 +540,26 @@ src/ui/style/qss_builder.py         |  45 +++---
   - Remove startup UI-thread blocking and confirm first paint < 5s.
   - Eliminate runtime QSS parse warnings and enforce with tests/gates.
   - Add launch regression test and rerun smoke/unit/walkthrough gates.
+
+## 2026-03-06 09:47:19 -05:00 - Stabilization + App Launch Recovery Pass
+- Starting commit: 16b9032f72be4a87a3eaf3ef12c209e884f36f28
+- Goals:
+  - eliminate Qt stylesheet parse/asset warnings and enforce as fatal gates
+  - remove startup and search UI-thread stalls that made launch/interaction feel hung
+  - harden startup instrumentation (watchdog, UI freeze detector, Qt warning capture)
+  - upgrade verifier/tests so regressions fail CI locally
+- Planned files:
+  - src/app.py
+  - src/core/startup_watchdog.py
+  - src/core/ui_freeze_detector.py
+  - src/core/qt_runtime.py
+  - src/core/perf.py
+  - src/ui/main_window_impl.py
+  - src/ui/style/qss_builder.py
+  - scripts/qss_sanity_check.py
+  - scripts/verify_requirements.py
+  - scripts/ui_smoke_walkthrough.py
+  - src/tests/test_app_launch.py
+  - src/tests/test_search_nonblocking.py
+  - docs/STABILIZATION_REPORT.md
+  - docs/qt_warnings_policy.md

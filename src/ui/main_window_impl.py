@@ -73,6 +73,7 @@ from ..core.file_index import export_results_csv, index_roots, search_files
 from ..core.kb import KB_CARDS
 from ..core.logging_setup import log_path, logs_dir
 from ..core.masking import MaskingOptions, mask_text, redaction_preview
+from ..core.perf import PERF_RECORDER
 from ..core.paths import ensure_dirs
 from ..core.registry import CAPABILITIES
 from ..core.registry import get_visible_capabilities
@@ -480,6 +481,7 @@ class MainWindow(QMainWindow):
         self._search_debounce_timer.timeout.connect(self._refresh_global_search_results)
         self._search_worker: TaskWorker | None = None
         self._search_request_id = 0
+        self._status_probe_worker: TaskWorker | None = None
         self._scale_apply_timer = QTimer(self)
         self._scale_apply_timer.setSingleShot(True)
         self._scale_apply_timer.setInterval(80)
@@ -487,9 +489,11 @@ class MainWindow(QMainWindow):
         self._pending_ui_scale_pct = int(getattr(self.settings_state, "ui_scale_pct", 100))
         self._search_popup = GlobalSearchPopup(self)
         self._search_popup.result_activated.connect(self._apply_global_search_result)
+        self._search_dispatch_started: dict[int, float] = {}
         self._persist_concierge_events = True
         self._auto_concierge_collapse = False
         self._startup_warmup_active = True
+        self._is_offscreen_platform = os.environ.get("QT_QPA_PLATFORM", "").strip().lower() in {"offscreen", "minimal"}
         self.layout_overlay: LayoutDebugOverlay | None = None
         self.run_bus_event.connect(self._handle_run_bus_event)
         self._run_status_subscription_id = self.run_event_bus.subscribe_global(
@@ -549,6 +553,23 @@ class MainWindow(QMainWindow):
 
         self.context = self._build_context_bar()
         self.app_shell.center_layout.addWidget(self.context)
+        self.startup_banner = QFrame()
+        self.startup_banner.setObjectName("StartupWarmupBanner")
+        self.startup_banner.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        startup_layout = QHBoxLayout(self.startup_banner)
+        startup_layout.setContentsMargins(12, 8, 12, 8)
+        startup_layout.setSpacing(8)
+        self.startup_spinner = QLabel("|")
+        self.startup_spinner.setObjectName("StartupWarmupSpinner")
+        self.startup_banner_text = QLabel("Loading background data...")
+        self.startup_banner_text.setObjectName("StartupWarmupText")
+        startup_layout.addWidget(self.startup_spinner)
+        startup_layout.addWidget(self.startup_banner_text, 1)
+        self.app_shell.center_layout.addWidget(self.startup_banner)
+        self._startup_banner_timer = QTimer(self)
+        self._startup_banner_timer.setInterval(120)
+        self._startup_banner_timer.timeout.connect(self._tick_startup_banner_spinner)
+        self._startup_banner_timer.start()
         self.pages = QStackedWidget()
         self.app_shell.center_layout.addWidget(self.pages, 1)
 
@@ -584,7 +605,7 @@ class MainWindow(QMainWindow):
         self._mark_startup_phase("mainwindow:restore_layout")
         self._restore_layout_state()
         self._mark_startup_phase("mainwindow:apply_theme_deferred")
-        QTimer.singleShot(0, lambda: self._apply_theme(refresh_data=False))
+        QTimer.singleShot(0, lambda: self._apply_theme(refresh_data=False, apply_density=False))
         self._mark_startup_phase("mainwindow:apply_button_guardrails")
         apply_button_guardrails(self, self.settings_state.density)
         default_open = False
@@ -667,36 +688,44 @@ class MainWindow(QMainWindow):
 
     def _schedule_startup_warmup(self) -> None:
         # Keep first paint fast: defer expensive data refresh into staged warmup tasks.
+        self._show_startup_banner()
         QTimer.singleShot(0, self._startup_warmup_stage_one)
 
     def _startup_warmup_stage_one(self) -> None:
         self._mark_startup_phase("mainwindow:warmup_stage_one")
         warm_static_index_async()
         refresh_dynamic_index_async(force=False)
-        self._update_status_strip()
+        self._queue_status_strip_refresh()
         self._update_weekly_status()
         self._update_context_labels()
         self._update_redaction_preview()
         self._update_diagnose_context({})
-        self._update_concierge()
         QTimer.singleShot(0, self._startup_warmup_stage_two)
 
     def _startup_warmup_stage_two(self) -> None:
         self._mark_startup_phase("mainwindow:warmup_stage_two")
-        self._refresh_home_history()
-        self._refresh_history()
-        self._refresh_run_center()
+        # Keep startup responsive: defer heavy page refreshes until pages are opened.
         QTimer.singleShot(0, self._startup_warmup_stage_three)
 
     def _startup_warmup_stage_three(self) -> None:
         self._mark_startup_phase("mainwindow:warmup_stage_three")
-        self._refresh_fixes()
-        self._refresh_toolbox()
-        self._refresh_runbooks()
-        self._refresh_home_favorites()
-        self._refresh_evidence_items()
         self._startup_warmup_active = False
+        self._hide_startup_banner()
         self._mark_startup_phase("mainwindow:warmup_complete")
+
+    def _show_startup_banner(self) -> None:
+        self.startup_banner.show()
+        if not self._startup_banner_timer.isActive():
+            self._startup_banner_timer.start()
+
+    def _hide_startup_banner(self) -> None:
+        self.startup_banner.hide()
+        if self._startup_banner_timer.isActive():
+            self._startup_banner_timer.stop()
+
+    def _tick_startup_banner_spinner(self) -> None:
+        self._status_spinner_index = (self._status_spinner_index + 1) % len(self._status_spinner_frames)
+        self.startup_spinner.setText(self._status_spinner_frames[self._status_spinner_index])
 
     def eventFilter(self, watched: Any, event: Any) -> bool:  # type: ignore[override]
         if self._event_filter_reentrant:
@@ -716,11 +745,12 @@ class MainWindow(QMainWindow):
                 if key == Qt.Key_Escape:
                     self._search_popup.hide_popup()
                     return True
+            if not self._search_popup.isVisible():
+                return super().eventFilter(watched, event)
             if (
-                self._search_popup.isVisible()
-                and event.type() == QEvent.MouseButtonPress
+                event.type() == QEvent.MouseButtonPress
                 and isinstance(watched, QWidget)
-                and os.environ.get("QT_QPA_PLATFORM", "").strip().lower() != "offscreen"
+                and not self._is_offscreen_platform
             ):
                 in_popup = watched is self._search_popup or self._search_popup.isAncestorOf(watched)
                 in_search = watched is self.top_search or self.top_search.isAncestorOf(watched)
@@ -783,6 +813,7 @@ class MainWindow(QMainWindow):
         refresh_dynamic_index_async(force=False)
         self._search_request_id += 1
         request_id = self._search_request_id
+        self._search_dispatch_started[request_id] = time.perf_counter()
         self._cancel_active_search_worker()
         worker = TaskWorker(
             self._compute_global_search_payload,
@@ -863,6 +894,9 @@ class MainWindow(QMainWindow):
         if not isinstance(grouped_rows, list):
             return
         self._search_popup.show_results(self.top_search, grouped_rows, query)
+        started = self._search_dispatch_started.pop(request_id, None)
+        if started is not None:
+            PERF_RECORDER.record("search.time_to_results_ms", (time.perf_counter() - started) * 1000.0)
         cache_stats = payload.get("cache_stats", {})
         LOGGER.debug(
             "global_search_result rid=%s query=%s rows=%s static_builds=%s dynamic_builds=%s",
@@ -876,6 +910,7 @@ class MainWindow(QMainWindow):
     def _on_search_worker_finished(self, request_id: int, worker_ref: TaskWorker) -> None:
         if self._search_worker is worker_ref and request_id <= self._search_request_id:
             self._search_worker = None
+        self._search_dispatch_started.pop(request_id, None)
 
     def _rank_search_rows(self, query: str, rows: list[SearchItem]) -> list[SearchItem]:
         return _rank_search_rows_fast(query, rows)
@@ -1406,7 +1441,7 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             self.toasts.show_toast(f"Clear file index failed: {exc}")
 
-    def _apply_theme(self, *, refresh_data: bool = True) -> None:
+    def _apply_theme(self, *, refresh_data: bool = True, apply_density: bool = True) -> None:
         started = time.perf_counter()
         palette = normalize_palette(self.settings_state.theme_palette)
         mode = normalize_mode(self.settings_state.theme_mode)
@@ -1425,10 +1460,11 @@ class MainWindow(QMainWindow):
             self._refresh_theme_icons()
         else:
             QTimer.singleShot(0, self._refresh_theme_icons)
-        if refresh_data:
-            self._apply_density(refresh_data=True)
-        else:
-            QTimer.singleShot(0, lambda: self._apply_density(refresh_data=False))
+        if apply_density:
+            if refresh_data:
+                self._apply_density(refresh_data=True)
+            else:
+                QTimer.singleShot(0, lambda: self._apply_density(refresh_data=False))
         self._sync_panel_toggle_icon()
         LOGGER.debug("theme_apply_ms=%.2f palette=%s mode=%s density=%s scale=%s", (time.perf_counter() - started) * 1000.0, palette, mode, density, scale_pct)
 
@@ -1755,6 +1791,7 @@ class MainWindow(QMainWindow):
         self._apply_mode_visibility()
 
     def _on_nav(self, idx: int) -> None:
+        started = time.perf_counter()
         if idx < 0 or idx >= len(self.NAV_ITEMS):
             return
         self.pages.setCurrentIndex(idx)
@@ -1762,9 +1799,28 @@ class MainWindow(QMainWindow):
         self.settings_state.last_page = page_name
         if page_name in {"History", "Reports"}:
             refresh_dynamic_index_async(force=True)
+        if page_name == "Home":
+            QTimer.singleShot(0, self._refresh_home_history)
+            QTimer.singleShot(0, self._refresh_home_favorites)
+        elif page_name == "History":
+            QTimer.singleShot(0, self._refresh_history)
+        elif page_name == "Reports":
+            QTimer.singleShot(0, self._refresh_run_center)
+            QTimer.singleShot(0, self._refresh_evidence_items)
+        elif page_name == "Fixes":
+            QTimer.singleShot(0, self._refresh_fixes)
+        elif page_name == "Playbooks":
+            QTimer.singleShot(0, self._refresh_toolbox)
+            QTimer.singleShot(0, self._refresh_runbooks)
+            QTimer.singleShot(0, self._refresh_home_favorites)
         self._sync_context_bar_visibility()
         self._sync_shell_status_bar()
         self._update_concierge()
+        elapsed_ms = (time.perf_counter() - started) * 1000.0
+        if page_name == "Settings":
+            PERF_RECORDER.record("ui.open_settings_ms", elapsed_ms)
+        elif page_name == "Playbooks":
+            PERF_RECORDER.record("ui.open_playbooks_ms", elapsed_ms)
 
     def _on_nav_collapsed_changed(self, collapsed: bool) -> None:
         self.settings_state.nav_collapsed = True
@@ -2097,6 +2153,8 @@ class MainWindow(QMainWindow):
         return "Run scan to populate findings." if not rows else f"{len(rows)} findings available."
 
     def _changes_text(self) -> str:
+        if self._startup_warmup_active:
+            return "History is loading in the background."
         rows = load_index()
         return "No prior session for comparison." if len(rows) < 2 else f"Compare with {rows[1].session_id} in History."
 
@@ -2571,8 +2629,22 @@ class MainWindow(QMainWindow):
             picks = [card.title for card in KB_CARDS[:2]]
         return " | ".join(picks[:2])
 
-    def _update_status_strip(self) -> None:
-        self._update_status_from_session(diagnostics.quick_check(include_capabilities=False))
+    def _queue_status_strip_refresh(self) -> None:
+        if self._status_probe_worker is not None:
+            return
+        worker = TaskWorker(diagnostics.quick_check, kwargs={"include_capabilities": False}, config=WorkerConfig(timeout_s=20))
+        worker.signals.result.connect(self._handle_status_strip_refresh_result)
+        worker.signals.finished.connect(lambda ref=worker: self._on_status_strip_refresh_finished(ref))
+        self._status_probe_worker = worker
+        start_worker(worker)
+
+    def _handle_status_strip_refresh_result(self, payload: Any) -> None:
+        if isinstance(payload, dict):
+            self._update_status_from_session(payload)
+
+    def _on_status_strip_refresh_finished(self, worker_ref: TaskWorker) -> None:
+        if self._status_probe_worker is worker_ref:
+            self._status_probe_worker = None
 
     def _update_status_from_session(self, data: dict[str, Any]) -> None:
         m = data.get("metrics", {})

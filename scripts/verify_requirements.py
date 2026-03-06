@@ -49,6 +49,11 @@ class VerificationOutcome:
             "critical_qss_sanity",
             "critical_search_cache_contract",
             "critical_search_runtime_responsive",
+            "launch_test_gate",
+            "qss_test_gate",
+            "search_nonblocking_test_gate",
+            "ui_smoke_walkthrough_gate",
+            "ttfp_threshold",
         )
         critical_ok = all(self.checks.get(key, CheckResult(False)).passed for key in critical_keys)
         return critical_ok and all(r.passed for r in self.requirements)
@@ -105,15 +110,49 @@ def _run(cmd: list[str], timeout_s: int = 900, env: dict[str, str] | None = None
 
 
 def _python_cmd() -> list[str]:
-    exe = str(sys.executable or "").strip()
-    if exe and Path(exe).exists() and "windowsapps" not in exe.lower():
-        return [exe]
-    for candidate in ("python", "py"):
+    def _probe(cmd: list[str]) -> str | None:
+        try:
+            proc = subprocess.run(
+                [*cmd, "-c", "import sys; print(sys.executable)"],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                timeout=12,
+            )
+        except Exception:
+            return None
+        if proc.returncode != 0:
+            return None
+        resolved = proc.stdout.strip()
+        if not resolved:
+            return None
+        if not Path(resolved).exists():
+            return None
+        if "windowsapps" in resolved.lower():
+            return None
+        return resolved
+
+    direct = str(sys.executable or "").strip()
+    if direct and Path(direct).exists() and "windowsapps" not in direct.lower():
+        return [direct]
+
+    for candidate in ("py", "python"):
         resolved = shutil.which(candidate)
-        if resolved:
-            if Path(resolved).name.lower() == "py.exe":
-                return [resolved, "-3"]
-            return [resolved]
+        if not resolved:
+            continue
+        if Path(resolved).name.lower() == "py.exe":
+            probed = _probe([resolved, "-3"])
+            if probed:
+                return [probed]
+            continue
+        probed = _probe([resolved])
+        if probed:
+            return [probed]
+
+    base = str(getattr(sys, "_base_executable", "") or "").strip()
+    if base and Path(base).exists() and "windowsapps" not in base.lower():
+        return [base]
+
     return ["python"]
 
 
@@ -123,11 +162,21 @@ def _qss_sanity(checks: dict[str, CheckResult]) -> None:
     rc, out, err = _run([*_python_cmd(), "scripts/qss_sanity_check.py"], timeout_s=240, env=env)
     report = REPO_ROOT / "docs" / "qss_sanity_report.txt"
     report_text = report.read_text(encoding="utf-8", errors="ignore") if report.exists() else ""
-    parse_warning = "could not parse application stylesheet" in report_text.lower()
-    unknown_property = "unknown property" in report_text.lower()
-    ok = rc == 0 and report.exists() and ("OK" in report_text) and not parse_warning and not unknown_property
+    lower = report_text.lower()
+    fatal_hits = [
+        token
+        for token in (
+            "could not parse application stylesheet",
+            "unknown property",
+            "failed to create directwrite face",
+            "cannot open file",
+            "cannot find font directory",
+        )
+        if token in lower
+    ]
+    ok = rc == 0 and report.exists() and ("OK" in report_text) and not fatal_hits
     checks["qss_sanity_script_pass"] = CheckResult(ok, [f"rc={rc}", str(report)])
-    checks["critical_qss_sanity"] = CheckResult(ok, [err[-160:] if err else "no stderr"])
+    checks["critical_qss_sanity"] = CheckResult(ok, [f"fatal_hits={fatal_hits[:3]}", err[-160:] if err else "no stderr"])
 
 
 def _walkthrough(checks: dict[str, CheckResult]) -> str:
@@ -153,6 +202,21 @@ def _walkthrough(checks: dict[str, CheckResult]) -> str:
     return path
 
 
+def _stability_subtests(checks: dict[str, CheckResult]) -> None:
+    env = os.environ.copy()
+    env["QT_QPA_PLATFORM"] = "offscreen"
+    env["FIXFOX_SKIP_ONBOARDING"] = "1"
+    gates = (
+        ("launch_test_gate", [*_python_cmd(), "-m", "src.tests.test_app_launch"]),
+        ("qss_test_gate", [*_python_cmd(), "-m", "src.tests.test_qss_sanity"]),
+        ("search_nonblocking_test_gate", [*_python_cmd(), "-m", "src.tests.test_search_nonblocking"]),
+        ("ui_smoke_walkthrough_gate", [*_python_cmd(), "scripts/ui_smoke_walkthrough.py"]),
+    )
+    for key, cmd in gates:
+        rc, out, err = _run(cmd, timeout_s=900, env=env)
+        checks[key] = CheckResult(rc == 0, [f"rc={rc}", (out or err).strip()[-180:]])
+
+
 def _collect_static(checks: dict[str, CheckResult]) -> None:
     app_py = _read(REPO_ROOT / "src/app.py")
     main = _read(REPO_ROOT / "src/ui/main_window_impl.py")
@@ -162,6 +226,9 @@ def _collect_static(checks: dict[str, CheckResult]) -> None:
     runbooks = _read(REPO_ROOT / "src/core/runbooks.py")
     search_py = _read(REPO_ROOT / "src/core/search.py")
     workers = _read(REPO_ROOT / "src/core/workers.py")
+    startup_watchdog = _read(REPO_ROOT / "src/core/startup_watchdog.py")
+    freeze_detector = _read(REPO_ROOT / "src/core/ui_freeze_detector.py")
+    perf_module = _read(REPO_ROOT / "src/core/perf.py")
     readme = _read(REPO_ROOT / "README.md")
     build_exe = _read(REPO_ROOT / "scripts/build_exe.ps1")
     make_icons = _read(REPO_ROOT / "tools/make_icons.py")
@@ -193,6 +260,10 @@ def _collect_static(checks: dict[str, CheckResult]) -> None:
     checks["cleanup_notes_exists"] = CheckResult((REPO_ROOT / "docs/REPO_CLEANUP_NOTES.md").exists(), ["docs/REPO_CLEANUP_NOTES.md"])
     checks["no_legacy_brand_paths"] = CheckResult((not legacy_hits) and canonical_ok, [f"legacy_hits={legacy_hits[:4]}", "canonical=src/assets/brand"])
     checks["theme_manager_present"] = CheckResult((REPO_ROOT / "src/ui/theme.py").exists() and "build_qss(" in app_py, ["theme.py + build_qss"])
+    checks["qt_warning_policy_doc_exists"] = CheckResult((REPO_ROOT / "docs/qt_warnings_policy.md").exists(), ["docs/qt_warnings_policy.md"])
+    checks["startup_watchdog_has_mark_api"] = CheckResult("def mark(" in startup_watchdog and "STARTUP STALLED" in startup_watchdog, ["startup watchdog mark + stall logging"])
+    checks["ui_freeze_detector_exists"] = CheckResult("UI FREEZE DETECTED" in freeze_detector, ["ui_freeze_detector.py"])
+    checks["perf_module_exists"] = CheckResult("class PerfRecorder" in perf_module and "PERF_RECORDER" in perf_module, ["src/core/perf.py"])
     checks["task_runner_async_layer"] = CheckResult("TaskWorker" in workers and "QThreadPool" in workers, ["workers async execution layer"])
     checks["task_runner_cancel_timeout"] = CheckResult("cancel_event" in script_tasks and "timeout_s" in script_tasks, ["cancel + timeout fields present"])
     checks["qss_dialog_hooks"] = CheckResult("QDialog#ToolRunnerWindow" in qss, ["ToolRunnerWindow selector"])
@@ -244,9 +315,11 @@ def _collect_runtime(checks: dict[str, CheckResult]) -> float:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     os.environ["FIXFOX_SKIP_ONBOARDING"] = "1"
     from src.ui.main_window import MainWindow
+    from src.core.perf import PERF_RECORDER
     from src.core.search import get_search_cache_stats, reset_search_cache_for_tests
 
     app = QApplication.instance() or QApplication([])
+    PERF_RECORDER.reset()
     start = time.perf_counter()
     w = MainWindow()
     w.show()
@@ -309,16 +382,27 @@ def _collect_runtime(checks: dict[str, CheckResult]) -> float:
         checks["no_qsplitter_runtime"] = CheckResult(len(w.findChildren(QSplitter)) == 0, ["runtime splitter count"])
         hits = [b for b in w.findChildren(type(w.btn_export)) if "open reports" in f"{b.text()} {b.toolTip()}".lower() and b.isVisible()]
         checks["no_duplicate_open_reports_runtime"] = CheckResult(len(hits) <= 2, [f"open_reports_visible={len(hits)}"])
+        if "Playbooks" in w.NAV_ITEMS:
+            w.nav.setCurrentRow(w.NAV_ITEMS.index("Playbooks")); _drain(app, 3)
         w.nav.setCurrentRow(w.NAV_ITEMS.index("Settings")); _drain(app, 4)
         overlap = False
         if isinstance(w.settings_nav, QListWidget):
-            for i in range(w.settings_nav.count() - 1):
-                a = w.settings_nav.visualItemRect(w.settings_nav.item(i))
-                b = w.settings_nav.visualItemRect(w.settings_nav.item(i + 1))
-                if a.adjusted(0, -1, 0, 1).intersects(b.adjusted(0, -1, 0, 1)):
+            visible_rects = []
+            for i in range(w.settings_nav.count()):
+                item = w.settings_nav.item(i)
+                if item is None or item.isHidden():
+                    continue
+                rect = w.settings_nav.visualItemRect(item)
+                if rect.height() <= 0:
+                    continue
+                visible_rects.append(rect)
+            for i in range(len(visible_rects) - 1):
+                a = visible_rects[i]
+                b = visible_rects[i + 1]
+                if a.bottom() > b.top() + 1:
                     overlap = True
                     break
-        checks["settings_sidebar_no_overlap_runtime"] = CheckResult(True, [f"overlap={overlap}"])
+        checks["settings_sidebar_no_overlap_runtime"] = CheckResult(not overlap, [f"overlap={overlap}"])
         checks["quick_check_non_blocking_runtime"] = CheckResult(True, ["validated by smoke + responsive nav in runtime"])
         checks["safe_mode_boundary_runtime"] = CheckResult(True, ["validated by smoke test mode assertions"])
         checks["dialog_object_names"] = CheckResult(True, ["ToolRunnerWindow object name and app stylesheet in runtime"])
@@ -331,6 +415,13 @@ def _collect_runtime(checks: dict[str, CheckResult]) -> float:
         checks["history_contract"] = CheckResult(checks.get("history_contract", CheckResult(False)).passed or all(hasattr(w, x) for x in ["hist_query", "hist_scope"]), ["history page contract"])
         checks["status_area_contract"] = CheckResult(hasattr(w, "run_status_chip"), ["status chip"])
         checks["play_registry_unique_category"] = CheckResult(True, ["validated by PlayRegistryContractTests"])
+        perf_snapshot = PERF_RECORDER.snapshot()
+        perf_metrics = perf_snapshot.get("metrics", {}) if isinstance(perf_snapshot, dict) else {}
+        checks["perf_search_metric_present"] = CheckResult("search.time_to_results_ms" in perf_metrics, [str(list(perf_metrics.keys())[:8])])
+        checks["perf_nav_metrics_present"] = CheckResult(
+            ("ui.open_settings_ms" in perf_metrics) and ("ui.open_playbooks_ms" in perf_metrics),
+            [str(list(perf_metrics.keys())[:8])],
+        )
     finally:
         w.close()
         _drain(app, 2)
@@ -366,8 +457,9 @@ def run_verification(*, verbose: bool = True, write_report: bool = True) -> Veri
     checks: dict[str, CheckResult] = {}
     _collect_static(checks)
     _qss_sanity(checks)
+    _stability_subtests(checks)
     ttfp = _collect_runtime(checks)
-    checks["ttfp_threshold"] = CheckResult(ttfp <= 13000.0, [f"ttfp_ms={ttfp:.1f} threshold=13000"])
+    checks["ttfp_threshold"] = CheckResult(ttfp <= 5000.0, [f"ttfp_ms={ttfp:.1f} threshold=5000"])
     shot_dir = _walkthrough(checks)
     checks["rebuild_verification_written"] = CheckResult(True, [str(REPORT_PATH)])
     if REQ_PATH.exists():

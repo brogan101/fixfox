@@ -18,10 +18,8 @@ def _alpha(color: str, a: float) -> str:
 
 def _qss_file_url(rel_path: str) -> str:
     path = resource_path(rel_path).replace("\\", "/")
-    if len(path) > 1 and path[1] == ":":
-        path = "/" + path
-    path = path.replace(" ", "%20")
-    return f"file://{path}"
+    # Qt stylesheet image URLs are most stable with normalized absolute paths.
+    return path
 
 
 def build_qss(tokens: ThemeTokens, mode: str, density: str) -> str:
@@ -67,6 +65,21 @@ QFrame#TopAppBar {{
   background: {_alpha(tokens.panel, 0.96)};
   border: 0;
   border-radius: {d.corner_radius + 6}px;
+}}
+
+QFrame#StartupWarmupBanner {{
+  background: {_alpha(tokens.panel2, 0.90)};
+  border: 1px solid {border_subtle};
+  border-radius: {d.corner_radius + 3}px;
+}}
+QLabel#StartupWarmupSpinner {{
+  color: {tokens.accent};
+  font-weight: 75;
+  min-width: 10px;
+}}
+QLabel#StartupWarmupText {{
+  color: {text_soft};
+  font-size: {max(8, d.font_size - 1)}pt;
 }}
 
 QFrame#BrandStatus {{
