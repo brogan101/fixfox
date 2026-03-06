@@ -2081,6 +2081,442 @@ def _run_office_outlook_helper(task: ScriptTask, context: ScriptTaskContext, dry
     }
 
 
+def _run_identity_signin_helper(task: ScriptTask, context: ScriptTaskContext, dry_run: bool) -> dict[str, Any]:
+    if dry_run:
+        return {
+            "task_id": task.id,
+            "title": task.title,
+            "dry_run": True,
+            "command": ["collect whoami, Credential Manager inventory, dsreg status, time sync, and Windows Hello path hints"],
+            "timeout_s": task.timeout_s,
+            "category": task.category,
+        }
+    output_dir = _ensure_output_dir(context.output_dir)
+    summary_file = _build_output_path(task, output_dir)
+    whoami = run_command(["whoami", "/all"], timeout_s=20, cancel_event=context.cancel_event, on_stdout_line=_stdout_cb(context), on_stderr_line=_stderr_cb(context))
+    creds = run_command(["cmdkey", "/list"], timeout_s=25, cancel_event=context.cancel_event, on_stdout_line=_stdout_cb(context), on_stderr_line=_stderr_cb(context))
+    dsreg = run_command(["dsregcmd", "/status"], timeout_s=45, cancel_event=context.cancel_event, on_stdout_line=_stdout_cb(context), on_stderr_line=_stderr_cb(context))
+    time_status = run_command(["w32tm", "/query", "/status"], timeout_s=25, cancel_event=context.cancel_event, on_stdout_line=_stdout_cb(context), on_stderr_line=_stderr_cb(context))
+    hello_path = Path.home() / "AppData" / "Local" / "Microsoft" / "Ngc"
+    cred_targets = [line.split(":", 1)[1].strip() for line in (creds.stdout or "").splitlines() if "Target:" in line][:40]
+    dsreg_lines = [line.strip() for line in (dsreg.stdout or "").splitlines() if ":" in line and any(token in line for token in ("AzureAdJoined", "DomainJoined", "DeviceAuthStatus", "WorkplaceJoined"))][:12]
+    time_lines = [line.strip() for line in (time_status.stdout or "").splitlines() if ":" in line][:10]
+    detail_file = output_dir / "identity_signin_details.txt"
+    detail_file.write_text(
+        _effective_mask(
+            "\n".join(
+                [
+                    "Credential targets:",
+                    *cred_targets,
+                    "",
+                    "dsreg status:",
+                    *dsreg_lines,
+                    "",
+                    "time status:",
+                    *time_lines,
+                    "",
+                    f"hello_path_exists={hello_path.exists()}",
+                ]
+            ),
+            context.mask_options,
+        ),
+        encoding="utf-8",
+    )
+    summary = _sectioned_summary(
+        title="Identity Sign-in Helper Summary",
+        checked=[
+            "Captured Windows identity context with whoami.",
+            "Captured Credential Manager inventory.",
+            "Captured dsreg device-registration status.",
+            "Captured Windows time-sync status.",
+            "Captured Windows Hello path existence hint.",
+        ],
+        found=[
+            f"credential_targets={len(cred_targets)}",
+            f"hello_path_exists={hello_path.exists()}",
+            *(dsreg_lines[:4] or ["dsreg status unavailable or not supported on this device."]),
+            *(time_lines[:3] or ["time status unavailable."]),
+        ],
+        changed=["No credentials or sign-in state were changed automatically."],
+        next_steps=[
+            "Remove only stale credentials for the affected app or service.",
+            "Retest one affected app after sign-out/sign-in.",
+            "Escalate if device registration or MFA state looks unhealthy.",
+        ],
+        technical_lines=[
+            f"whoami_code={whoami.code}",
+            f"cmdkey_code={creds.code}",
+            f"dsreg_code={dsreg.code}",
+            f"time_code={time_status.code}",
+        ],
+    )
+    _write_summary_file(summary_file, summary, context.mask_options)
+    return {
+        "task_id": task.id,
+        "title": task.title,
+        "dry_run": False,
+        "code": 0 if whoami.code == 0 else whoami.code,
+        "stdout": _effective_mask(summary[:3200], context.mask_options),
+        "stderr": _effective_mask((creds.stderr or dsreg.stderr or time_status.stderr)[:1200], context.mask_options),
+        "duration_s": whoami.duration_s + creds.duration_s + dsreg.duration_s + time_status.duration_s,
+        "timed_out": whoami.timed_out or creds.timed_out or dsreg.timed_out or time_status.timed_out,
+        "category": task.category,
+        "output_files": [str(summary_file), str(detail_file)],
+        "summary_text": summary,
+        "normalized_findings": [
+            {"status": "warn" if cred_targets else "pass", "summary": f"Credential Manager contains {len(cred_targets)} stored targets.", "next_best_action": "Remove only stale entries related to the failing app."},
+            {"status": "fail" if dsreg.code != 0 else "pass", "summary": (dsreg_lines[0] if dsreg_lines else "dsreg device-registration details were not available."), "next_best_action": "Escalate if join/auth posture is not what the tenant expects."},
+            {"status": "warn" if any("Local CMOS Clock" in line for line in time_lines) else "pass", "summary": (time_lines[0] if time_lines else "Time sync state unavailable."), "next_best_action": "Correct system time drift before retrying app sign-in."},
+        ],
+    }
+
+
+def _run_vpn_remote_access_helper(task: ScriptTask, context: ScriptTaskContext, dry_run: bool) -> dict[str, Any]:
+    if dry_run:
+        return {
+            "task_id": task.id,
+            "title": task.title,
+            "dry_run": True,
+            "command": ["collect vpn profiles, rasdial state, virtual adapters, and route data"],
+            "timeout_s": task.timeout_s,
+            "category": task.category,
+        }
+    output_dir = _ensure_output_dir(context.output_dir)
+    summary_file = _build_output_path(task, output_dir)
+    vpn = run_command(["powershell", "-NoProfile", "-Command", "Get-VpnConnection -AllUserConnection -ErrorAction SilentlyContinue | Select-Object Name,ConnectionStatus,TunnelType,AllUserConnection | ConvertTo-Json -Depth 4"], timeout_s=35, cancel_event=context.cancel_event, on_stdout_line=_stdout_cb(context), on_stderr_line=_stderr_cb(context))
+    rasdial = run_command(["rasdial"], timeout_s=20, cancel_event=context.cancel_event, on_stdout_line=_stdout_cb(context), on_stderr_line=_stderr_cb(context))
+    adapters = run_command(["powershell", "-NoProfile", "-Command", "Get-NetAdapter -ErrorAction SilentlyContinue | Where-Object {$_.InterfaceDescription -match 'VPN|WAN Miniport|Cisco|AnyConnect|Juniper|GlobalProtect'} | Select-Object Name,Status,InterfaceDescription | ConvertTo-Json -Depth 4"], timeout_s=35, cancel_event=context.cancel_event, on_stdout_line=_stdout_cb(context), on_stderr_line=_stderr_cb(context))
+    routes = run_command(["route", "print"], timeout_s=25, cancel_event=context.cancel_event, on_stdout_line=_stdout_cb(context), on_stderr_line=_stderr_cb(context))
+    pbk = Path.home() / "AppData" / "Roaming" / "Microsoft" / "Network" / "Connections" / "Pbk" / "rasphone.pbk"
+    details_file = output_dir / "vpn_remote_access_details.txt"
+    details_file.write_text(
+        _effective_mask(
+            "\n".join(
+                [
+                    "rasdial:",
+                    (rasdial.stdout or rasdial.stderr).strip(),
+                    "",
+                    f"rasphone_exists={pbk.exists()} ({pbk})",
+                    "",
+                    "vpn_profiles:",
+                    vpn.stdout or "[]",
+                    "",
+                    "vpn_adapters:",
+                    adapters.stdout or "[]",
+                ]
+            ),
+            context.mask_options,
+        ),
+        encoding="utf-8",
+    )
+    summary = _sectioned_summary(
+        title="VPN / Remote Access Helper Summary",
+        checked=[
+            "Collected VPN profile status with Get-VpnConnection.",
+            "Collected current rasdial state.",
+            "Collected VPN/virtual adapter inventory.",
+            "Captured route table for tunnel/path analysis.",
+        ],
+        found=[
+            f"vpn_query_code={vpn.code}",
+            f"rasdial_code={rasdial.code}",
+            f"adapter_code={adapters.code}",
+            f"rasphone_exists={pbk.exists()}",
+        ],
+        changed=["No VPN profile or route state was changed automatically."],
+        next_steps=[
+            "Restart the VPN client and reconnect before escalating.",
+            "Retest one internal DNS name or UNC path after reconnect.",
+            "Escalate if the tunnel connects but internal routes/resources still fail.",
+        ],
+        technical_lines=[f"route_code={routes.code}", f"details_file={details_file}"],
+    )
+    _write_summary_file(summary_file, summary, context.mask_options)
+    return {
+        "task_id": task.id,
+        "title": task.title,
+        "dry_run": False,
+        "code": 0 if routes.code == 0 else routes.code,
+        "stdout": _effective_mask(summary[:3200], context.mask_options),
+        "stderr": _effective_mask((vpn.stderr or adapters.stderr or rasdial.stderr)[:1200], context.mask_options),
+        "duration_s": vpn.duration_s + rasdial.duration_s + adapters.duration_s + routes.duration_s,
+        "timed_out": vpn.timed_out or rasdial.timed_out or adapters.timed_out or routes.timed_out,
+        "category": task.category,
+        "output_files": [str(summary_file), str(details_file)],
+        "summary_text": summary,
+        "normalized_findings": [
+            {"status": "pass" if vpn.code == 0 else "warn", "summary": "VPN profile inventory was collected.", "next_best_action": "Compare connection status with the user's expected VPN profile."},
+            {"status": "warn" if "No connections" in (rasdial.stdout or "") else "pass", "summary": (rasdial.stdout or rasdial.stderr or "rasdial returned no active tunnel details.")[:220], "next_best_action": "Reconnect the VPN and retest an internal resource."},
+        ],
+    }
+
+
+def _run_outlook_profile_deep_helper(task: ScriptTask, context: ScriptTaskContext, dry_run: bool) -> dict[str, Any]:
+    if dry_run:
+        return {
+            "task_id": task.id,
+            "title": task.title,
+            "dry_run": True,
+            "command": ["collect Outlook process, profile, search service, add-ins, and OST/PST path state"],
+            "timeout_s": task.timeout_s,
+            "category": task.category,
+        }
+    output_dir = _ensure_output_dir(context.output_dir)
+    summary_file = _build_output_path(task, output_dir)
+    processes = run_command(["powershell", "-NoProfile", "-Command", "Get-Process OUTLOOK,SearchIndexer -ErrorAction SilentlyContinue | Select-Object Name,Id,Responding,StartTime | ConvertTo-Json -Depth 4"], timeout_s=30, cancel_event=context.cancel_event, on_stdout_line=_stdout_cb(context), on_stderr_line=_stderr_cb(context))
+    wsearch = run_command(["powershell", "-NoProfile", "-Command", "Get-Service WSearch -ErrorAction SilentlyContinue | Select-Object Name,Status,StartType | ConvertTo-Json -Depth 3"], timeout_s=20, cancel_event=context.cancel_event, on_stdout_line=_stdout_cb(context), on_stderr_line=_stderr_cb(context))
+    addins = run_command(["powershell", "-NoProfile", "-Command", "$p='HKCU:\\Software\\Microsoft\\Office\\Outlook\\Addins'; if(Test-Path $p){Get-ChildItem $p | Select-Object PSChildName | ConvertTo-Json -Depth 3}"], timeout_s=25, cancel_event=context.cancel_event, on_stdout_line=_stdout_cb(context), on_stderr_line=_stderr_cb(context))
+    profile_key = run_command(["powershell", "-NoProfile", "-Command", "$p='HKCU:\\Software\\Microsoft\\Office\\16.0\\Outlook\\Profiles'; if(Test-Path $p){Get-ChildItem $p | Select-Object PSChildName | ConvertTo-Json -Depth 3}"], timeout_s=25, cancel_event=context.cancel_event, on_stdout_line=_stdout_cb(context), on_stderr_line=_stderr_cb(context))
+    outlook_dir = Path.home() / "AppData" / "Local" / "Microsoft" / "Outlook"
+    ost_files = list(outlook_dir.glob("*.ost"))[:40]
+    pst_files = list((Path.home() / "Documents" / "Outlook Files").glob("*.pst"))[:20]
+    detail_file = output_dir / "outlook_profile_deep_details.txt"
+    detail_file.write_text(
+        _effective_mask(
+            "\n".join(
+                [
+                    f"outlook_path_exists={outlook_dir.exists()} ({outlook_dir})",
+                    f"ost_files={len(ost_files)}",
+                    *[f"ost={row.name}" for row in ost_files[:10]],
+                    f"pst_files={len(pst_files)}",
+                    *[f"pst={row.name}" for row in pst_files[:10]],
+                    "",
+                    "wsearch:",
+                    wsearch.stdout or "{}",
+                    "",
+                    "profiles:",
+                    profile_key.stdout or "[]",
+                    "",
+                    "addins:",
+                    addins.stdout or "[]",
+                ]
+            ),
+            context.mask_options,
+        ),
+        encoding="utf-8",
+    )
+    summary = _sectioned_summary(
+        title="Outlook Profile Deep Helper Summary",
+        checked=[
+            "Collected Outlook and SearchIndexer process posture.",
+            "Collected Windows Search service posture.",
+            "Collected Outlook profile registry names.",
+            "Collected add-in names and OST/PST path-only inventory.",
+        ],
+        found=[
+            f"outlook_dir_exists={outlook_dir.exists()}",
+            f"ost_files={len(ost_files)}",
+            f"pst_files={len(pst_files)}",
+            f"wsearch_code={wsearch.code}",
+        ],
+        changed=["No Outlook profile, OST, or add-in state was changed automatically."],
+        next_steps=[
+            "Use Outlook safe mode to isolate add-ins before recreating the profile.",
+            "Keep the existing profile until the new profile is validated.",
+            "Escalate if mailbox-side state remains the blocker after local profile cleanup.",
+        ],
+        technical_lines=[f"process_code={processes.code}", f"profile_code={profile_key.code}", f"addins_code={addins.code}"],
+    )
+    _write_summary_file(summary_file, summary, context.mask_options)
+    return {
+        "task_id": task.id,
+        "title": task.title,
+        "dry_run": False,
+        "code": 0 if detail_file.exists() else 1,
+        "stdout": _effective_mask(summary[:3200], context.mask_options),
+        "stderr": _effective_mask((processes.stderr or wsearch.stderr or profile_key.stderr)[:1200], context.mask_options),
+        "duration_s": processes.duration_s + wsearch.duration_s + addins.duration_s + profile_key.duration_s,
+        "timed_out": processes.timed_out or wsearch.timed_out or addins.timed_out or profile_key.timed_out,
+        "category": task.category,
+        "output_files": [str(summary_file), str(detail_file)],
+        "summary_text": summary,
+        "normalized_findings": [
+            {"status": "warn" if ost_files else "pass", "summary": f"Detected {len(ost_files)} OST file(s) in the local Outlook cache path.", "next_best_action": "If profile repair is needed, keep the old profile until the new one is validated."},
+            {"status": "pass" if wsearch.code == 0 else "warn", "summary": "Windows Search service posture was collected for Outlook search troubleshooting.", "next_best_action": "Check whether search failures match a stopped or unhealthy WSearch service."},
+        ],
+    }
+
+
+def _run_teams_support_helper(task: ScriptTask, context: ScriptTaskContext, dry_run: bool) -> dict[str, Any]:
+    if dry_run:
+        return {
+            "task_id": task.id,
+            "title": task.title,
+            "dry_run": True,
+            "command": ["collect Teams process, cache, logs, and update posture"],
+            "timeout_s": task.timeout_s,
+            "category": task.category,
+        }
+    output_dir = _ensure_output_dir(context.output_dir)
+    summary_file = _build_output_path(task, output_dir)
+    proc = run_command(["powershell", "-NoProfile", "-Command", "Get-Process Teams,'ms-teams' -ErrorAction SilentlyContinue | Select-Object Name,Id,Responding,StartTime,Path | ConvertTo-Json -Depth 4"], timeout_s=30, cancel_event=context.cancel_event, on_stdout_line=_stdout_cb(context), on_stderr_line=_stderr_cb(context))
+    details = run_command(["powershell", "-NoProfile", "-Command", "$paths=@($env:APPDATA+'\\Microsoft\\Teams', $env:LOCALAPPDATA+'\\Packages\\MSTeams_8wekyb3d8bbwe\\LocalCache', $env:LOCALAPPDATA+'\\Packages\\MSTeams_8wekyb3d8bbwe\\LocalState'); $rows=@(); foreach($p in $paths){$rows += [PSCustomObject]@{path=$p; exists=(Test-Path $p)}}; $rows | ConvertTo-Json -Depth 4"], timeout_s=30, cancel_event=context.cancel_event, on_stdout_line=_stdout_cb(context), on_stderr_line=_stderr_cb(context))
+    app_events = run_command(["wevtutil", "qe", "Application", "/c:25", "/f:text"], timeout_s=30, cancel_event=context.cancel_event, on_stdout_line=_stdout_cb(context), on_stderr_line=_stderr_cb(context))
+    detail_file = output_dir / "teams_support_details.txt"
+    detail_file.write_text(_effective_mask(f"{details.stdout}\n\n{proc.stdout}\n", context.mask_options), encoding="utf-8")
+    summary = _sectioned_summary(
+        title="Teams Support Helper Summary",
+        checked=[
+            "Collected Teams process posture.",
+            "Collected Teams cache/log path existence hints.",
+            "Collected recent application log excerpt for client-side crash clues.",
+        ],
+        found=[
+            f"teams_process_code={proc.code}",
+            f"cache_detail_code={details.code}",
+            f"app_events_code={app_events.code}",
+        ],
+        changed=["No Teams cache or app state was changed automatically."],
+        next_steps=[
+            "Close Teams fully before any cache reset.",
+            "Retest sign-in and a test call after cache/device cleanup.",
+            "Escalate if Teams still fails while Windows device/privacy posture is healthy.",
+        ],
+        technical_lines=[f"detail_file={detail_file}"],
+    )
+    _write_summary_file(summary_file, summary, context.mask_options)
+    return {
+        "task_id": task.id,
+        "title": task.title,
+        "dry_run": False,
+        "code": 0 if detail_file.exists() else 1,
+        "stdout": _effective_mask(summary[:3200], context.mask_options),
+        "stderr": _effective_mask((proc.stderr or details.stderr)[:1200], context.mask_options),
+        "duration_s": proc.duration_s + details.duration_s + app_events.duration_s,
+        "timed_out": proc.timed_out or details.timed_out or app_events.timed_out,
+        "category": task.category,
+        "output_files": [str(summary_file), str(detail_file)],
+        "summary_text": summary,
+        "normalized_findings": [
+            {"status": "pass" if proc.code == 0 else "warn", "summary": "Teams process posture was collected.", "next_best_action": "Compare whether Teams launches at all before resetting cache."},
+            {"status": "warn", "summary": "Teams cache and package paths were inventoried for guided cleanup.", "next_best_action": "Only clear cache after documenting the current tenant/account context."},
+        ],
+    }
+
+
+def _run_shell_start_search_helper(task: ScriptTask, context: ScriptTaskContext, dry_run: bool) -> dict[str, Any]:
+    if dry_run:
+        return {
+            "task_id": task.id,
+            "title": task.title,
+            "dry_run": True,
+            "command": ["collect Explorer, Start/Search process, WSearch service, and icon-cache posture"],
+            "timeout_s": task.timeout_s,
+            "category": task.category,
+        }
+    output_dir = _ensure_output_dir(context.output_dir)
+    summary_file = _build_output_path(task, output_dir)
+    shell_proc = run_command(["powershell", "-NoProfile", "-Command", "Get-Process explorer,SearchHost,StartMenuExperienceHost -ErrorAction SilentlyContinue | Select-Object Name,Id,Responding,StartTime | ConvertTo-Json -Depth 4"], timeout_s=30, cancel_event=context.cancel_event, on_stdout_line=_stdout_cb(context), on_stderr_line=_stderr_cb(context))
+    wsearch = run_command(["powershell", "-NoProfile", "-Command", "Get-Service WSearch -ErrorAction SilentlyContinue | Select-Object Name,Status,StartType | ConvertTo-Json -Depth 3"], timeout_s=20, cancel_event=context.cancel_event, on_stdout_line=_stdout_cb(context), on_stderr_line=_stderr_cb(context))
+    explorer_events = run_command(["wevtutil", "qe", "Application", "/c:40", "/f:text"], timeout_s=30, cancel_event=context.cancel_event, on_stdout_line=_stdout_cb(context), on_stderr_line=_stderr_cb(context))
+    icon_cache = list((Path.home() / "AppData" / "Local" / "Microsoft" / "Windows" / "Explorer").glob("iconcache*"))[:30]
+    detail_file = output_dir / "shell_start_search_details.txt"
+    detail_file.write_text(
+        _effective_mask(
+            "\n".join(
+                [
+                    "icon_cache_files:",
+                    *[row.name for row in icon_cache],
+                    "",
+                    "processes:",
+                    shell_proc.stdout or "[]",
+                    "",
+                    "wsearch:",
+                    wsearch.stdout or "{}",
+                ]
+            ),
+            context.mask_options,
+        ),
+        encoding="utf-8",
+    )
+    summary = _sectioned_summary(
+        title="Shell / Start / Search Helper Summary",
+        checked=[
+            "Collected Explorer, SearchHost, and StartMenuExperienceHost process posture.",
+            "Collected Windows Search service posture.",
+            "Collected icon-cache file presence hints.",
+            "Captured recent application-event context for shell crash review.",
+        ],
+        found=[
+            f"icon_cache_files={len(icon_cache)}",
+            f"wsearch_code={wsearch.code}",
+            f"process_code={shell_proc.code}",
+            f"event_query_code={explorer_events.code}",
+        ],
+        changed=["No profile, search index, or icon cache state was changed automatically."],
+        next_steps=[
+            "Restart Explorer first if the shell is stuck.",
+            "Only rebuild icon cache or search index after evidence is captured.",
+            "Escalate if temp-profile or corruption symptoms persist.",
+        ],
+        technical_lines=[f"detail_file={detail_file}"],
+    )
+    _write_summary_file(summary_file, summary, context.mask_options)
+    return {
+        "task_id": task.id,
+        "title": task.title,
+        "dry_run": False,
+        "code": 0 if detail_file.exists() else 1,
+        "stdout": _effective_mask(summary[:3200], context.mask_options),
+        "stderr": _effective_mask((shell_proc.stderr or wsearch.stderr)[:1200], context.mask_options),
+        "duration_s": shell_proc.duration_s + wsearch.duration_s + explorer_events.duration_s,
+        "timed_out": shell_proc.timed_out or wsearch.timed_out or explorer_events.timed_out,
+        "category": task.category,
+        "output_files": [str(summary_file), str(detail_file)],
+        "summary_text": summary,
+        "normalized_findings": [
+            {"status": "pass" if shell_proc.code == 0 else "warn", "summary": "Explorer/Start/Search process posture was collected.", "next_best_action": "Restart Explorer if the shell is present but visibly stuck."},
+            {"status": "pass" if wsearch.code == 0 else "warn", "summary": "Windows Search service posture was collected for Start/Search failures.", "next_best_action": "Check whether Search failures line up with WSearch state."},
+        ],
+    }
+
+
+def _run_restart_explorer_safe(task: ScriptTask, context: ScriptTaskContext, dry_run: bool) -> dict[str, Any]:
+    if dry_run:
+        return {
+            "task_id": task.id,
+            "title": task.title,
+            "dry_run": True,
+            "command": ["restart explorer.exe safely for shell recovery"],
+            "timeout_s": task.timeout_s,
+            "category": task.category,
+        }
+    output_dir = _ensure_output_dir(context.output_dir)
+    summary_file = _build_output_path(task, output_dir)
+    result = run_command(
+        ["powershell", "-NoProfile", "-Command", "Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 1; Start-Process explorer.exe"],
+        timeout_s=30,
+        cancel_event=context.cancel_event,
+        on_stdout_line=_stdout_cb(context),
+        on_stderr_line=_stderr_cb(context),
+    )
+    summary = _sectioned_summary(
+        title="Restart Explorer Summary",
+        checked=["Stopped any stuck explorer.exe process and relaunched explorer.exe."],
+        found=[f"restart_code={result.code}"],
+        changed=["Explorer was restarted for shell recovery."],
+        next_steps=["Retest Start, Search, taskbar, tray, and File Explorer immediately.", "If symptoms return quickly, continue with guided shell repair or escalation."],
+        technical_lines=[f"restart_code={result.code}"],
+    )
+    _write_summary_file(summary_file, summary, context.mask_options)
+    return {
+        "task_id": task.id,
+        "title": task.title,
+        "dry_run": False,
+        "code": result.code,
+        "stdout": _effective_mask(summary[:2400], context.mask_options),
+        "stderr": _effective_mask(result.stderr[:1000], context.mask_options),
+        "duration_s": result.duration_s,
+        "timed_out": result.timed_out,
+        "category": task.category,
+        "output_files": [str(summary_file)],
+        "summary_text": summary,
+        "normalized_findings": [
+            {"status": "changed" if result.code == 0 else "fail", "summary": "Explorer restart was attempted as a safe shell reset.", "next_best_action": "Retest Start/Search/taskbar behavior now."},
+        ],
+    }
+
+
 def _run_wifi_report_fix_wizard(task: ScriptTask, context: ScriptTaskContext, dry_run: bool) -> dict[str, Any]:
     if dry_run:
         return {
@@ -2766,6 +3202,8 @@ SCRIPT_TASKS: tuple[ScriptTask, ...] = (
     ScriptTask("task_camera_privacy_check", "Camera/Privacy Quick Check", "Review camera/mic privacy status and provide safe settings links.", None, 60, "Safe", "privacy", output_name="privacy_camera_mic_summary", runner=_run_camera_privacy_check),
     ScriptTask("task_onedrive_sync_helper", "OneDrive Sync Helper", "Collect OneDrive/process/network hints and provide guided sync recovery steps.", None, 70, "Safe", "cloud", output_name="onedrive_summary", runner=_run_onedrive_sync_helper),
     ScriptTask("task_usb_bt_disconnect_helper", "USB/Bluetooth Disconnect Helper", "Collect device disconnect hints and power guidance in read-only mode.", None, 80, "Safe", "devices", output_name="usb_bt_summary", runner=_run_usb_bt_disconnect_helper),
+    ScriptTask("task_identity_signin_helper", "Identity Sign-in Helper", "Collect device registration, time sync, cached credential, and Windows Hello posture.", None, 120, "Safe", "identity", output_name="identity_signin_summary", runner=_run_identity_signin_helper),
+    ScriptTask("task_vpn_remote_access_helper", "VPN / Remote Access Helper", "Collect VPN profiles, adapters, tunnel hints, and remote-access posture.", None, 120, "Safe", "network", output_name="vpn_remote_access_summary", runner=_run_vpn_remote_access_helper),
     ScriptTask("task_winsock_reset", "Winsock Reset", "Reset winsock catalog.", ("netsh", "winsock", "reset"), 45, "Admin", "network", admin_required=True, reboot_likely=True, output_name="winsock_reset"),
     ScriptTask("task_tcpip_reset", "TCP/IP Reset", "Reset TCP/IP stack.", ("netsh", "int", "ip", "reset"), 45, "Admin", "network", admin_required=True, reboot_likely=True, output_name="tcpip_reset"),
     # IT/MSP helpers
@@ -2774,6 +3212,9 @@ SCRIPT_TASKS: tuple[ScriptTask, ...] = (
     ScriptTask("task_firewall_profile_summary", "Firewall/Profile Summary", "Read-only firewall profile state summary.", None, 45, "Safe", "security", output_name="firewall_summary", runner=_run_firewall_profile_summary),
     ScriptTask("task_wmi_repair_helper", "WMI Repair Helper", "Collect WMI health and provide cautious guided repair steps.", None, 70, "Admin", "wmi", admin_required=False, reboot_likely=False, output_name="wmi_health", runner=_run_wmi_repair_helper),
     ScriptTask("task_office_outlook_helper", "Office/Outlook Helper", "Collect Office/Outlook path and version basics (paths only).", None, 70, "Safe", "office", output_name="office_outlook_summary", runner=_run_office_outlook_helper),
+    ScriptTask("task_outlook_profile_deep_helper", "Outlook Profile Deep Helper", "Collect Outlook process, profile, add-in, search, and OST/PST path state.", None, 120, "Safe", "office", output_name="outlook_profile_deep_summary", runner=_run_outlook_profile_deep_helper),
+    ScriptTask("task_teams_support_helper", "Teams Support Helper", "Collect Teams process, cache, log, and update posture for real meeting/app triage.", None, 110, "Safe", "office", output_name="teams_support_summary", runner=_run_teams_support_helper),
+    ScriptTask("task_shell_start_search_helper", "Shell / Start / Search Helper", "Collect Explorer, Start/Search, icon-cache, and profile posture.", None, 110, "Safe", "services", output_name="shell_start_search_summary", runner=_run_shell_start_search_helper),
     ScriptTask("task_eventlog_exporter_pack", "Event Log Exporter Pack", "Export core event logs bundle on demand.", None, 140, "Safe", "eventlogs", output_name="eventlogs_export_summary", runner=lambda t, c, d: _run_evidence_pack(t, c, d, ["task_evtx_application", "task_evtx_system", "task_evtx_setup", "task_evtx_windows_update", "task_evtx_printservice", "task_evtx_devicesetup"], "Event Log")),
     ScriptTask("task_system_profile_belarc_lite", "Belarc-lite System Profile", "Build local system profile summary (hardware/software/security best effort).", None, 80, "Safe", "system", output_name="system_profile_summary", runner=_run_system_profile),
     ScriptTask("task_startup_autostart_pack", "Startup/Autostart Pack", "Collect startup folders, Run keys, tasks, and optional autorunsc output.", None, 120, "Safe", "system", output_name="startup_pack_summary", runner=_run_startup_autostart_pack),
@@ -2784,6 +3225,7 @@ SCRIPT_TASKS: tuple[ScriptTask, ...] = (
     ScriptTask("task_windows_update_reset_tool", "Windows Update Reset Tool", "Admin reset chain for Windows Update components.", None, 420, "Admin", "repair", admin_required=True, reboot_likely=True, output_name="update_reset_summary", runner=lambda t, c, d: _run_admin_repair_chain(t, c, d, ["task_update_services_status", "task_reset_update_components", "task_update_services_status"], "update_reset_log.txt", "Windows Update Reset")),
     ScriptTask("task_sfc_dism_integrity_tool", "SFC/DISM Integrity Tool", "Admin integrity chain using SFC and DISM.", None, 3600, "Admin", "repair", admin_required=True, reboot_likely=True, output_name="integrity_repair_summary", runner=lambda t, c, d: _run_admin_repair_chain(t, c, d, ["task_sfc_scannow", "task_dism_restorehealth"], "integrity_log.txt", "SFC/DISM Integrity")),
     ScriptTask("task_printer_full_reset_tool", "Printer Full Reset Tool", "Admin printer repair chain with spooler restart and optional clear spool folder.", None, 420, "Admin", "repair", admin_required=True, reboot_likely=False, output_name="printer_reset_summary", runner=lambda t, c, d: _run_admin_repair_chain(t, c, d, ["task_restart_spooler", "task_clear_spool_folder", "task_printer_status"], "printer_reset_log.txt", "Printer Full Reset")),
+    ScriptTask("task_restart_explorer_safe", "Restart Explorer", "Restart explorer.exe safely for shell recovery.", None, 45, "Safe", "repair", output_name="restart_explorer", runner=_run_restart_explorer_safe),
     ScriptTask("task_smart_snapshot", "SMART Snapshot + Warnings", "Collect disk SMART/health hints best effort.", None, 70, "Safe", "hardware", output_name="smart_summary", runner=_run_smart_snapshot),
     ScriptTask("task_thermal_hints", "Thermal/Throttle Hints", "Collect thermal and throttle hints best effort.", None, 60, "Safe", "hardware", output_name="thermal_summary", runner=_run_thermal_hints),
     # Printer remediations/evidence

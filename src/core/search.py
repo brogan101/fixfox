@@ -12,6 +12,7 @@ from .registry import CAPABILITIES
 from .route_registry import list_routes
 from .runbooks import RUNBOOKS
 from .support_catalog import list_issues, list_support_playbooks
+from .support_playbooks import deep_support_playbook_map
 from .script_tasks import list_script_tasks
 from .toolbox import TOOL_DIRECTORY
 
@@ -85,7 +86,10 @@ def _build_static_rows() -> list[_IndexedRow]:
         subtitle = f"{issue.family_label} | {issue.subfamily} | {issue.severity} | {alias_text}"
         rows.append(_to_indexed(SearchItem("issue", issue.id, issue.title, subtitle)))
     for playbook in list_support_playbooks():
-        subtitle = f"{playbook.risk} | {playbook.automation} | ~{playbook.minutes}m | {', '.join(playbook.symptoms[:3])}"
+        deep = deep_support_playbook_map().get(playbook.id)
+        alias_text = ", ".join(deep.aliases[:3]) if deep is not None else ""
+        deep_text = "deep script-backed" if deep is not None else "mapped"
+        subtitle = f"{deep_text} | {playbook.risk} | {playbook.automation} | ~{playbook.minutes}m | {', '.join(playbook.symptoms[:3])} {alias_text}".strip()
         rows.append(_to_indexed(SearchItem("support_playbook", playbook.id, playbook.title, subtitle)))
     for task in list_script_tasks():
         rows.append(_to_indexed(SearchItem("task", task.id, task.title, f"{task.desc} [{task.category}]")))

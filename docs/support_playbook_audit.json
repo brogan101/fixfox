@@ -1,0 +1,106 @@
+{
+  "stats": {
+    "playbook_count": 15,
+    "diagnostic_script_count": 21,
+    "remediation_script_count": 9,
+    "guided_flow_count": 15,
+    "shared_primitive_count": 30,
+    "support_bundle_integrated_count": 15
+  },
+  "playbooks": [
+    "backup_pre_fix_snapshot_workflow",
+    "browser_repair",
+    "identity_credential_repair",
+    "identity_token_cache_reset",
+    "network_baseline_repair",
+    "new_pc_post_reimage_validation",
+    "os_health_integrity_repair",
+    "outlook_mailbox_repair",
+    "printer_spooler_repair",
+    "profile_shell_repair",
+    "slow_pc_triage",
+    "support_bundle_export_playbook",
+    "teams_meeting_repair",
+    "vpn_remote_access_repair",
+    "windows_update_repair"
+  ],
+  "executed_runs": [
+    {
+      "playbook_id": "identity_credential_repair",
+      "mode": "diagnose",
+      "title": "Sign-in / Credential Repair",
+      "code": 0,
+      "cancelled": false,
+      "finding_count": 3,
+      "evidence_files": 7,
+      "summary_excerpt": "Sign-in / Credential Repair Summary\n\nWhat we checked:\n- diagnostic: Identity Sign-in Helper\n- diagnostic: Office/Outlook Helper\n- validation: Identity Sign-in Helper\n\nWhat we found:\n- Identity Sign-in Helper -> pass\n- Office/Outlook Helper -> pass\n- Identity Sign-in Helper -> pass\n\nWhat we changed:\n- No direct system changes were made.\n\nNext steps:\n- Remove only stale entries related to the failing app.\n- Confirm whether prompts are Windows-wide or app-specific.\n- Remove only stale entries related to the failing app.\n- Escalate to directory/identity support if dsreg/device auth is unhealthy, M",
+      "evidence_root": "C:\\Users\\btheobald\\AppData\\Local\\FixFox\\state\\support_playbooks\\identity_credential_repair_20260306_182802"
+    },
+    {
+      "playbook_id": "network_baseline_repair",
+      "mode": "diagnose",
+      "title": "Network Baseline and Repair",
+      "code": 1,
+      "cancelled": false,
+      "finding_count": 3,
+      "evidence_files": 18,
+      "summary_excerpt": "Network Baseline and Repair Summary\n\nWhat we checked:\n- diagnostic: Network Evidence Pack\n- diagnostic: VPN / Remote Access Helper\n- validation: Network Evidence Pack\n\nWhat we found:\n- Network Evidence Pack -> fail\n- VPN / Remote Access Helper -> pass\n- Network Evidence Pack -> fail\n\nWhat we changed:\n- No direct system changes were made.\n\nNext steps:\n- Identify whether the failure is adapter, DNS, route, or proxy related.\n- Compare connection status with the user's expected VPN profile.\n- Compare pre/post DNS, proxy, route, and adapter state.\n- Escalate to network support if local stack repair",
+      "evidence_root": "C:\\Users\\btheobald\\AppData\\Local\\FixFox\\state\\support_playbooks\\network_baseline_repair_20260306_182824"
+    },
+    {
+      "playbook_id": "outlook_mailbox_repair",
+      "mode": "diagnose",
+      "title": "Outlook / Mailbox Repair",
+      "code": 0,
+      "cancelled": false,
+      "finding_count": 3,
+      "evidence_files": 7,
+      "summary_excerpt": "Outlook / Mailbox Repair Summary\n\nWhat we checked:\n- diagnostic: Outlook Profile Deep Helper\n- diagnostic: Office/Outlook Helper\n- validation: Outlook Profile Deep Helper\n\nWhat we found:\n- Outlook Profile Deep Helper -> pass\n- Office/Outlook Helper -> pass\n- Outlook Profile Deep Helper -> pass\n\nWhat we changed:\n- No direct system changes were made.\n\nNext steps:\n- If profile repair is needed, keep the old profile until the new one is validated.\n- Verify Office pathing and baseline app posture.\n- If profile repair is needed, keep the old profile until the new one is validated.\n- Escalate if Outl",
+      "evidence_root": "C:\\Users\\btheobald\\AppData\\Local\\FixFox\\state\\support_playbooks\\outlook_mailbox_repair_20260306_182828"
+    },
+    {
+      "playbook_id": "teams_meeting_repair",
+      "mode": "diagnose",
+      "title": "Teams / Meeting Repair",
+      "code": 0,
+      "cancelled": false,
+      "finding_count": 4,
+      "evidence_files": 9,
+      "summary_excerpt": "Teams / Meeting Repair Summary\n\nWhat we checked:\n- diagnostic: Teams Support Helper\n- diagnostic: Audio & Mic Fix Helper\n- diagnostic: Camera/Privacy Quick Check\n- validation: Teams Support Helper\n\nWhat we found:\n- Teams Support Helper -> pass\n- Audio & Mic Fix Helper -> pass\n- Camera/Privacy Quick Check -> pass\n- Teams Support Helper -> pass\n\nWhat we changed:\n- No direct system changes were made.\n\nNext steps:\n- Compare whether Teams launches at all before resetting cache.\n- Check whether the problem is at the Windows device layer.\n- Confirm whether Windows privacy is blocking Teams.\n- Compare",
+      "evidence_root": "C:\\Users\\btheobald\\AppData\\Local\\FixFox\\state\\support_playbooks\\teams_meeting_repair_20260306_182843"
+    },
+    {
+      "playbook_id": "profile_shell_repair",
+      "mode": "full",
+      "title": "Profile / Shell Repair",
+      "code": 0,
+      "cancelled": false,
+      "finding_count": 4,
+      "evidence_files": 7,
+      "summary_excerpt": "Profile / Shell Repair Summary\n\nWhat we checked:\n- diagnostic: Shell / Start / Search Helper\n- diagnostic: Belarc-lite System Profile\n- remediation: Restart Explorer\n- validation: Shell / Start / Search Helper\n\nWhat we found:\n- Shell / Start / Search Helper -> pass\n- Belarc-lite System Profile -> pass\n- Restart Explorer -> changed\n- Shell / Start / Search Helper -> pass\n\nWhat we changed:\n- Restart Explorer: remediation executed\n\nNext steps:\n- Restart Explorer if the shell is present but visibly stuck.\n- Capture machine posture for escalation.\n- Retest Start/Search/taskbar behavior now.\n- Resta",
+      "evidence_root": "C:\\Users\\btheobald\\AppData\\Local\\FixFox\\state\\support_playbooks\\profile_shell_repair_20260306_182848"
+    },
+    {
+      "playbook_id": "support_bundle_export_playbook",
+      "mode": "diagnose",
+      "title": "Support Bundle Export",
+      "code": 0,
+      "cancelled": false,
+      "finding_count": 3,
+      "evidence_files": 28,
+      "summary_excerpt": "Support Bundle Export Summary\n\nWhat we checked:\n- diagnostic: Event Log Exporter Pack\n- diagnostic: Belarc-lite System Profile\n- validation: Event Log Exporter Pack\n\nWhat we found:\n- Event Log Exporter Pack -> pass\n- Belarc-lite System Profile -> pass\n- Event Log Exporter Pack -> pass\n\nWhat we changed:\n- No direct system changes were made.\n\nNext steps:\n- Verify the exportable evidence set is populated.\n- Ensure baseline posture is included in the bundle.\n- Open Reports and verify the evidence checklist.\n- Escalate only after Reports confirms the bundle contains the required evidence and maskin",
+      "evidence_root": "C:\\Users\\btheobald\\AppData\\Local\\FixFox\\state\\support_playbooks\\support_bundle_export_playbook_20260306_182859"
+    },
+    {
+      "playbook_id": "windows_update_repair",
+      "mode": "diagnose",
+      "title": "Windows Update Repair",
+      "code": 0,
+      "cancelled": false,
+      "finding_count": 2,
+      "evidence_files": 14,
+      "summary_excerpt": "Windows Update Repair Summary\n\nWhat we checked:\n- diagnostic: Update Repair Evidence Pack\n- validation: Update Repair Evidence Pack\n\nWhat we found:\n- Update Repair Evidence Pack -> pass\n- Update Repair Evidence Pack -> pass\n\nWhat we changed:\n- No direct system changes were made.\n\nNext steps:\n- Capture servicing posture before any reset.\n- Retest the failed update with the new evidence pack.\n- Escalate if the reset chain and post-check still leave servicing broken, especially when CBS/DISM or feature-update readiness faults remain.\n\nSuccess looks like:\n- Update services look healthy post-reset.",
+      "evidence_root": "C:\\Users\\btheobald\\AppData\\Local\\FixFox\\state\\support_playbooks\\windows_update_repair_20260306_182903"
+    }
+  ]
+}

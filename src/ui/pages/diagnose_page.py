@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from PySide6.QtWidgets import QCheckBox, QComboBox, QHBoxLayout, QLineEdit, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QCheckBox, QComboBox, QHBoxLayout, QLabel, QLineEdit, QVBoxLayout, QWidget
 
 from ..components.feed_renderer import SkeletonLoader
 from ..style import spacing
@@ -57,6 +57,18 @@ class DiagnosePage(PageScroll):
         left_layout.addWidget(w.diag_counts)
         left_layout.addWidget(w.diag_top3)
         left_layout.addWidget(w.diag_next)
+        w.diag_playbook_summary = Card("Deep Playbook Run", "Issue-aware diagnostics, latest findings, and next actions appear here.")
+        w.diag_playbook_summary_text = QLabel("Select an issue-family entry to inspect deep diagnostic coverage.")
+        w.diag_playbook_summary_text.setWordWrap(True)
+        run_diag_btn = SoftButton("Run Selected Diagnostics")
+        run_diag_btn.clicked.connect(w._run_selected_support_playbook_diagnostics)
+        w.diag_playbook_findings = Card("Latest Script-backed Findings", "No deep playbook run yet.", right_widget=run_diag_btn)
+        w.diag_playbook_findings_text = QLabel("Run a deep playbook to populate normalized findings, validation, and escalation guidance.")
+        w.diag_playbook_findings_text.setWordWrap(True)
+        w.diag_playbook_summary.body_layout().addWidget(w.diag_playbook_summary_text)
+        w.diag_playbook_findings.body_layout().addWidget(w.diag_playbook_findings_text)
+        left_layout.addWidget(w.diag_playbook_summary)
+        left_layout.addWidget(w.diag_playbook_findings)
         left_layout.addStretch(1)
 
         center = QWidget()

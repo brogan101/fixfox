@@ -836,3 +836,78 @@ src/ui/style/qss_builder.py         |  45 +++---
 - Fresh proof:
   - latest walkthrough/verifier screenshot set: `docs/screenshots/20260306_175451`
   - support catalog report: `docs/support_catalog_report.json`
+
+## 2026-03-06 18:15:00 -05:00 - Deep Real Playbooks / Script-Backed Implementation Pass
+- Starting commit: `5318addbc6765d37191b22d785dd44971922a51f`
+- Branch: `main`
+- Proof harness:
+  - `git fetch --all`
+  - `git rev-parse HEAD`
+  - `git status --short --branch`
+  - `.venv\Scripts\python.exe --version`
+  - `.venv\Scripts\python.exe -m pip --version`
+- Python version: `Python 3.14.3`
+- Pip version: `pip 26.0.1`
+- Goals for this run:
+  - turn the highest-value support playbooks into real executable workflows with script-backed diagnostics, safe actions, validation, and evidence capture
+  - add a canonical support-playbook execution model instead of only dispatching raw tasks/runbooks from issue mappings
+  - surface deep playbook detail, run history, evidence, and validation summaries across Playbooks, Diagnose, Fixes, Reports, History, and Settings
+  - deepen priority families first: identity, network/vpn, printer, Outlook/Office, Teams/collab, browser/SSO, slow-PC, Windows Update/OS health, shell/start/search, and support bundle/export
+- Top playbook families being deepened:
+  - sign-in / credential / token repair
+  - network / DNS / adapter / VPN repair
+  - print / spooler / printer repair
+  - Outlook / Office / mail profile repair
+  - Teams / collaboration / audio-video repair
+  - browser / SSO / web app repair
+  - slow PC / performance triage
+  - Windows Update / OS health repair
+  - profile / shell / search / Start repair
+  - support bundle / pre-fix snapshot / post-reimage validation
+- Script architecture plan:
+  - keep `src/core/script_tasks.py` as the primitive execution layer
+  - add a support-playbook registry/executor that binds issue-aware playbooks to diagnostic, remediation, validation, evidence, and guided/manual steps
+  - normalize script output into a support-playbook run result with findings, actions, evidence, validation, escalation, and bundle references
+  - persist support-playbook runs into sessions so Reports and History can render them directly
+- Risk areas:
+  - `src/core/script_tasks.py`
+  - `src/core/runbooks.py`
+  - `src/core/evidence_collector.py`
+  - `src/core/support_catalog.py`
+  - `src/ui/main_window_impl.py`
+  - `src/ui/pages/playbooks_page.py`
+  - `src/ui/pages/diagnose_page.py`
+  - `src/ui/pages/fixes_page.py`
+  - `src/ui/pages/reports_page.py`
+  - `src/ui/pages/history_page.py`
+- Verification plan:
+  - add registry and execution tests for deep support playbooks
+  - run targeted script-backed audits for playbook registry integrity and normalized execution output
+  - run smoke + walkthrough + verifier after UI/result integration
+  - generate a fresh screenshot set showing playbook detail, runnable diagnostics, fix guidance, and run evidence
+
+## 2026-03-06 18:41:00 -05:00 - Deep Playbook Verification Summary
+- Implemented:
+  - `src/core/support_playbooks.py` as the canonical deep support-playbook registry and execution path
+  - new script primitives in `src/core/script_tasks.py` for identity, VPN/remote access, Outlook profile state, Teams state, shell/start/search state, and safe Explorer restart
+  - deep playbook detail, execution, and result surfaces across Playbooks / Diagnose / Fixes / Reports / History
+- Deep coverage:
+  - 15 deep script-backed playbooks
+  - 21 diagnostic scripts
+  - 9 remediation scripts
+  - 15 guided/manual flows
+  - 30 shared script primitives
+  - 15 support-bundle-integrated playbooks
+- Execution proof:
+  - `.venv\Scripts\python.exe -m unittest src.tests.test_support_playbooks`
+  - `.venv\Scripts\python.exe scripts\support_playbook_audit.py`
+  - executed deep playbooks: identity, network, Outlook, Teams, shell, support bundle, Windows Update
+- Verification executed:
+  - `.venv\Scripts\python.exe -m src.tests.smoke`
+  - `.venv\Scripts\python.exe scripts\ui_walkthrough.py`
+  - `.venv\Scripts\python.exe scripts\qss_sanity_check.py`
+  - `.venv\Scripts\python.exe scripts\font_sanity_check.py`
+  - `.venv\Scripts\python.exe scripts\verify_requirements.py`
+- Fresh proof:
+  - latest walkthrough/verifier screenshot set: `docs/screenshots/20260306_183618`
+  - deep playbook audit: `docs/support_playbook_audit.json`

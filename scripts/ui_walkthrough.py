@@ -419,6 +419,17 @@ def main() -> int:
                 family_shot = out_dir / "playbooks_family_drilldown.png"
                 _capture_shell(window, family_shot)
                 captured.append(str(family_shot.relative_to(REPO_ROOT)).replace("\\", "/"))
+        deep_detail_shot = out_dir / "deep_playbook_detail.png"
+        _capture_shell(window, deep_detail_shot)
+        captured.append(str(deep_detail_shot.relative_to(REPO_ROOT)).replace("\\", "/"))
+
+        if hasattr(window, "_run_selected_support_playbook_diagnostics"):
+            window._run_selected_support_playbook_diagnostics()
+            deadline = time.time() + 180
+            while getattr(window, "active_worker", None) is not None and time.time() < deadline:
+                _drain(app, cycles=3, delay=0.08)
+            if getattr(window, "active_worker", None) is not None:
+                failures.append("Deep support playbook diagnostics did not finish in time.")
 
         diagnose_idx = window.NAV_ITEMS.index("Diagnose")
         window.nav.setCurrentRow(diagnose_idx)
@@ -429,6 +440,9 @@ def main() -> int:
         diagnose_shot = out_dir / "diagnose_issue_triage.png"
         _capture_shell(window, diagnose_shot)
         captured.append(str(diagnose_shot.relative_to(REPO_ROOT)).replace("\\", "/"))
+        diagnose_results_shot = out_dir / "diagnose_playbook_results.png"
+        _capture_shell(window, diagnose_results_shot)
+        captured.append(str(diagnose_results_shot.relative_to(REPO_ROOT)).replace("\\", "/"))
 
         fixes_idx = window.NAV_ITEMS.index("Fixes")
         window.nav.setCurrentRow(fixes_idx)
@@ -461,6 +475,19 @@ def main() -> int:
                     settings_support = out_dir / "settings_support_help.png"
                     _capture_shell(window, settings_support)
                     captured.append(str(settings_support.relative_to(REPO_ROOT)).replace("\\", "/"))
+
+        if getattr(window, "current_session", None):
+            window.nav.setCurrentRow(window.NAV_ITEMS.index("Reports"))
+            _drain(app, cycles=4)
+            reports_support = out_dir / "reports_playbook_evidence.png"
+            _capture_shell(window, reports_support)
+            captured.append(str(reports_support.relative_to(REPO_ROOT)).replace("\\", "/"))
+
+            window.nav.setCurrentRow(window.NAV_ITEMS.index("History"))
+            _drain(app, cycles=4)
+            history_support = out_dir / "history_playbook_evidence.png"
+            _capture_shell(window, history_support)
+            captured.append(str(history_support.relative_to(REPO_ROOT)).replace("\\", "/"))
 
         window.run_quick_check("Quick Check")
         deadline = time.time() + 75

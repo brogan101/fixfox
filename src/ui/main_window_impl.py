@@ -109,6 +109,12 @@ from ..core.support_catalog import (
     support_fix_map,
     support_playbook_map,
 )
+from ..core.support_playbooks import (
+    deep_support_playbook_map,
+    deep_support_playbook_stats,
+    execute_support_playbook,
+    is_deep_support_playbook,
+)
 from ..core.toolbox import TOP_TOOLS, TOOL_DIRECTORY, launch_tool, search_tools
 from ..core.utils import open_uri, resource_path
 from ..core.version import APP_VERSION
@@ -3106,8 +3112,9 @@ class MainWindow(QMainWindow):
                 findings = len(self.current_session.get("findings", []))
                 actions = len(self.current_session.get("actions", []))
                 evidence = len(self.current_session.get("evidence", {}).get("files", [])) if isinstance(self.current_session.get("evidence", {}), dict) else 0
+                support_runs = len(self.current_session.get("support_playbook_runs", [])) if isinstance(self.current_session.get("support_playbook_runs", []), list) else 0
                 self.rep_session_summary.sub.setText(
-                    f"Session {self.current_session.get('session_id', '')} | {findings} findings | {actions} actions | {evidence} evidence files"
+                    f"Session {self.current_session.get('session_id', '')} | {findings} findings | {actions} actions | {support_runs} deep playbook runs | {evidence} evidence files"
                 )
             else:
                 self.rep_session_summary.sub.setText("No active session loaded yet.")
@@ -3125,6 +3132,12 @@ class MainWindow(QMainWindow):
             r.addChild(QTreeWidgetItem(["Issue", support_context.get("title", "")]))
             r.addChild(QTreeWidgetItem(["Family", support_context.get("family_label", "")]))
             r.addChild(QTreeWidgetItem(["Primary Playbook", support_context.get("primary_playbook_id", "")]))
+        support_runs = self.current_session.get("support_playbook_runs", []) if isinstance(self.current_session.get("support_playbook_runs", []), list) else []
+        if support_runs:
+            latest = support_runs[-1]
+            r.addChild(QTreeWidgetItem(["Deep Playbook Runs", str(len(support_runs))]))
+            r.addChild(QTreeWidgetItem(["Latest Deep Run", str(latest.get("title", ""))]))
+            r.addChild(QTreeWidgetItem(["Latest Deep Status", str(latest.get("status", ""))]))
         r.addChild(QTreeWidgetItem(["Findings", str(len(self.current_session.get("findings", [])))]))
         r.addChild(QTreeWidgetItem(["Actions", str(len(self.current_session.get("actions", [])))]))
         r.addChild(QTreeWidgetItem(["Preset", self.rep_preset.currentText()]))
@@ -3348,28 +3361,37 @@ class MainWindow(QMainWindow):
         actions = s.get("actions", [])
         evidence = s.get("evidence", {}).get("files", []) if isinstance(s.get("evidence", {}), dict) else []
         support_context = s.get("support_context", {}) if isinstance(s.get("support_context", {}), dict) else {}
+        support_runs = s.get("support_playbook_runs", []) if isinstance(s.get("support_playbook_runs", []), list) else []
         top_rows = [str(row.get("title", "")).strip() for row in findings[:3] if str(row.get("title", "")).strip()]
         exports = "yes" if any(meta.session_id == sid and meta.last_export_path for meta in load_index()) else "no"
         lines = [
             f"Session ID: {sid}",
             f"Goal: {goals}",
             f"Actions taken: {len(actions)}",
+            f"Deep playbook runs: {len(support_runs)}",
             f"Evidence collected: {len(evidence)}",
             f"Export generated: {exports}",
             "Top findings:",
         ]
         if support_context:
             lines.insert(2, f"Issue family: {support_context.get('family_label', 'n/a')} | {support_context.get('title', 'n/a')}")
+        if support_runs:
+            latest_run = support_runs[-1]
+            lines.insert(4, f"Latest deep run: {latest_run.get('title', 'n/a')} | {latest_run.get('status', 'n/a')} | mode={latest_run.get('mode', 'n/a')}")
         if top_rows:
             lines.extend([f"- {row}" for row in top_rows])
         else:
             lines.append("- none")
         self.hist_detail.sub.setText("\n".join(lines))
         if hasattr(self, "hist_issue_summary") and support_context:
+            latest_line = ""
+            if support_runs:
+                latest_run = support_runs[-1]
+                latest_line = f"\nLatest deep run: {latest_run.get('title', 'n/a')} | {latest_run.get('status', 'n/a')}"
             self.hist_issue_summary.sub.setText(
                 f"Selected session issue: {support_context.get('title', 'n/a')}\n"
                 f"Family: {support_context.get('family_label', 'n/a')}\n"
-                f"Primary playbook: {support_context.get('primary_playbook_id', 'n/a')}"
+                f"Primary playbook: {support_context.get('primary_playbook_id', 'n/a')}{latest_line}"
             )
         if hasattr(self, "hist_compare"):
             self.hist_compare.set_text("\n".join(lines))
@@ -3430,7 +3452,7 @@ class MainWindow(QMainWindow):
         self._rebuild_diagnose_sections(s.get("findings", []))
         self._update_diagnose_context({})
         self._update_status_from_session(s)
-        self._rebuild_report_tree(); self._update_redaction_preview(); self._refresh_evidence_items(); self._refresh_run_center(); self._update_context_labels(); self._refresh_support_issue_library(); self._refresh_support_diagnose(); self._refresh_support_fix_library(); self._refresh_support_reports_summary(); self._refresh_support_history_summary(); self._update_concierge()
+        self._rebuild_report_tree(); self._update_redaction_preview(); self._refresh_evidence_items(); self._refresh_run_center(); self._update_context_labels(); self._refresh_support_issue_library(); self._refresh_support_diagnose(); self._refresh_support_fix_library(); self._refresh_support_reports_summary(); self._refresh_support_history_summary(); self._render_support_playbook_detail(); self._update_concierge()
 
     def _make_tool_row(self, item: FeedItemAdapter, density: str) -> QWidget:
         row = ToolRow(item.title, item.category or "tool", item.subtitle, payload=item.payload, density=density)
@@ -3543,6 +3565,11 @@ class MainWindow(QMainWindow):
             self.nav.setCurrentRow(self.NAV_ITEMS.index("Playbooks"))
             self._select_runbook(key)
             self.run_selected_runbook(False)
+            return
+        if run_kind == "support_playbook":
+            self.nav.setCurrentRow(self.NAV_ITEMS.index("Playbooks"))
+            self._set_support_playbook_selection(key)
+            self._run_support_playbook(key, mode="diagnose")
             return
         if run_kind == "fix":
             self.nav.setCurrentRow(self.NAV_ITEMS.index("Fixes"))
@@ -4025,6 +4052,123 @@ class MainWindow(QMainWindow):
         self._refresh_support_reports_summary()
         self._refresh_support_history_summary()
 
+    def _latest_support_playbook_run(self, playbook_id: str = "") -> dict[str, Any] | None:
+        if not self.current_session:
+            return None
+        rows = self.current_session.get("support_playbook_runs", [])
+        if not isinstance(rows, list):
+            return None
+        wanted = str(playbook_id or "").strip()
+        for row in reversed(rows):
+            if not isinstance(row, dict):
+                continue
+            if wanted and str(row.get("playbook_id", "")).strip() != wanted:
+                continue
+            return row
+        return None
+
+    def _set_support_playbook_selection(self, playbook_id: str) -> None:
+        playbook = support_playbook_map().get(str(playbook_id or "").strip())
+        if playbook is None:
+            return
+        self.selected_support_playbook_id = playbook.id
+        if self.current_session and isinstance(self.current_session.get("support_context", {}), dict):
+            self.current_session["support_context"]["primary_playbook_id"] = playbook.id
+            save_session(self.current_session)
+        self._render_support_playbook_detail()
+
+    def _render_support_playbook_detail(self) -> None:
+        playbook = support_playbook_map().get(str(getattr(self, "selected_support_playbook_id", "")).strip())
+        issue = support_issue_map().get(str(getattr(self, "selected_support_issue_id", "")).strip())
+        plan = deep_support_playbook_map().get(playbook.id) if playbook is not None else None
+        latest = self._latest_support_playbook_run(playbook.id if playbook is not None else "")
+        if hasattr(self, "pb_playbook_detail") and playbook is None:
+            self.pb_playbook_detail.title.setText("Deep Playbook Detail")
+            self.pb_playbook_detail.sub.setText("Select a mapped playbook to inspect script-backed workflow coverage.")
+        if playbook is None:
+            return
+        issue_line = f"Issue context: {issue.title}\n" if issue is not None else ""
+        run_line = ""
+        if latest is not None:
+            run_line = f"\nLatest run: {latest.get('status', 'n/a')} | mode={latest.get('mode', 'n/a')} | findings={latest.get('finding_count', 0)}"
+        if hasattr(self, "pb_playbook_detail"):
+            self.pb_playbook_detail.title.setText(f"Deep Playbook: {playbook.title}")
+            self.pb_playbook_detail.sub.setText(playbook.purpose)
+        if hasattr(self, "pb_playbook_detail_text"):
+            if plan is None:
+                self.pb_playbook_detail_text.setText(
+                    f"{issue_line}{playbook.purpose}\n\n"
+                    f"Risk: {playbook.risk} | Automation: {playbook.automation} | ~{playbook.minutes}m\n"
+                    f"Symptoms: {', '.join(playbook.symptoms[:4])}\n"
+                    f"This playbook currently routes through its mapped action (`{playbook.primary_action_ref}`) but is not yet a deep script-backed support playbook.{run_line}"
+                )
+            else:
+                self.pb_playbook_detail_text.setText(
+                    f"{issue_line}{playbook.purpose}\n\n"
+                    f"Risk: {playbook.risk} | Automation: {playbook.automation} | ~{playbook.minutes}m | Audience: {plan.audience}\n"
+                    f"Aliases: {', '.join(plan.aliases[:4])}\n"
+                    f"Support bundle integrated: {'yes' if plan.support_bundle_integrated else 'no'}{run_line}"
+                )
+        if hasattr(self, "pb_playbook_scripts"):
+            if plan is None:
+                self.pb_playbook_scripts.set_text("No deep script-binding metadata for this playbook yet.")
+            else:
+                lines: list[str] = ["Diagnostics:"]
+                lines.extend([f"- {row.title}: {row.purpose}" for row in plan.diagnostics] or ["- none"])
+                lines.append("")
+                lines.append("Remediations:")
+                lines.extend([f"- {row.title}: {row.purpose}" for row in plan.remediations] or ["- guided/manual only"])
+                lines.append("")
+                lines.append("Validations:")
+                lines.extend([f"- {row.title}: {row.purpose}" for row in plan.validations] or ["- none"])
+                self.pb_playbook_scripts.set_text("\n".join(lines))
+        if hasattr(self, "pb_playbook_guided"):
+            if plan is None:
+                self.pb_playbook_guided.set_text("No deep guided/manual steps for this playbook yet.")
+            else:
+                lines = [f"- {row.title}: {row.details}\n  Validate: {row.validate}\n  Escalate when: {row.escalate_when}" for row in plan.guided_steps]
+                self.pb_playbook_guided.set_text("\n".join(lines) or "No guided/manual steps.")
+        if hasattr(self, "pb_playbook_validation"):
+            if plan is None:
+                self.pb_playbook_validation.set_text(
+                    "Success criteria:\n- " + "\n- ".join(playbook.validation) + "\n\nEscalate when:\n- " + "\n- ".join(playbook.escalation)
+                )
+            else:
+                lines = [
+                    "Evidence plans:",
+                    *[f"- {row}" for row in plan.evidence_plan_ids],
+                    "",
+                    "Success criteria:",
+                    *[f"- {row}" for row in plan.success_criteria],
+                    "",
+                    "Escalate when:",
+                    *[f"- {row}" for row in plan.escalation_rules],
+                ]
+                if latest is not None:
+                    lines.extend(["", "Latest run summary:", f"- {latest.get('summary', '')[:500]}"])
+                self.pb_playbook_validation.set_text("\n".join(lines))
+        if hasattr(self, "diag_playbook_summary_text"):
+            if plan is None:
+                self.diag_playbook_summary_text.setText(f"{playbook.title} routes through `{playbook.primary_action_ref}`. Use Playbooks for detail.")
+            else:
+                self.diag_playbook_summary_text.setText(
+                    f"{playbook.title}\nScripts: {len(plan.diagnostics)} diagnostics, {len(plan.remediations)} remediations, {len(plan.validations)} validations."
+                )
+        if hasattr(self, "diag_playbook_findings_text"):
+            if latest is None:
+                self.diag_playbook_findings_text.setText("Run a deep playbook to populate normalized findings, validation, and escalation guidance.")
+            else:
+                lines = [f"- {row.get('title', '')}: {row.get('status', '')} | {row.get('summary', '')[:120]}" for row in latest.get("findings", [])[:5]]
+                self.diag_playbook_findings_text.setText("\n".join(lines) or latest.get("summary", "No findings summary."))
+        if hasattr(self, "support_fix_latest_run"):
+            if latest is None:
+                self.support_fix_latest_run.set_text("No support playbook run recorded yet for this issue context.")
+            else:
+                self.support_fix_latest_run.set_text(
+                    f"Status: {latest.get('status', 'n/a')} | Mode: {latest.get('mode', 'n/a')} | Findings: {latest.get('finding_count', 0)}\n"
+                    f"{latest.get('summary', '')[:900]}"
+                )
+
     def _select_support_issue(self, issue_id: str, *, open_target: str = "") -> None:
         issue = support_issue_map().get(str(issue_id or "").strip())
         if issue is None:
@@ -4042,7 +4186,7 @@ class MainWindow(QMainWindow):
                 f"Network required: {'yes' if issue.network_required else 'no'} | Reboot risk: {'yes' if issue.reboot_required else 'no'}"
             )
         if hasattr(self, "pb_issue_playbooks"):
-            plays = [f"{row.title} [{row.risk} | {row.automation} | ~{row.minutes}m]" for row in playbooks_for_issue(issue.id)]
+            plays = [f"{row.title} [{'Deep' if is_deep_support_playbook(row.id) else 'Mapped'} | {row.risk} | {row.automation} | ~{row.minutes}m]" for row in playbooks_for_issue(issue.id)]
             self.pb_issue_playbooks.set_text("\n".join(plays) or "No playbooks mapped.")
         if hasattr(self, "pb_issue_diagnostics"):
             diags = [f"{row.title}: {row.source}" for row in diagnostics_for_issue(issue.id)]
@@ -4050,6 +4194,7 @@ class MainWindow(QMainWindow):
         if hasattr(self, "pb_issue_fixes"):
             fixes = [f"{row.title} [{row.risk} | {row.automation}] - {row.summary}" for row in fixes_for_issue(issue.id)]
             self.pb_issue_fixes.set_text("\n".join(fixes) or "No fixes mapped.")
+        self._set_support_playbook_selection(self.selected_support_playbook_id)
         self._refresh_support_fix_library()
         self._refresh_support_diagnose()
         self._refresh_support_reports_summary()
@@ -4108,16 +4253,163 @@ class MainWindow(QMainWindow):
         if playbook is None:
             self.toasts.show_toast("No mapped support playbook.")
             return
-        self.selected_support_playbook_id = playbook.id
-        self._dispatch_support_action(playbook.primary_action_ref)
+        self._set_support_playbook_selection(playbook.id)
+        self._run_support_playbook(playbook.id, mode="full")
+
+    def _run_selected_support_playbook_diagnostics(self) -> None:
+        issue = support_issue_map().get(str(getattr(self, "selected_support_issue_id", "")).strip())
+        if issue is None:
+            self.toasts.show_toast("Select an issue first.")
+            return
+        playbook_id = str(getattr(self, "selected_support_playbook_id", "")).strip() or next(iter(issue.playbook_ids), "")
+        if not playbook_id:
+            self.toasts.show_toast("No mapped support playbook.")
+            return
+        self._set_support_context(issue.id, create_session=True)
+        self._set_support_playbook_selection(playbook_id)
+        self._run_support_playbook(playbook_id, mode="diagnose")
 
     def _open_selected_support_playbook(self) -> None:
         issue = support_issue_map().get(str(getattr(self, "selected_support_issue_id", "")).strip())
         if issue is None or not issue.playbook_ids:
             self.toasts.show_toast("No mapped support playbook.")
             return
-        self.selected_support_playbook_id = issue.playbook_ids[0]
+        self._set_support_playbook_selection(issue.playbook_ids[0])
         self.nav.setCurrentRow(self.NAV_ITEMS.index("Playbooks"))
+
+    def _run_support_playbook(self, playbook_id: str, *, mode: str) -> None:
+        playbook = support_playbook_map().get(str(playbook_id or "").strip())
+        if playbook is None:
+            self.toasts.show_toast("Support playbook not found.")
+            return
+        if not is_deep_support_playbook(playbook.id):
+            if mode == "diagnose":
+                self.toasts.show_toast("This playbook is not yet deep script-backed. Opening mapped action instead.")
+            self._dispatch_support_action(playbook.primary_action_ref)
+            return
+        if self.active_worker is not None:
+            self.toasts.show_toast("Another task is running.")
+            return
+        issue_id = str(getattr(self, "selected_support_issue_id", "")).strip()
+        sid = self._ensure_active_session(f"Support Playbook: {playbook.title}")
+        mask_options = MaskingOptions(
+            enabled=self.rep_safe.isChecked() if hasattr(self, "rep_safe") else self.settings_state.share_safe_default,
+            mask_ip=self.rep_ip.isChecked() if hasattr(self, "rep_ip") else self.settings_state.mask_ip_default,
+            extra_tokens=(),
+        )
+        plan = deep_support_playbook_map()[playbook.id]
+        allow_admin_actions = False
+        if mode == "full" and any(script_task_map()[row.task_id].admin_required for row in plan.remediations):
+            answer = QMessageBox.question(
+                self,
+                "Run admin remediation?",
+                f"{playbook.title} includes admin remediation steps.\n\nRun full remediation instead of diagnostics-only?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            allow_admin_actions = answer == QMessageBox.Yes
+        run_id = self.run_event_bus.create_run(
+            name=f"Support Playbook: {playbook.title}",
+            risk=playbook.risk,
+            session_id=sid,
+            metadata={"kind": "support_playbook", "capability_id": playbook.id, "support_playbook_id": playbook.id, "mode": mode},
+        )
+
+        def task(progress_cb: Any, partial_cb: Any, log_cb: Any, cancel_event: Any, timeout_s: int) -> dict[str, Any]:
+            return execute_support_playbook(
+                playbook.id,
+                mode=mode,
+                issue_id=issue_id,
+                session_id=sid,
+                mask_options=mask_options,
+                cancel_event=cancel_event,
+                progress_cb=progress_cb,
+                partial_cb=partial_cb,
+                log_cb=log_cb,
+                timeout_s=timeout_s,
+                allow_admin_actions=allow_admin_actions,
+                run_event_bus=self.run_event_bus,
+                run_id=run_id,
+            )
+
+        detail_lines = [
+            f"Deep playbook: {playbook.title}",
+            f"Mode: {mode}",
+            f"Risk: {playbook.risk}",
+            f"Diagnostics: {len(plan.diagnostics)}",
+            f"Remediations: {len(plan.remediations)}",
+            f"Validations: {len(plan.validations)}",
+        ]
+        self._start_task(
+            f"Support Playbook: {playbook.title}",
+            task,
+            lambda payload: self._on_support_playbook(playbook.id, payload),
+            timeout_s=max(120, playbook.minutes * 30),
+            risk=playbook.risk,
+            plain_summary=playbook.purpose,
+            details_text="\n".join(detail_lines),
+            next_steps="Review normalized findings, then apply guided/manual steps or export a bundle.",
+            rerun_cb=lambda: self._run_support_playbook(playbook.id, mode=mode),
+            evidence_root=str(ensure_dirs()["state"] / "support_playbooks"),
+            run_id=run_id,
+            run_metadata={"kind": "support_playbook", "capability_id": playbook.id, "support_playbook_id": playbook.id, "mode": mode},
+        )
+
+    def _on_support_playbook(self, playbook_id: str, payload: dict[str, Any]) -> None:
+        if not self.current_session:
+            return
+        run_status = "Failed" if int(payload.get("code", 0)) != 0 else "Completed"
+        rows = self.current_session.setdefault("support_playbook_runs", [])
+        if not isinstance(rows, list):
+            rows = []
+            self.current_session["support_playbook_runs"] = rows
+        rows.append(
+            {
+                "playbook_id": playbook_id,
+                "issue_id": str(payload.get("issue_id", getattr(self, "selected_support_issue_id", ""))),
+                "title": str(payload.get("title", playbook_id)),
+                "mode": str(payload.get("mode", "diagnose")),
+                "status": run_status,
+                "timestamp_local": _now_local(),
+                "finding_count": len(payload.get("findings", [])) if isinstance(payload.get("findings", []), list) else 0,
+                "summary": str(payload.get("summary_text", ""))[:4000],
+                "findings": payload.get("findings", []),
+                "guided_steps": payload.get("guided_steps", []),
+                "evidence_plan_ids": payload.get("evidence_plan_ids", []),
+                "evidence_files": payload.get("evidence_files", []),
+                "support_bundle_integrated": bool(payload.get("support_bundle_integrated", False)),
+            }
+        )
+        task_meta = script_task_map()
+        for step in payload.get("steps", []):
+            if not isinstance(step, dict):
+                continue
+            result = step.get("result", {})
+            if not isinstance(result, dict):
+                continue
+            self._merge_files_into_session_evidence(
+                result.get("output_files", []),
+                task_meta.get(str(step.get("task_id", ""))).category if str(step.get("task_id", "")) in task_meta else "evidence",
+                str(step.get("task_id", "")),
+            )
+        self._append_action(
+            {
+                "key": playbook_id,
+                "title": str(payload.get("title", playbook_id)),
+                "risk": "Admin" if payload.get("requires_admin") else "Safe",
+                "code": int(payload.get("code", 0)),
+                "result": str(payload.get("summary_text", ""))[:8000],
+                "type": "support_playbook",
+            }
+        )
+        save_session(self.current_session)
+        self._history_dirty = True
+        self._render_support_playbook_detail()
+        self._refresh_support_reports_summary()
+        self._refresh_support_history_summary()
+        self._refresh_support_fix_library()
+        self._refresh_evidence_items()
+        self.toasts.show_toast(f"{payload.get('title', 'Support playbook')} {run_status.lower()}.")
 
     def _set_support_fix_selection(self, fix_id: str) -> None:
         fix = support_fix_map().get(str(fix_id or "").strip())
@@ -4187,9 +4479,9 @@ class MainWindow(QMainWindow):
             actions_layout.setContentsMargins(0, 0, 0, 0)
             actions_layout.setSpacing(spacing("xs"))
             use_btn = SoftButton("Use Issue")
-            run_btn = PrimaryButton("Run Playbook")
+            run_btn = PrimaryButton("Run Diagnostics")
             use_btn.clicked.connect(lambda _checked=False, issue_id=issue.id: self._select_support_issue(issue_id, open_target="diagnose"))
-            run_btn.clicked.connect(lambda _checked=False, issue_id=issue.id: (self._select_support_issue(issue_id, open_target="diagnose"), self._run_selected_support_playbook()))
+            run_btn.clicked.connect(lambda _checked=False, issue_id=issue.id: (self._select_support_issue(issue_id, open_target="diagnose"), self._run_selected_support_playbook_diagnostics()))
             actions_layout.addWidget(use_btn)
             actions_layout.addWidget(run_btn)
             actions_layout.addStretch(1)
@@ -4232,6 +4524,7 @@ class MainWindow(QMainWindow):
             )
         if adapters:
             self._set_support_fix_selection(adapters[0].key)
+        self._render_support_playbook_detail()
 
     def _refresh_support_reports_summary(self) -> None:
         if not hasattr(self, "rep_issue_summary"):
@@ -4241,8 +4534,11 @@ class MainWindow(QMainWindow):
             context = self.current_session.get("support_context", {}) if isinstance(self.current_session.get("support_context", {}), dict) else {}
         issue_id = str(context.get("issue_id", getattr(self, "selected_support_issue_id", ""))).strip()
         issue = support_issue_map().get(issue_id)
+        latest = self._latest_support_playbook_run()
         if issue is None:
             self.rep_issue_summary.sub.setText("No issue-family context selected yet.")
+            if hasattr(self, "rep_playbook_summary"):
+                self.rep_playbook_summary.sub.setText("No deep playbook runs recorded yet.")
             return
         self.rep_issue_summary.title.setText(f"Issue-family Reporting: {issue.title}")
         self.rep_issue_summary.sub.setText(
@@ -4251,27 +4547,46 @@ class MainWindow(QMainWindow):
             f"Evidence: {', '.join(issue.evidence_plan_ids)}\n"
             f"Escalation: {issue.escalation[0] if issue.escalation else 'n/a'}"
         )
+        if hasattr(self, "rep_playbook_summary"):
+            if latest is None:
+                self.rep_playbook_summary.sub.setText("No deep playbook runs recorded yet.")
+            else:
+                self.rep_playbook_summary.title.setText(f"Script-backed Playbook Runs: {latest.get('title', 'Latest run')}")
+                self.rep_playbook_summary.sub.setText(
+                    f"Mode: {latest.get('mode', 'n/a')} | Status: {latest.get('status', 'n/a')} | Findings: {latest.get('finding_count', 0)}\n"
+                    f"Evidence plans: {', '.join([str(x) for x in latest.get('evidence_plan_ids', [])][:4])}\n"
+                    f"{str(latest.get('summary', ''))[:700]}"
+                )
 
     def _refresh_support_history_summary(self) -> None:
         if not hasattr(self, "hist_issue_summary"):
             return
         issue = support_issue_map().get(str(getattr(self, "selected_support_issue_id", "")).strip())
+        latest = self._latest_support_playbook_run()
         if issue is None:
             self.hist_issue_summary.sub.setText("Previously selected issue families, playbooks, and escalation posture appear here when present in a session.")
             return
         self.hist_issue_summary.title.setText("Issue / Playbook History")
+        extra = ""
+        if latest is not None:
+            extra = (
+                f"\nLatest deep run: {latest.get('title', 'n/a')} | {latest.get('status', 'n/a')} | "
+                f"{latest.get('finding_count', 0)} findings"
+            )
         self.hist_issue_summary.sub.setText(
-            f"Current issue focus: {issue.title}\nFamily: {issue.family_label}\nPrimary playbook: {issue.playbook_ids[0] if issue.playbook_ids else 'n/a'}"
+            f"Current issue focus: {issue.title}\nFamily: {issue.family_label}\nPrimary playbook: {issue.playbook_ids[0] if issue.playbook_ids else 'n/a'}{extra}"
         )
 
     def _refresh_support_settings_summary(self) -> None:
         if not hasattr(self, "s_support_catalog_summary"):
             return
         stats = support_catalog_stats()
+        deep = deep_support_playbook_stats()
         self.s_support_catalog_summary.setText(
             f"Support catalog: {stats.issue_count} issue classes across {stats.family_count} families, "
             f"{stats.playbook_count} shared playbooks, {stats.diagnostic_count} diagnostics, "
-            f"and {stats.fix_count} mapped fixes."
+            f"and {stats.fix_count} mapped fixes.\n"
+            f"Deep script-backed playbooks: {deep.playbook_count} | shared primitives: {deep.shared_primitive_count} | support-bundle integrated: {deep.support_bundle_integrated_count}."
         )
 
     def _refresh_runbooks(self) -> None:
@@ -4871,9 +5186,12 @@ class MainWindow(QMainWindow):
         elif k == "support_playbook":
             playbook = support_playbook_map().get(v)
             if playbook is not None:
-                self.selected_support_playbook_id = playbook.id
+                self._set_support_playbook_selection(playbook.id)
                 self.nav.setCurrentRow(self.NAV_ITEMS.index("Playbooks"))
-                self._show_page_help(playbook.title, playbook.purpose)
+                if is_deep_support_playbook(playbook.id):
+                    self._render_support_playbook_detail()
+                else:
+                    self._show_page_help(playbook.title, playbook.purpose)
         elif k == "fix":
             self.nav.setCurrentRow(self.NAV_ITEMS.index("Fixes")); self._select_fix(v)
         elif k == "runbook":
