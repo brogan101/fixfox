@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from PySide6.QtCore import QByteArray, Qt
+from PySide6.QtCore import QByteArray, QRectF, Qt
 from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QApplication, QWidget
@@ -31,8 +31,10 @@ _ICON_ALIASES: dict[str, str] = {
     "wrench": "wrench",
     "reports": "reports",
     "history": "history",
-    "settings": "gear",
-    "gear": "gear",
+    "clock": "clock",
+    "settings": "cog",
+    "gear": "cog",
+    "cog": "cog",
     "settings_gear": "settings_gear",
     "help": "help",
     "search": "search",
@@ -42,6 +44,7 @@ _ICON_ALIASES: dict[str, str] = {
     "stop": "stop",
     "cancel": "stop",
     "export": "export",
+    "file": "file",
     "download": "export",
     "panel": "panel_open",
     "details": "details",
@@ -58,6 +61,7 @@ _ICON_ALIASES: dict[str, str] = {
     "chevron_down": "chevron_down",
     "chevron_right": "chevron_right",
     "chevron_left": "chevron_left",
+    "undo": "undo",
     "next": "chevron_right",
     "back": "chevron_left",
     "check_circle": "check_circle",
@@ -91,7 +95,8 @@ def render_svg(path: str | Path, size: int) -> QPixmap:
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.Antialiasing, True)
     painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
-    renderer.render(painter)
+    inset = max(1.0, target * 0.08)
+    renderer.render(painter, QRectF(inset, inset, target - (inset * 2.0), target - (inset * 2.0)))
     painter.end()
     return pixmap
 
@@ -106,7 +111,8 @@ def render_svg_from_bytes(svg_data: bytes, size: int) -> QPixmap:
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.Antialiasing, True)
     painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
-    renderer.render(painter)
+    inset = max(1.0, target * 0.08)
+    renderer.render(painter, QRectF(inset, inset, target - (inset * 2.0), target - (inset * 2.0)))
     painter.end()
     return pixmap
 
@@ -117,7 +123,24 @@ def _rasterize_asset(path: Path, size: int) -> QPixmap:
     base = QPixmap(str(path))
     if base.isNull():
         return QPixmap()
-    return base.scaled(size, size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+    target = max(14, int(size))
+    inset = max(1, int(round(target * 0.08)))
+    scaled = base.scaled(
+        max(8, target - (inset * 2)),
+        max(8, target - (inset * 2)),
+        Qt.KeepAspectRatio,
+        Qt.SmoothTransformation,
+    )
+    pixmap = QPixmap(target, target)
+    pixmap.fill(Qt.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing, True)
+    painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+    x = int((target - scaled.width()) / 2)
+    y = int((target - scaled.height()) / 2)
+    painter.drawPixmap(x, y, scaled)
+    painter.end()
+    return pixmap
 
 
 def _tint_pixmap(base: QPixmap, color: QColor) -> QPixmap:

@@ -29,6 +29,7 @@ class PageHeader(QWidget):
         cta: QWidget | None = None,
         help_text: str = "",
         on_help: Callable[[str, str], None] | None = None,
+        show_help: bool = False,
     ) -> None:
         super().__init__()
         root = QVBoxLayout(self)
@@ -64,8 +65,9 @@ class PageHeader(QWidget):
         row.addLayout(labels, 1)
         if cta is not None:
             row.addWidget(cta, 0, Qt.AlignRight | Qt.AlignTop)
-        help_btn = IconButton("help", self, f"{title} help")
-        if on_help is not None:
-            help_btn.clicked.connect(lambda: on_help(str(title), str(help_text or subtitle)))
-        row.addWidget(help_btn, 0, Qt.AlignTop)
+        if show_help:
+            help_btn = IconButton("help", self, f"{title} help")
+            if on_help is not None:
+                help_btn.clicked.connect(lambda: on_help(str(title), str(help_text or subtitle)))
+            row.addWidget(help_btn, 0, Qt.AlignTop)
         root.addLayout(row)

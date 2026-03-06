@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..theme import resolve_density_tokens
+from ..icons import get_icon
 from .rows import BaseRow, row_height_for_density
 
 
@@ -47,6 +48,10 @@ class EmptyState(QWidget):
         inner.setSpacing(6)
         ico = QLabel(icon)
         ico.setObjectName("CardTitle")
+        pix = get_icon(icon, self, size=20).pixmap(20, 20)
+        if not pix.isNull():
+            ico.setPixmap(pix)
+            ico.setAlignment(Qt.AlignHCenter)
         txt = QLabel(message)
         txt.setObjectName("CardSubtitle")
         txt.setWordWrap(True)
@@ -54,13 +59,18 @@ class EmptyState(QWidget):
         inner.addWidget(txt, 0, Qt.AlignHCenter)
         if cta is not None:
             inner.addWidget(cta, 0, Qt.AlignHCenter)
-        layout.addWidget(frame)
-        layout.addStretch(1)
+        layout.addWidget(frame, 0, Qt.AlignTop)
 
     def update_content(self, icon: str, message: str) -> None:
         labels = self.findChildren(QLabel)
         if labels:
-            labels[0].setText(icon)
+            pix = get_icon(icon, self, size=20).pixmap(20, 20)
+            if not pix.isNull():
+                labels[0].setPixmap(pix)
+                labels[0].setText("")
+            else:
+                labels[0].setPixmap(pix)
+                labels[0].setText(icon)
         if len(labels) > 1:
             labels[1].setText(message)
 

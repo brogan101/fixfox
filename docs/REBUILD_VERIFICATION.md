@@ -1,9 +1,9 @@
 # Rebuild Verification
 
-Generated: 2026-03-06 15:25:47
+Generated: 2026-03-06 17:03:56
 
-- TTFP (ms): `1690.3`
-- Walkthrough dir: `C:\Users\btheobald\Desktop\IT Core\docs\screenshots\20260306_152514`
+- TTFP (ms): `1779.2`
+- Walkthrough dir: `C:\Users\btheobald\Desktop\IT Core\docs\screenshots\20260306_170320`
 - Final verdict: `PASS`
 
 ## Requirement Checklist
@@ -13,7 +13,7 @@ Generated: 2026-03-06 15:25:47
 | ENF-001 | Requirements source of truth exists and is complete. | **PASS** | check:requirements_file_exists=PASS C:\Users\btheobald\Desktop\IT Core\docs\REQUIREMENTS.json |
 | ENF-002 | Verifier script exists and executes static, runtime, performance checks. | **PASS** | check:verifier_script_exists=PASS scripts/verify_requirements.py |
 | ENF-003 | Requirements gate test fails when verifier fails. | **PASS** | check:requirements_gate_test_exists=PASS src/tests/test_requirements_gate.py |
-| ENF-004 | Verifier calls UI walkthrough and enforces clipping report pass. | **PASS** | check:walkthrough_called_by_verifier=PASS scripts/ui_walkthrough.py<br>check:walkthrough_pass=PASS rc=0<br>check:walkthrough_clipping_clean=PASS C:\Users\btheobald\Desktop\IT Core\docs\screenshots\20260306_152514 |
+| ENF-004 | Verifier calls UI walkthrough and enforces clipping report pass. | **PASS** | check:walkthrough_called_by_verifier=PASS scripts/ui_walkthrough.py<br>check:walkthrough_pass=PASS rc=0<br>check:walkthrough_clipping_clean=PASS C:\Users\btheobald\Desktop\IT Core\docs\screenshots\20260306_170320 |
 | BR-001 | Brand source is normalized to src/assets/brand/fixfox_logo_source.png. | **PASS** | check:brand_source_exists=PASS src/assets/brand/fixfox_logo_source.png<br>check:no_double_extension_logo=PASS double extension absent |
 | BR-002 | Brand assets are generated from source (mark, @2x, ico). | **PASS** | check:brand_derived_assets_exist=PASS mark, mark@2x, ico<br>check:brand_build_script_exists=PASS scripts/build_brand_assets.py |
 | BR-003 | App and window icons use FixFox brand icon. | **PASS** | check:app_icon_applied_runtime=PASS application icon configured in src/app.py<br>check:window_icon_applied_runtime=PASS window_icon_null=False |
@@ -25,19 +25,19 @@ Generated: 2026-03-06 15:25:47
 | PERF-001 | Long work is async/off UI thread via worker layer. | **PASS** | check:task_runner_async_layer=PASS workers async execution layer |
 | PERF-002 | Task layer supports cancel/timeout signaling. | **PASS** | check:task_runner_cancel_timeout=PASS cancel + timeout fields present |
 | PERF-003 | Click-to-feedback is immediate and UI stays responsive. | **PASS** | check:quick_check_non_blocking_runtime=PASS validated by smoke + responsive nav in runtime |
-| PERF-004 | Time-to-first-paint is within defined threshold. | **PASS** | check:ttfp_threshold=PASS ttfp_ms=1690.3 threshold=5000 |
+| PERF-004 | Time-to-first-paint is within defined threshold. | **PASS** | check:ttfp_threshold=PASS ttfp_ms=1779.2 threshold=5000 |
 | STYLE-001 | Centralized theme/token pipeline exists. | **PASS** | check:theme_manager_present=PASS theme.py + build_qss |
 | STYLE-002 | QSS styling applies to app and dialogs/popups. | **PASS** | check:dialog_object_names=PASS ToolRunnerWindow object name and app stylesheet in runtime<br>check:qss_dialog_hooks=PASS ToolRunnerWindow selector<br>check:qss_sanity_script_pass=PASS rc=0 |
 | STYLE-003 | Global combo down-arrow override is present. | **PASS** | check:combo_arrow_override=PASS global combo arrow |
 | STYLE-004 | No hardcoded absolute font paths; graceful fallback. | **PASS** | check:no_absolute_font_paths=PASS validated by runtime app startup |
 | SHELL-001 | Single icon nav rail only (no legacy double nav). | **PASS** | check:single_nav_runtime=PASS buttons=7<br>check:no_legacy_nav_static=PASS Covered by broader verifier gate. |
 | SHELL-002 | Top app bar contains branded identity, search, quick check, overflow. | **PASS** | check:top_app_bar_contract=PASS primary app-bar controls visible |
-| SHELL-003 | No duplicate Open Reports actions next to overflow. | **PASS** | check:no_duplicate_open_reports_static=PASS Open Reports static count<br>check:no_duplicate_open_reports_runtime=PASS open_reports_visible=1 |
+| SHELL-003 | No duplicate Open Reports actions next to overflow. | **PASS** | check:no_duplicate_open_reports_static=PASS Open Reports static count<br>check:no_duplicate_open_reports_runtime=PASS open_reports_visible=0 |
 | SHELL-004 | About Qt removed. | **PASS** | check:no_about_qt=PASS About Qt absent |
 | SHELL-005 | No QSplitter usage in shell (static and runtime). | **PASS** | check:no_qsplitter_static=PASS no QSplitter in main window<br>check:no_qsplitter_runtime=PASS runtime splitter count |
 | SHELL-006 | Help is integrated inside Settings flow. | **PASS** | check:help_in_settings=PASS settings page exists |
 | ICON-001 | Required icon assets exist (home/open_book/wrench/gear/reports/history/search/details/etc). | **PASS** | check:required_icons_exist=PASS required icon assets |
-| ICON-002 | Required nav icon mapping: settings=gear fixes=wrench playbooks=open_book. | **PASS** | check:required_nav_icon_mapping=PASS required mapping set<br>check:required_nav_icon_runtime=PASS {'Home': 'home', 'Playbooks': 'open_book', 'Diagnose': 'diagnose', 'Fixes': 'wrench', 'Reports': 'reports', 'History': 'history', 'Settings': 'gear'} |
+| ICON-002 | Required nav icon mapping: settings=gear fixes=wrench playbooks=open_book. | **PASS** | check:required_nav_icon_mapping=PASS required mapping set<br>check:required_nav_icon_runtime=PASS {'Home': 'home', 'Playbooks': 'open_book', 'Diagnose': 'diagnose', 'Fixes': 'wrench', 'Reports': 'reports', 'History': 'history', 'Settings': 'cog'} |
 | ICON-003 | Icon loader supports caching and tinting. | **PASS** | check:icon_loader_cache_tint=PASS cache+tint |
 | SEARCH-001 | Search control is expandable and animated in app bar. | **PASS** | check:search_expand_contract=PASS expandable search |
 | SEARCH-002 | Ctrl+K focuses search. | **PASS** | check:search_ctrl_k_runtime=PASS Ctrl+K focus |
@@ -45,7 +45,7 @@ Generated: 2026-03-06 15:25:47
 | SEARCH-004 | Search debounce and keyboard navigation exist. | **PASS** | check:search_debounce_keyboard=PASS debounce+keyboard |
 | SEARCH-005 | Search index includes route and play registries. | **PASS** | check:search_uses_route_play_registries=PASS search uses registries |
 | SEARCH-006 | Search query path does not rebuild static index on each keystroke. | **PASS** | check:search_no_static_rebuild_on_query_static=PASS query_index does not call build_search_index<br>check:search_cache_static_not_rebuilt_runtime=PASS static_build_delta=1 |
-| SEARCH-007 | Search typing remains responsive under debounced async execution. | **PASS** | check:search_ui_responsive_runtime=PASS timer_ticks=59<br>check:search_keystroke_block_budget_runtime=PASS elapsed_ms=957.3 threshold=1400 |
+| SEARCH-007 | Search typing remains responsive under debounced async execution. | **PASS** | check:search_ui_responsive_runtime=PASS timer_ticks=53<br>check:search_keystroke_block_budget_runtime=PASS elapsed_ms=966.7 threshold=1400 |
 | DETAIL-001 | Details sheet is hidden by default. | **PASS** | check:details_hidden_default_runtime=PASS collapsed=True |
 | DETAIL-002 | Details sheet has open toggle and open/close works. | **PASS** | check:details_toggle_visible_runtime=PASS panel toggle visible<br>check:details_open_close_runtime=PASS opened=True |
 | DETAIL-003 | Details content shows contextual summary and actions. | **PASS** | check:details_has_context_actions=PASS details sheet context widgets present |
@@ -65,15 +65,15 @@ Generated: 2026-03-06 15:25:47
 | COLOR-001 | UI applies accent + severity visual cues consistently. | **PASS** | check:severity_color_contract=PASS severity styles |
 | SPACE-001 | Major pages avoid large dead zones with meaningful content. | **PASS** | check:no_empty_dead_zone_contract=PASS home sections populated |
 | POP-001 | ToolRunner and popup/dialog surfaces match theme style. | **PASS** | check:dialog_object_names=PASS ToolRunnerWindow object name and app stylesheet in runtime<br>check:qss_dialog_hooks=PASS ToolRunnerWindow selector |
-| CLIP-001 | No clipping across walkthrough resolutions. | **PASS** | check:walkthrough_clipping_clean=PASS C:\Users\btheobald\Desktop\IT Core\docs\screenshots\20260306_152514 |
+| CLIP-001 | No clipping across walkthrough resolutions. | **PASS** | check:walkthrough_clipping_clean=PASS C:\Users\btheobald\Desktop\IT Core\docs\screenshots\20260306_170320 |
 | UX-001 | Toast notifications exist for task/export/copy/masking outcomes. | **PASS** | check:toasts_contract=PASS toast usage present |
 | UX-002 | Global crash/error banner and copy-details path exist. | **PASS** | check:global_error_handling_contract=PASS global exception handler in app bootstrap |
 | UX-003 | Task center/details keeps users informed about running jobs. | **PASS** | check:task_center_contract=PASS runner + status panel |
 | UX-004 | Shared empty-state component used across pages. | **PASS** | check:empty_state_component_contract=PASS shared EmptyState component |
 | CLEAN-001 | Repo cleanup plan contains keep/remove/archive proofs. | **PASS** | check:cleanup_plan_exists=PASS docs/REPO_CLEANUP_PLAN.md |
 | CLEAN-002 | Repo cleanup notes document executed changes and proofs. | **PASS** | check:cleanup_notes_exists=PASS docs/REPO_CLEANUP_NOTES.md |
-| QA-001 | UI walkthrough screenshots + manifest generated. | **PASS** | check:walkthrough_pass=PASS rc=0<br>check:walkthrough_manifest_exists=PASS C:\Users\btheobald\Desktop\IT Core\docs\screenshots\20260306_152514 |
-| QA-002 | Clipping report has no violations. | **PASS** | check:walkthrough_clipping_clean=PASS C:\Users\btheobald\Desktop\IT Core\docs\screenshots\20260306_152514 |
+| QA-001 | UI walkthrough screenshots + manifest generated. | **PASS** | check:walkthrough_pass=PASS rc=0<br>check:walkthrough_manifest_exists=PASS C:\Users\btheobald\Desktop\IT Core\docs\screenshots\20260306_170320 |
+| QA-002 | Clipping report has no violations. | **PASS** | check:walkthrough_clipping_clean=PASS C:\Users\btheobald\Desktop\IT Core\docs\screenshots\20260306_170320 |
 | QA-003 | Smoke and unit tests pass. | **PASS** | check:smoke_test_pass=PASS validated by explicit final command<br>check:unit_test_pass=PASS validated by explicit final command |
 | QA-004 | Requirements gate test passes. | **PASS** | check:requirements_gate_test_pass=PASS validated by explicit final command |
 | PLAY-001 | Play contract enforces preflight, outcome, evidence, rollback metadata. | **PASS** | check:play_registry_metadata_complete=PASS play metadata<br>check:script_task_outcome_contract=PASS outcome contract |
@@ -179,7 +179,7 @@ Generated: 2026-03-06 15:25:47
 - `no_double_extension_logo`: **PASS**
   - double extension absent
 - `no_duplicate_open_reports_runtime`: **PASS**
-  - open_reports_visible=1
+  - open_reports_visible=0
 - `no_duplicate_open_reports_static`: **PASS**
   - Open Reports static count
 - `no_empty_dead_zone_contract`: **PASS**
@@ -248,7 +248,7 @@ Generated: 2026-03-06 15:25:47
 - `required_nav_icon_mapping`: **PASS**
   - required mapping set
 - `required_nav_icon_runtime`: **PASS**
-  - {'Home': 'home', 'Playbooks': 'open_book', 'Diagnose': 'diagnose', 'Fixes': 'wrench', 'Reports': 'reports', 'History': 'history', 'Settings': 'gear'}
+  - {'Home': 'home', 'Playbooks': 'open_book', 'Diagnose': 'diagnose', 'Fixes': 'wrench', 'Reports': 'reports', 'History': 'history', 'Settings': 'cog'}
 - `requirements_file_exists`: **PASS**
   - C:\Users\btheobald\Desktop\IT Core\docs\REQUIREMENTS.json
 - `requirements_gate_test_exists`: **PASS**
@@ -275,7 +275,7 @@ Generated: 2026-03-06 15:25:47
 - `search_expand_contract`: **PASS**
   - expandable search
 - `search_keystroke_block_budget_runtime`: **PASS**
-  - elapsed_ms=957.3 threshold=1400
+  - elapsed_ms=966.7 threshold=1400
 - `search_no_static_rebuild_on_query_static`: **PASS**
   - query_index does not call build_search_index
 - `search_nonblocking_test_gate`: **PASS**
@@ -284,7 +284,7 @@ Generated: 2026-03-06 15:25:47
 [FixFox UI AUDIT] legacy_nav_widgets=0 list_candidates=0
 [FixFox UI AUDIT] side_sheet_visible_default=False
 - `search_ui_responsive_runtime`: **PASS**
-  - timer_ticks=59
+  - timer_ticks=53
 - `search_uses_route_play_registries`: **PASS**
   - search uses registries
 - `settings_apply_nonblocking_test_gate`: **PASS**
@@ -342,7 +342,7 @@ Generated: 2026-03-06 15:25:47
 - `tree_expander_runtime_customized`: **PASS**
   - tree branch override present in runtime stylesheet
 - `ttfp_threshold`: **PASS**
-  - ttfp_ms=1690.3 threshold=5000
+  - ttfp_ms=1779.2 threshold=5000
 - `ui_freeze_detector_exists`: **PASS**
   - ui_freeze_detector.py
 - `ui_layout_sanity_gate`: **PASS**
@@ -356,7 +356,7 @@ Generated: 2026-03-06 15:25:47
   - idates=0
 [FixFox UI AUDIT] side_sheet_visible_default=False
 UI smoke walkthrough: PASS
-screenshots_dir=C:\Users\btheobald\Desktop\IT Core\docs\screenshots\stability_20260306_152458
+screenshots_dir=C:\Users\btheobald\Desktop\IT Core\docs\screenshots\stability_20260306_170305
 - `unified_evidence_model_exists`: **PASS**
   - evidence model
 - `unit_test_pass`: **PASS**
@@ -366,13 +366,13 @@ screenshots_dir=C:\Users\btheobald\Desktop\IT Core\docs\screenshots\stability_20
 - `walkthrough_called_by_verifier`: **PASS**
   - scripts/ui_walkthrough.py
 - `walkthrough_clipping_clean`: **PASS**
-  - C:\Users\btheobald\Desktop\IT Core\docs\screenshots\20260306_152514
+  - C:\Users\btheobald\Desktop\IT Core\docs\screenshots\20260306_170320
 - `walkthrough_manifest_exists`: **PASS**
-  - C:\Users\btheobald\Desktop\IT Core\docs\screenshots\20260306_152514
+  - C:\Users\btheobald\Desktop\IT Core\docs\screenshots\20260306_170320
 - `walkthrough_pass`: **PASS**
   - rc=0
   - 
 - `walkthrough_qt_warnings_clean`: **PASS**
-  - C:\Users\btheobald\Desktop\IT Core\docs\screenshots\20260306_152514
+  - C:\Users\btheobald\Desktop\IT Core\docs\screenshots\20260306_170320
 - `window_icon_applied_runtime`: **PASS**
   - window_icon_null=False

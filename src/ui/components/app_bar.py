@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import QEasingCurve, QPropertyAnimation, Qt, Signal
 from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QLineEdit, QProgressBar, QStackedWidget, QToolButton, QVBoxLayout
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QLineEdit, QProgressBar, QStackedWidget, QToolButton, QVBoxLayout, QWidget
 
 from ...core.brand import APP_DISPLAY_NAME
 from ...core.utils import resource_path
@@ -37,8 +37,9 @@ class AppToolbar(QFrame):
 
         self.run_status_panel = RunStatusPanel()
         self.run_status_panel.setObjectName("BrandStatus")
+        self.run_status_panel.setMinimumWidth(300)
         status_l = QHBoxLayout(self.run_status_panel)
-        status_l.setContentsMargins(spacing("md"), spacing("xs"), spacing("md"), spacing("xs"))
+        status_l.setContentsMargins(spacing("md"), spacing("sm"), spacing("md"), spacing("sm"))
         status_l.setSpacing(spacing("sm"))
 
         self.brand_mark = QLabel()
@@ -48,25 +49,43 @@ class AppToolbar(QFrame):
 
         text_col = QVBoxLayout()
         text_col.setContentsMargins(0, 0, 0, 0)
-        text_col.setSpacing(0)
+        text_col.setSpacing(2)
         self.app_identity = QLabel(APP_DISPLAY_NAME)
         self.app_identity.setObjectName("Wordmark")
-        self.run_status_title = QLabel("Idle")
+        self.run_status_eyebrow = QLabel("SYSTEM STATUS")
+        self.run_status_eyebrow.setObjectName("TopStatusEyebrow")
+        self.run_status_title = QLabel("Ready for local diagnostics")
         self.run_status_title.setObjectName("TopStatusText")
-        self.run_status_detail = QLabel("No active task.")
+        self.run_status_detail = QLabel("No active run. Search, launch a quick check, or reopen a session.")
         self.run_status_detail.setObjectName("TopStatusSubtle")
         self.run_status_detail.setWordWrap(False)
+        self.run_status_meta = QWidget()
+        self.run_status_meta.setObjectName("TopStatusMeta")
+        meta_l = QHBoxLayout(self.run_status_meta)
+        meta_l.setContentsMargins(0, 0, 0, 0)
+        meta_l.setSpacing(spacing("xs"))
         text_col.addWidget(self.app_identity)
+        text_col.addWidget(self.run_status_eyebrow)
         text_col.addWidget(self.run_status_title)
         text_col.addWidget(self.run_status_detail)
+        text_col.addWidget(self.run_status_meta)
 
         self.run_status_chip = QLabel("Idle")
         self.run_status_chip.setObjectName("RunnerStatusChip")
         self.run_status_chip.setProperty("kind", "info")
+        self.run_status_session_chip = QLabel("Session none")
+        self.run_status_session_chip.setObjectName("RunnerStatusChip")
+        self.run_status_session_chip.setProperty("kind", "muted")
+        self.run_status_attention_chip = QLabel("Local-only")
+        self.run_status_attention_chip.setObjectName("RunnerStatusChip")
+        self.run_status_attention_chip.setProperty("kind", "muted")
+        meta_l.addWidget(self.run_status_chip, 0)
+        meta_l.addWidget(self.run_status_session_chip, 0)
+        meta_l.addWidget(self.run_status_attention_chip, 0)
+        meta_l.addStretch(1)
 
         status_l.addWidget(self.brand_mark, 0, Qt.AlignVCenter)
         status_l.addLayout(text_col, 1)
-        status_l.addWidget(self.run_status_chip, 0, Qt.AlignVCenter)
 
         self.top_search = QLineEdit()
         self.top_search.setObjectName("SearchInput")
@@ -96,12 +115,6 @@ class AppToolbar(QFrame):
         self.btn_panel_toggle.setChecked(False)
         self.btn_panel_toggle.clicked.connect(lambda checked: self.details_toggled.emit(bool(checked)))
 
-        self.btn_export = QToolButton()
-        self.btn_export.setObjectName("AppBarIconButton")
-        self.btn_export.setText("")
-        self.btn_export.setIcon(get_icon("export", self.btn_export))
-        self.btn_export.setToolTip("Open Reports")
-
         self.btn_overflow = QToolButton()
         self.btn_overflow.setObjectName("AppBarIconButton")
         self.btn_overflow.setText("")
@@ -122,7 +135,6 @@ class AppToolbar(QFrame):
         layout.addWidget(self.search_stack, 1)
         layout.addWidget(self.btn_quick_check, 0)
         layout.addWidget(self.btn_panel_toggle, 0)
-        layout.addWidget(self.btn_export, 0)
         layout.addWidget(self.btn_overflow, 0)
         root.addLayout(layout, 1)
 
@@ -188,7 +200,6 @@ class AppToolbar(QFrame):
         self._refresh_brand_mark()
         self.compact_search_btn.setIcon(get_icon("search", self.compact_search_btn))
         self.btn_quick_check.setIcon(get_icon("quick_check", self.btn_quick_check))
-        self.btn_export.setIcon(get_icon("export", self.btn_export))
         self.btn_overflow.setIcon(get_icon("overflow", self.btn_overflow))
         self.set_details_open(self.btn_panel_toggle.isChecked())
 

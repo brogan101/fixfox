@@ -22,9 +22,9 @@ FONT_WARNING_PATTERNS = (
     "Cannot open",
 )
 REQUIRED_MENU = {
-    "Session": ["New Session", "Open Session", "Export", "Open Exports Folder"],
+    "Session": ["New Session", "Open Session", "Support Bundle", "Open Bundles Folder"],
     "View": ["Toggle Details Panel", "Density", "Theme", "Palette", "Mode"],
-    "Help": ["Docs", "About Fix Fox"],
+    "Support": ["Open Support Hub"],
 }
 
 
@@ -491,7 +491,7 @@ def _run_runtime_checks(_repo_root: Path) -> dict[str, Any]:
             "search_narrow_index": search_narrow_index,
             "visible_primary_actions": int(
                 bool(window.btn_quick_check.isVisible())
-                + bool(window.btn_export.isVisible())
+                + bool(window.btn_panel_toggle.isVisible())
                 + bool(window.btn_overflow.isVisible())
             ),
             "details_toggle_visible": bool(window.btn_panel_toggle.isVisible()),
@@ -583,7 +583,7 @@ def run_verification(write_report: Path | None = None, verbose: bool = True) -> 
 
     session_items = runtime["menu_groups"].get("Session", [])
     view_items = runtime["menu_groups"].get("View", [])
-    help_items = runtime["menu_groups"].get("Help", [])
+    help_items = runtime["menu_groups"].get("Support", [])
     b4_session = all(item in session_items for item in REQUIRED_MENU["Session"])
     b4_view = all(item in view_items for item in REQUIRED_MENU["View"])
     b4_help = all(item in help_items for item in REQUIRED_MENU["Help"])
@@ -591,11 +591,11 @@ def run_verification(write_report: Path | None = None, verbose: bool = True) -> 
     results.append(RequirementResult("B4", "Overflow menu grouping and separators", b4_pass, [
         f"Session group items: {session_items}",
         f"View group items: {view_items}",
-        f"Help group items: {help_items}",
+        f"Support group items: {help_items}",
         f"Section/separator count: {runtime['menu_separator_count']}",
         f"Session complete: {b4_session}",
         f"View complete: {b4_view}",
-        f"Help complete: {b4_help}",
+        f"Support complete: {b4_help}",
     ]))
 
     icon_ico = repo_root / "src" / "assets" / "brand" / "fixfox_icon.ico"

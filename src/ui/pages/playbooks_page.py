@@ -40,13 +40,25 @@ class PlaybooksPage(PageScroll):
         layout.addWidget(
             build_page_header(
                 "Playbooks",
-                "Catalog of fix plays with clear risk, timing, and run controls.",
+                "Guided workflows, deterministic tools, and runbooks with clear risk and execution context.",
                 help_text="Use filters and category facets to find the right play quickly.",
                 on_help=w._show_page_help,
             )
         )
         w.pb_callout = InlineCallout("Playbooks", "", level="info", density=w.settings_state.density)
         layout.addWidget(w.pb_callout)
+
+        summary_row = QWidget()
+        summary_row_layout = QGridLayout(summary_row)
+        summary_row_layout.setContentsMargins(0, 0, 0, 0)
+        summary_row_layout.setSpacing(spacing("md"))
+        catalog_summary = Card("Workflow Hub", "Pick the right surface for the job: guided goal, direct tool, script task, or runbook.")
+        catalog_summary.body_layout().addWidget(QLabel("Tools are best for one-off actions. Runbooks are best when you need ordered, repeatable steps."))
+        confidence_summary = Card("Execution posture", "Every row exposes risk, timing, and what will actually run before you commit.")
+        confidence_summary.body_layout().addWidget(QLabel("Use Dry-Run, Tool Detail, or the side sheet to understand impact before making changes."))
+        summary_row_layout.addWidget(catalog_summary, 0, 0)
+        summary_row_layout.addWidget(confidence_summary, 0, 1)
+        layout.addWidget(summary_row)
 
         w.pb_basic_container = QWidget()
         basic_layout = QVBoxLayout(w.pb_basic_container)

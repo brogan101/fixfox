@@ -722,3 +722,46 @@ src/ui/style/qss_builder.py         |  45 +++---
   - launch/crash/supportability/persistence/package checks are materially improved and verified
   - explicit perf budgets are still not met consistently (`startup.splash_visible_ms`, `startup.main_shell_visible_ms`, `startup.first_interactive_ms`, first `History` open)
   - release verdict for this run remains `NOT GOOD TO TEST` until the remaining startup/history latency gap is closed or explicitly waived
+
+## 2026-03-06 16:23:44 -05:00 - Master UI Repair / Completion / Occlusion Pass
+- Starting commit: `e40167afc644b9ae20c3178e9457edeb8a241732`
+- Branch: `main`
+- Proof harness:
+  - `git fetch --all`
+  - `git rev-parse HEAD`
+  - `git status --short --branch`
+  - `python --version` failed in this shell because the Windows Store alias resolution is broken
+  - `pip --version` failed because `pip` is not on `PATH`
+  - execution route for this run: `py` and `py -m pip`
+- Goals:
+  - repair clipped icon geometry and shared hover/selected/focus states
+  - remove redundant top-bar actions and redesign the status module into a real product-status surface
+  - rebuild the global search dropdown geometry/attachment/row states
+  - replace the broken Settings side-list treatment with a denser, premium segmented experience and centralize Help/Support/About there
+  - diagnose whether thin pages are actually empty or merely weakened/hidden by layout and side-sheet competition, then repopulate every top-level page
+- Regressions targeted from latest visible proof:
+  - cramped `Fix Fox Ready` module with weak hierarchy
+  - top-right `Open Reports` duplication
+  - detached/cropped global search dropdown rendering
+  - thin Reports/Home/Playbooks presentation and inconsistent page density
+  - settings navigation/pill styling weakness and scattered Help affordances
+  - nav/action icon clipping risk across rail/header/focus states
+- Latest repo screenshot folder identified:
+  - primary full proof folder: `docs/screenshots/20260306_142837`
+  - latest screenshot directories by timestamp also include `docs/screenshots/20260306_152608` and `docs/screenshots/20260306_152514`
+- Expected high-risk files/modules:
+  - `src/ui/components/app_bar.py`
+  - `src/ui/components/nav.py`
+  - `src/ui/components/global_search.py`
+  - `src/ui/components/page_primitives.py`
+  - `src/ui/components/side_sheet.py`
+  - `src/ui/pages/home_page.py`
+  - `src/ui/pages/playbooks_page.py`
+  - `src/ui/pages/diagnose_page.py`
+  - `src/ui/pages/fixes_page.py`
+  - `src/ui/pages/reports_page.py`
+  - `src/ui/pages/history_page.py`
+  - `src/ui/pages/settings_page.py`
+  - `src/ui/widgets.py`
+  - `src/ui/style/qss_builder.py`
+  - `src/ui/main_window_impl.py`

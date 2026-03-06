@@ -71,7 +71,7 @@ def _check_shell_runtime() -> list[str]:
         nav_rails = [w for w in window.findChildren(QWidget) if w.objectName() == "NavRail"]
         if len(nav_rails) != 1:
             failures.append(f"expected exactly one NavRail, found {len(nav_rails)}")
-        for button in (window.btn_export, window.btn_overflow, window.compact_search_btn):
+        for button in (window.btn_panel_toggle, window.btn_overflow, window.compact_search_btn):
             if button.icon().isNull():
                 failures.append(f"toolbar icon missing for {button.objectName() or button.__class__.__name__}")
     finally:

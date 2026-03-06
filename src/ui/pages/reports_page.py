@@ -27,7 +27,7 @@ class ReportsPage(PageScroll):
         layout.addWidget(
             build_page_header(
                 "Reports",
-                "Create validated support bundles with share-safe masking.",
+                "Review the active case, validate masking, and build a support-ready export bundle.",
                 help_text="Use the 3-step flow: configure, preview evidence/redaction, then create and validate the bundle.",
                 on_help=w._show_page_help,
                 cta=details_btn,
@@ -36,15 +36,33 @@ class ReportsPage(PageScroll):
         w.rep_callout = InlineCallout("Reports", "", level="warn", density=w.settings_state.density)
         layout.addWidget(w.rep_callout)
 
+        overview = QWidget()
+        overview_layout = QVBoxLayout(overview)
+        overview_layout.setContentsMargins(0, 0, 0, 0)
+        overview_layout.setSpacing(spacing("md"))
+        overview_row = QWidget()
+        overview_row_layout = QVBoxLayout(overview_row)
+        overview_row_layout.setContentsMargins(0, 0, 0, 0)
+        overview_row_layout.setSpacing(spacing("md"))
+        w.rep_session_summary = Card("Active Session", "No active session loaded yet.")
+        w.rep_session_summary.body_layout().addWidget(QLabel("Load or create a session to unlock live bundle validation."))
+        w.rep_handoff_summary = Card("Handoff Checklist", "Masking preview, evidence review, validation, and summary copy all live here.")
+        w.rep_handoff_summary.body_layout().addWidget(QLabel("Use Reports as the final review station before sharing anything externally."))
+        overview_row_layout.addWidget(w.rep_session_summary)
+        overview_row_layout.addWidget(w.rep_handoff_summary)
+        overview_layout.addWidget(overview_row)
+        layout.addWidget(overview)
+
         export_flow = Card(
             "Support Bundle Flow",
             "1) Choose session  2) Choose bundle type  3) Configure masking  4) Create and validate",
         )
+        export_flow.body_layout().addWidget(QLabel("Reports stays useful even before a session exists: configure defaults, review the checklist, then generate once a case is loaded."))
         layout.addWidget(export_flow)
 
         w.rep_empty_state = EmptyState(
-            "Run a goal first",
-            "Start from Home or the top app bar to generate a session, then return here to configure and export.",
+            "No active session yet",
+            "Start from Home or reopen a case from History, then return here to review masking, validate evidence, and export.",
             icon="!",
         )
         layout.addWidget(w.rep_empty_state)

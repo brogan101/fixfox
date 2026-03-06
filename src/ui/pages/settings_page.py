@@ -48,13 +48,13 @@ class SettingsPage(PageScroll):
         layout.addWidget(
             build_page_header(
                 "Settings",
-                "Policy, privacy, appearance, and support settings.",
+                "Preferences, privacy, diagnostics, and support for the full FixFox shell.",
                 help_text="Each setting includes plain-English impact; details stay collapsed until needed.",
                 on_help=w._show_page_help,
             )
         )
 
-        toolbar = Card("Settings Tools", "Search, reset defaults, or export current settings.")
+        toolbar = Card("Settings Tools", "Search preferences, restore defaults, or jump straight to support workflows.")
         tools_row = QWidget()
         tools_row_l = QVBoxLayout(tools_row)
         tools_row_l.setContentsMargins(0, 0, 0, 0)
@@ -67,14 +67,14 @@ class SettingsPage(PageScroll):
         tools_row_bottom.setSpacing(spacing("sm"))
         w.settings_search = QLineEdit()
         w.settings_search.setObjectName("SearchInput")
-        w.settings_search.setPlaceholderText("Search settings")
+        w.settings_search.setPlaceholderText("Search settings, diagnostics, or support")
         w.settings_search.textChanged.connect(w._filter_settings_nav)
         b_reset = SoftButton("Reset Defaults")
         w.s_export_btn = SoftButton("Export Settings JSON")
-        b_help = SoftButton("Help Center")
+        b_help = SoftButton("Open Support Hub")
         b_reset.clicked.connect(w._reset_settings_defaults)
         w.s_export_btn.clicked.connect(w._export_settings_json)
-        b_help.clicked.connect(lambda: w._show_page_help("Settings", "Safety, privacy, and rollback guidance."))
+        b_help.clicked.connect(lambda: w._open_settings_section("Support"))
         tools_row_top.addWidget(w.settings_search, 1)
         tools_row_bottom.addWidget(b_reset, 0)
         tools_row_bottom.addWidget(w.s_export_btn, 0)
@@ -103,9 +103,9 @@ class SettingsPage(PageScroll):
         settings_sections = (
             ("Safety", "shield"),
             ("Privacy", "privacy"),
-            ("Appearance", "gear"),
-            ("Advanced", "wrench"),
-            ("Feedback", "help"),
+            ("Appearance", "cog"),
+            ("Diagnostics", "wrench"),
+            ("Support", "info"),
         )
         for name, icon_name in settings_sections:
             item = QListWidgetItem(name)
@@ -238,7 +238,7 @@ class SettingsPage(PageScroll):
         pdl = QVBoxLayout(p_advanced)
         pdl.setContentsMargins(0, 0, 0, 0)
         pdl.setSpacing(10)
-        c_adv = Card("Advanced", "Operational paths and logs.")
+        c_adv = Card("Diagnostics & Maintenance", "Operational paths, evidence tools, and local maintenance controls.")
         b_open = SoftButton("Open Logs Folder")
         b_open.clicked.connect(lambda: os.startfile(str(logs_dir())) if os.name == "nt" else None)
         b_copy = SoftButton("Copy Log Path")
@@ -277,11 +277,11 @@ class SettingsPage(PageScroll):
         c_adv.body_layout().addWidget(b_diag)
         c_adv.body_layout().addWidget(w._setting_hint("Runs core evidence collection and attaches output for export."))
         c_adv.body_layout().addWidget(b_support)
-        c_adv.body_layout().addWidget(w._setting_hint("Open Reports to build a full support bundle with validation and summaries."))
+        c_adv.body_layout().addWidget(w._setting_hint("Open Reports to build a validated support bundle with masking previews and summaries."))
         c_adv.body_layout().addWidget(b_logo)
         c_adv.body_layout().addWidget(w._setting_hint("Creates FixFoxLogo.png on your Desktop for support docs/screenshots."))
         c_adv.body_layout().addWidget(b_logo_recreate)
-        c_adv.body_layout().addWidget(QLabel("App summary"))
+        c_adv.body_layout().addWidget(QLabel("Operational summary"))
         c_adv.body_layout().addWidget(w._setting_hint(f"{APP_DISPLAY_NAME} v{APP_VERSION}"))
         c_adv.body_layout().addWidget(w._setting_hint("Local-only design. No telemetry and no automatic cloud transfer."))
         c_adv.body_layout().addWidget(w._setting_hint(f"Capabilities: {len(CAPABILITIES)} | Runbooks: {len(RUNBOOKS)}"))
@@ -292,6 +292,28 @@ class SettingsPage(PageScroll):
         pfl = QVBoxLayout(p_feedback)
         pfl.setContentsMargins(0, 0, 0, 0)
         pfl.setSpacing(10)
+        support_actions = Card("Help / Support / About", "Canonical home for guidance, diagnostics handoff, and build details.")
+        b_help_center = SoftButton("Open Help Center")
+        b_help_center.clicked.connect(lambda: w._show_page_help("Support", "Guided help, privacy notes, safety guidance, and export support live here."))
+        b_open_reports = SoftButton("Open Reports")
+        b_open_reports.clicked.connect(lambda: w.nav.setCurrentRow(w.NAV_ITEMS.index("Reports")))
+        b_about = SoftButton("About FixFox")
+        b_about.clicked.connect(w._show_about_fixfox_dialog)
+        b_export_diag = SoftButton("Export Diagnostics")
+        b_export_diag.clicked.connect(w._collect_core_evidence)
+        support_actions.body_layout().addWidget(b_help_center)
+        support_actions.body_layout().addWidget(w._setting_hint("Read setup, privacy, safety, and support-bundle guidance without leaving Settings."))
+        support_actions.body_layout().addWidget(b_open_reports)
+        support_actions.body_layout().addWidget(w._setting_hint("Reports is the canonical export/review station for support handoff."))
+        support_actions.body_layout().addWidget(b_export_diag)
+        support_actions.body_layout().addWidget(w._setting_hint("Collect a fresh diagnostics set before exporting or escalating."))
+        support_actions.body_layout().addWidget(b_about)
+        support_actions.body_layout().addWidget(w._setting_hint(f"Build info: {APP_DISPLAY_NAME} {APP_VERSION}"))
+        local_paths = ensure_dirs()
+        support_actions.body_layout().addWidget(w._setting_hint(f"Logs: {local_paths['logs']}"))
+        support_actions.body_layout().addWidget(w._setting_hint(f"Exports: {local_paths['exports']}"))
+        pfl.addWidget(support_actions)
+
         c_fb = Card("Local Feedback", "Saved as JSON locally; no network calls.")
         form = QWidget()
         fl = QFormLayout(form)

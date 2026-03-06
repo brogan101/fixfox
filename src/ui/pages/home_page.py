@@ -29,7 +29,7 @@ class HomePage(PageScroll):
         layout.addWidget(
             build_page_header(
                 "Home",
-                "Status, goals, favorites, and recent sessions.",
+                "Command center for diagnostics, session recovery, and support export readiness.",
                 help_text="Start from a goal card or recent session, then export when done.",
                 on_help=w._show_page_help,
             )
@@ -43,7 +43,7 @@ class HomePage(PageScroll):
         hero_actions_layout.setSpacing(spacing("sm"))
         hero_run = PrimaryButton("Quick Check")
         hero_run.clicked.connect(lambda: w.run_quick_check("Quick Check"))
-        hero_export = SoftButton("Support Bundle")
+        hero_export = SoftButton("Prepare Bundle")
         hero_export.clicked.connect(lambda: w.nav.setCurrentRow(w.NAV_ITEMS.index("Reports")))
         hero_settings = SoftButton("Settings")
         hero_settings.clicked.connect(lambda: w.nav.setCurrentRow(w.NAV_ITEMS.index("Settings")))
@@ -52,16 +52,16 @@ class HomePage(PageScroll):
         hero_actions_layout.addWidget(hero_settings)
         hero_actions_layout.addStretch(1)
 
-        hero = Card("Welcome to FixFox", "Run local diagnostics and create share-safe support bundles.", right_widget=hero_actions)
+        hero = Card("FixFox Control Center", "Run local diagnostics, recover a session, and prepare a share-safe support bundle without leaving the shell.", right_widget=hero_actions)
         mark = QLabel()
         pix = QPixmap(resource_path("assets/brand/fixfox_mark.png"))
         if not pix.isNull():
             mark.setPixmap(pix.scaled(40, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         hero.body_layout().addWidget(mark)
-        hero.body_layout().addWidget(QLabel("Local-only by default. No telemetry."))
+        hero.body_layout().addWidget(QLabel("Local-only by default. No telemetry, no background uploads, and no hidden network steps."))
         layout.addWidget(hero)
 
-        status = Card("System Status", "Last checked: n/a")
+        status = Card("System Readiness", "Live summary of the current machine state and export posture.")
         w.home_last = status.sub
         strip = QWidget()
         strip_layout = QHBoxLayout(strip)
@@ -77,6 +77,20 @@ class HomePage(PageScroll):
         strip_layout.addStretch(1)
         status.body_layout().addWidget(strip)
         layout.addWidget(status)
+
+        prep_row = QWidget()
+        prep_row_layout = QHBoxLayout(prep_row)
+        prep_row_layout.setContentsMargins(0, 0, 0, 0)
+        prep_row_layout.setSpacing(spacing("md"))
+        triage = Card("What to do first", "Start with a safe baseline, then move to guided diagnostics and fixes.")
+        triage.body_layout().addWidget(QLabel("1. Run Quick Check to create a working session."))
+        triage.body_layout().addWidget(QLabel("2. Review top findings in Diagnose."))
+        triage.body_layout().addWidget(QLabel("3. Use Fixes or Playbooks for deterministic next steps."))
+        export_ready = Card("Support Bundle Readiness", "Reports becomes the handoff station once a session exists.")
+        export_ready.body_layout().addWidget(QLabel("Includes masking preview, bundle tree, evidence checklist, and ticket-summary copy actions."))
+        prep_row_layout.addWidget(triage, 1)
+        prep_row_layout.addWidget(export_ready, 1)
+        layout.addWidget(prep_row)
 
         goals = QWidget()
         goals_layout = QGridLayout(goals)
@@ -145,12 +159,12 @@ class HomePage(PageScroll):
         w.home_favorites = FeedRenderer(
             w._make_home_favorite_row,
             density=w.settings_state.density,
-            empty_icon="*",
-            empty_message="No favorites yet.",
+            empty_icon="quick_check",
+            empty_message="Pin tools, fixes, or runbooks from their menus to build a reusable command deck.",
         )
         w.home_favorites.item_activated.connect(w._launch_home_favorite)
         w.home_favorites.context_requested.connect(w._home_favorite_menu)
-        manage_btn = SoftButton("Manage Favorites")
+        manage_btn = SoftButton("Choose Quick Actions")
         manage_btn.clicked.connect(lambda: w.nav.setCurrentRow(w.NAV_ITEMS.index("Settings")))
         manage_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         favorites_card.body_layout().addWidget(manage_btn)
@@ -164,11 +178,11 @@ class HomePage(PageScroll):
         w.home_recent = FeedRenderer(w._make_session_row, density=w.settings_state.density, empty_icon="clock", empty_message="No sessions yet.")
         w.home_recent.item_activated.connect(lambda payload: w._load_session(str((payload or {}).get("session_id", ""))) if isinstance(payload, dict) else None)
         w.home_recent.context_requested.connect(w._session_menu)
-        history_card = Card("Recent Sessions", "Reopen prior sessions or continue toward support export.")
+        history_card = Card("Recent Sessions", "Reopen prior sessions, compare outcomes, or continue toward support export.")
         history_card.body_layout().addWidget(w.home_recent)
-        export_btn = SoftButton("Open Reports")
+        export_btn = SoftButton("Prepare Bundle")
         export_btn.clicked.connect(lambda: w.nav.setCurrentRow(w.NAV_ITEMS.index("Reports")))
-        quick_action = Card("Support Bundle", "Open Reports to validate and package the active session.", right_widget=export_btn)
+        quick_action = Card("Bundle Workflow", "Move to Reports to validate masking, review included evidence, and generate a support bundle.", right_widget=export_btn)
         row_layout.addWidget(history_card, 1)
         row_layout.addWidget(quick_action, 0)
         layout.addWidget(row, 1)

@@ -56,8 +56,9 @@ class IconButton(QToolButton):
 
     def set_density(self, density: str) -> None:
         d = resolve_density_tokens(density)
-        self.setFixedHeight(d.button_height)
-        self.setIconSize(QSize(d.icon_size, d.icon_size))
+        edge = max(d.button_height, d.icon_size + 12)
+        self.setFixedSize(edge, edge)
+        self.setIconSize(QSize(max(14, d.icon_size - 1), max(14, d.icon_size - 1)))
 
 
 class KebabMenuButton(QToolButton):

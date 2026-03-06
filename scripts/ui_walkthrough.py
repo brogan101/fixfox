@@ -38,8 +38,12 @@ def _capture_shell(window: MainWindow, path: Path, include_popup: bool = False) 
     popup = getattr(window, "_search_popup", None)
     win_geo = window.frameGeometry()
     region = win_geo
+    popup_geo = None
     if include_popup and isinstance(popup, QWidget) and popup.isVisible():
-        region = region.united(popup.frameGeometry())
+        popup_top_left = popup.mapToGlobal(QPoint(0, 0))
+        popup_geo = popup.frameGeometry()
+        popup_geo.moveTopLeft(popup_top_left)
+        region = region.united(popup_geo)
 
     screen = QApplication.primaryScreen()
     pix = QPixmap()
@@ -52,7 +56,8 @@ def _capture_shell(window: MainWindow, path: Path, include_popup: bool = False) 
             canvas.fill(Qt.transparent)
             painter = QPainter(canvas)
             painter.drawPixmap(window.frameGeometry().topLeft() - region.topLeft(), base)
-            painter.drawPixmap(popup.frameGeometry().topLeft() - region.topLeft(), popup.grab())
+            popup_pos = popup_geo.topLeft() if popup_geo is not None else popup.mapToGlobal(QPoint(0, 0))
+            painter.drawPixmap(popup_pos - region.topLeft(), popup.grab())
             painter.end()
             pix = canvas
         else:
@@ -66,6 +71,11 @@ def _measure_content(window: MainWindow) -> tuple[int, int]:
     if pages is None:
         return (0, 0)
     return (pages.width(), pages.height())
+
+
+def _capture_widget(widget: QWidget, path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    widget.grab().save(str(path), "PNG")
 
 
 def _detect_clipping(window: MainWindow) -> list[str]:
@@ -339,6 +349,17 @@ def main() -> int:
         _capture_shell(window, search_shot, include_popup=True)
         captured.append(str(search_shot.relative_to(REPO_ROOT)).replace("\\", "/"))
 
+        no_results_query = "zz_fixfox_no_results_zz"
+        window.top_search.setText(no_results_query)
+        window._refresh_global_search_results()
+        _drain(app, cycles=3)
+        no_results_shot = out_dir / "search_dropdown_no_results.png"
+        _capture_shell(window, no_results_shot, include_popup=True)
+        captured.append(str(no_results_shot.relative_to(REPO_ROOT)).replace("\\", "/"))
+        window.top_search.clear()
+        window._search_popup.hide_popup()
+        _drain(app, cycles=2)
+
         if getattr(window, "concierge", None) is not None and window.concierge.collapsed:
             window.btn_panel_toggle.click()
             _drain(app, cycles=4)
@@ -350,6 +371,38 @@ def main() -> int:
         if getattr(window, "concierge", None) is not None and not window.concierge.collapsed:
             window.btn_panel_toggle.click()
             _drain(app, cycles=3)
+
+        top_bar_shot = out_dir / "top_bar_after_cleanup.png"
+        _capture_widget(window.app_shell.toolbar, top_bar_shot)
+        captured.append(str(top_bar_shot.relative_to(REPO_ROOT)).replace("\\", "/"))
+
+        status_shot = out_dir / "status_module.png"
+        _capture_widget(window.run_status_panel, status_shot)
+        captured.append(str(status_shot.relative_to(REPO_ROOT)).replace("\\", "/"))
+
+        settings_idx = window.NAV_ITEMS.index("Settings")
+        window.nav.setCurrentRow(settings_idx)
+        _drain(app, cycles=3)
+        settings_nav_shot = out_dir / "settings_section_selected.png"
+        _capture_widget(window.settings_nav, settings_nav_shot)
+        captured.append(str(settings_nav_shot.relative_to(REPO_ROOT)).replace("\\", "/"))
+
+        nav_button = window.nav._buttons.get("Settings") if hasattr(window.nav, "_buttons") else None
+        if isinstance(nav_button, QWidget):
+            nav_button.setFocus(Qt.TabFocusReason)
+            _drain(app, cycles=2)
+            nav_state_shot = out_dir / "nav_selected_focus.png"
+            _capture_widget(window.nav, nav_state_shot)
+            captured.append(str(nav_state_shot.relative_to(REPO_ROOT)).replace("\\", "/"))
+
+        if hasattr(window, "s_ui_scale"):
+            window.s_ui_scale.setValue(125)
+            _drain(app, cycles=3)
+            window.s_ui_scale.sliderReleased.emit()
+            _drain(app, cycles=3)
+            scale_shot = out_dir / "scale_125_settings.png"
+            _capture_shell(window, scale_shot)
+            captured.append(str(scale_shot.relative_to(REPO_ROOT)).replace("\\", "/"))
 
         window.run_quick_check("Quick Check")
         deadline = time.time() + 75
@@ -363,6 +416,16 @@ def main() -> int:
                 break
         else:
             failures.append("Tool Runner screenshot not captured from Quick Check.")
+        if getattr(window, "current_session", None):
+            window.nav.setCurrentRow(window.NAV_ITEMS.index("Reports"))
+            _drain(app, cycles=4)
+            populated_reports = out_dir / "reports_content_visible.png"
+            _capture_shell(window, populated_reports)
+            captured.append(str(populated_reports.relative_to(REPO_ROOT)).replace("\\", "/"))
+            if getattr(window, "rep_evidence_card", None) is not None:
+                micro_shot = out_dir / "micro_component_reports_evidence.png"
+                _capture_widget(window.rep_evidence_card, micro_shot)
+                captured.append(str(micro_shot.relative_to(REPO_ROOT)).replace("\\", "/"))
         if getattr(window, "concierge", None) is not None and not window.concierge.collapsed:
             window.btn_panel_toggle.click()
             _drain(app, cycles=4)

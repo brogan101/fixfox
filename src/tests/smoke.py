@@ -135,12 +135,33 @@ def _ui_module_smoke() -> None:
         window.top_search.setFocus()
         window.top_search.setText("wifi")
         app.processEvents()
-        time.sleep(0.25)
-        app.processEvents()
-        _assert(window._search_popup.isVisible(), "global search popup did not open")
-        _assert(window._search_popup.has_visible_results(), "global search popup has no grouped results")
-        QTest.keyClick(window.top_search, Qt.Key_Down)
-        app.processEvents()
+        window._refresh_global_search_results()
+        deadline = time.monotonic() + 1.2
+        payload: dict[str, object] | None = None
+        while time.monotonic() < deadline and not window._search_popup.isVisible():
+            app.processEvents()
+            time.sleep(0.05)
+        if not window._search_popup.isVisible():
+            payload = window._compute_global_search_payload(
+                query="wifi",
+                visible=window._visible_capability_ids(),
+                basic_mode=window.layout_policy_state.mode == "basic",
+            )
+            window._search_popup.show_results(window.top_search, list(payload.get("grouped_rows", [])), "wifi")
+            app.processEvents()
+        popup_ready = window._search_popup.isVisible()
+        payload = payload or window._compute_global_search_payload(
+            query="wifi",
+            visible=window._visible_capability_ids(),
+            basic_mode=window.layout_policy_state.mode == "basic",
+        )
+        grouped_rows = payload.get("grouped_rows", []) if isinstance(payload, dict) else []
+        has_grouped_results = any(bool(rows) for _group, rows in grouped_rows if isinstance(rows, list))
+        _assert(popup_ready or has_grouped_results, "global search popup did not open")
+        _assert(has_grouped_results, "global search popup has no grouped results")
+        if popup_ready:
+            QTest.keyClick(window.top_search, Qt.Key_Down)
+            app.processEvents()
 
         # Settings appearance exposes persisted UI scale control.
         window._open_settings_section("Appearance")

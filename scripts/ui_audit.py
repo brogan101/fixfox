@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import time
 from pathlib import Path
 
 from PySide6.QtCore import QTimer, Qt
@@ -88,8 +89,11 @@ def main() -> int:
             app.processEvents()
 
     window.top_search.setText("quick")
-    window._refresh_global_search_results()
-    app.processEvents()
+    deadline = time.time() + 1.2
+    while time.time() < deadline and not window._search_popup.isVisible():
+        window._refresh_global_search_results()
+        app.processEvents()
+        QTest.qWait(40)
     _assert(window._search_popup.isVisible(), "Search popup did not open", failures)
     QTest.qWait(180)
     app.processEvents()
@@ -98,7 +102,7 @@ def main() -> int:
     splash_pixmap = build_splash_pixmap(status_text="Audit probe")
     _assert(not splash_pixmap.isNull(), "Splash pixmap did not render", failures)
 
-    for btn in (window.btn_quick_check, window.btn_panel_toggle, window.btn_export):
+    for btn in (window.btn_quick_check, window.btn_panel_toggle, window.btn_overflow):
         _assert(not _is_clipped(btn), f"Top bar control clipped: {btn.objectName() or btn.text()}", failures)
 
     if hasattr(window, "settings_nav"):

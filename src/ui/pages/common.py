@@ -25,6 +25,7 @@ def build_page_header(
     cta: QWidget | None = None,
     help_text: str = "",
     on_help: Callable[[str, str], None] | None = None,
+    show_help: bool = False,
 ) -> QWidget:
     return PageHeader(
         title=title,
@@ -32,4 +33,5 @@ def build_page_header(
         cta=cta,
         help_text=help_text,
         on_help=on_help,
+        show_help=show_help,
     )

@@ -14,7 +14,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QListWidget, QSplitter, QToolButton
+from PySide6.QtWidgets import QAbstractButton, QApplication, QListWidget, QSplitter, QToolButton
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 REQ_PATH = REPO_ROOT / "docs" / "REQUIREMENTS.json"
@@ -374,7 +374,7 @@ def _collect_static(checks: dict[str, CheckResult]) -> None:
         [f"placeholder_nav_icons={placeholder_nav_icons[:4]}"],
     )
     checks["required_icons_exist"] = CheckResult(all((icon_root / x).exists() for x in required_icons), ["required icon assets"])
-    checks["required_nav_icon_mapping"] = CheckResult(all(x in main for x in ['"Playbooks": "open_book"', '"Fixes": "wrench"', '"Settings": "gear"']), ["required mapping set"])
+    checks["required_nav_icon_mapping"] = CheckResult(all(x in main for x in ['"Playbooks": "open_book"', '"Fixes": "wrench"', '"Settings": "cog"']), ["required mapping set"])
     checks["icon_loader_cache_tint"] = CheckResult("_ICON_CACHE" in icons and "_tint_pixmap" in icons, ["cache+tint"])
     checks["search_expand_contract"] = CheckResult("set_search_collapsed" in _read(REPO_ROOT / "src/ui/components/app_bar.py"), ["expandable search"])
     checks["search_debounce_keyboard"] = CheckResult(all(x in main for x in ["_search_debounce_timer", "Qt.Key_Down", "Qt.Key_Up"]), ["debounce+keyboard"])
@@ -438,9 +438,9 @@ def _collect_runtime(checks: dict[str, CheckResult]) -> float:
         nav_btns = [b for b in w.nav.findChildren(QToolButton) if b.objectName() == "NavRailButton"]
         mapping = {str(b.toolTip()).strip(): str(b.property("icon_name") or "").strip() for b in nav_btns}
         checks["single_nav_runtime"] = CheckResult(len(nav_btns) >= max(1, len(w.NAV_ITEMS) - 1), [f"buttons={len(nav_btns)}"])
-        checks["required_nav_icon_runtime"] = CheckResult(mapping.get("Settings") == "gear" and mapping.get("Fixes") == "wrench" and mapping.get("Playbooks") == "open_book", [str(mapping)])
+        checks["required_nav_icon_runtime"] = CheckResult(mapping.get("Settings") == "cog" and mapping.get("Fixes") == "wrench" and mapping.get("Playbooks") == "open_book", [str(mapping)])
         checks["nav_icons_non_null_runtime"] = CheckResult(all(not b.icon().isNull() for b in nav_btns), [f"buttons={len(nav_btns)}"])
-        checks["top_app_bar_contract"] = CheckResult(w.btn_quick_check.isVisible() and w.btn_export.isVisible() and w.btn_overflow.isVisible(), ["primary app-bar controls visible"])
+        checks["top_app_bar_contract"] = CheckResult(w.btn_quick_check.isVisible() and w.btn_panel_toggle.isVisible() and w.btn_overflow.isVisible(), ["primary app-bar controls visible"])
         style_qss = app.styleSheet()
         checks["combo_indicator_runtime_customized"] = CheckResult(
             "QComboBox::down-arrow" in style_qss,
@@ -461,7 +461,11 @@ def _collect_runtime(checks: dict[str, CheckResult]) -> float:
         w._focus_top_search(); _drain(app, 2)
         QTest.keyClick(w, Qt.Key_K, Qt.ControlModifier); _drain(app, 2)
         ctrl_k_ok = bool(w.top_search.hasFocus())
-        w.top_search.setText("quick"); _drain(app, 2); w._refresh_global_search_results(); _drain(app, 2)
+        w.top_search.setText("quick"); _drain(app, 2)
+        deadline = time.perf_counter() + 1.2
+        while time.perf_counter() < deadline and not w._search_popup.isVisible():
+            w._refresh_global_search_results()
+            _drain(app, 2)
         vis0 = w._search_popup.isVisible()
         QTest.qWait(550); _drain(app, 2)
         vis1 = w._search_popup.isVisible()
@@ -497,8 +501,8 @@ def _collect_runtime(checks: dict[str, CheckResult]) -> float:
         checks["search_keystroke_block_budget_runtime"] = CheckResult(keystroke_budget_ok, [f"elapsed_ms={typing_elapsed_ms:.1f} threshold=1400"])
         checks["critical_search_runtime_responsive"] = CheckResult(cache_ok and responsive_ok and keystroke_budget_ok, [f"cache_ok={cache_ok} responsive_ok={responsive_ok} budget_ok={keystroke_budget_ok}"])
         checks["no_qsplitter_runtime"] = CheckResult(len(w.findChildren(QSplitter)) == 0, ["runtime splitter count"])
-        hits = [b for b in w.findChildren(type(w.btn_export)) if "open reports" in f"{b.text()} {b.toolTip()}".lower() and b.isVisible()]
-        checks["no_duplicate_open_reports_runtime"] = CheckResult(len(hits) <= 2, [f"open_reports_visible={len(hits)}"])
+        hits = [b for b in w.findChildren(QAbstractButton) if "open reports" in f"{b.text()} {b.toolTip()}".lower() and b.isVisible()]
+        checks["no_duplicate_open_reports_runtime"] = CheckResult(len(hits) == 0, [f"open_reports_visible={len(hits)}"])
         if "Playbooks" in w.NAV_ITEMS:
             w.nav.setCurrentRow(w.NAV_ITEMS.index("Playbooks")); _drain(app, 3)
         w.nav.setCurrentRow(w.NAV_ITEMS.index("Settings")); _drain(app, 4)

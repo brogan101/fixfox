@@ -95,13 +95,21 @@ QLabel#StartupWarmupText {{
 }}
 
 QFrame#BrandStatus {{
-  background: {surface_raised};
-  border: 0;
-  border-radius: {d.corner_radius + 8}px;
+  background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+    stop:0 {_alpha(tokens.panel2, 0.98)},
+    stop:1 {_alpha(tokens.panel, 0.98)});
+  border: 1px solid {_alpha(tokens.border, 0.88)};
+  border-radius: {d.corner_radius + 10}px;
 }}
 QLabel#Wordmark {{
-  font-size: {d.font_size + 1}pt;
+  font-size: {d.font_size + 2}pt;
   font-weight: 75;
+}}
+QLabel#TopStatusEyebrow {{
+  color: {tokens.text_muted};
+  font-size: {max(7, d.font_size - 2)}pt;
+  letter-spacing: 0.08em;
+  font-weight: 63;
 }}
 QLabel#TopBrandSubtitle {{
   color: {text_soft};
@@ -112,19 +120,23 @@ QLabel#BrandMark {{
 }}
 QLabel#TopStatusText {{
   color: {tokens.text};
-  font-weight: 57;
+  font-size: {d.font_size + 1}pt;
+  font-weight: 63;
 }}
 QLabel#TopStatusSubtle {{
   color: {tokens.text_muted};
   font-size: {max(8, d.font_size - 1)}pt;
+}}
+QWidget#TopStatusMeta {{
+  background: transparent;
 }}
 
 QWidget#NavRail {{
   background: {_alpha(tokens.panel, 0.92)};
   border: 0;
   border-radius: {d.corner_radius + 8}px;
-  min-width: 72px;
-  max-width: 72px;
+  min-width: 80px;
+  max-width: 80px;
 }}
 QFrame#NavRailDivider {{
   background: {_alpha(tokens.border, 0.55)};
@@ -136,13 +148,14 @@ QToolButton#NavRailButton,
 QToolButton#NavRailAuxButton {{
   background: transparent;
   border: 1px solid transparent;
-  border-radius: {d.corner_radius + 8}px;
-  padding: 0;
-  icon-size: {d.icon_size + 1}px;
+  border-radius: {d.corner_radius + 10}px;
+  padding: 10px;
+  margin: 0 2px;
+  icon-size: {max(16, d.icon_size - 1)}px;
 }}
 QToolButton#NavRailButton:checked {{
-  background: {accent_tint};
-  border-color: {focus_ring};
+  background: {_alpha(tokens.accent, 0.18)};
+  border-color: {_alpha(tokens.accent, 0.38)};
 }}
 QToolButton#NavRailButton:hover,
 QToolButton#NavRailAuxButton:hover {{
@@ -157,20 +170,31 @@ QLabel#RunnerStatusChip {{
   background: {tokens.panel2};
   border: 1px solid {border_soft};
   border-radius: 999px;
-  padding: 3px 10px;
+  padding: 4px 10px;
   font-weight: 63;
 }}
 QLabel#RunnerStatusChip[kind="ok"] {{
   color: {tokens.ok};
+  background: {_alpha(tokens.ok, 0.10)};
+  border-color: {_alpha(tokens.ok, 0.20)};
 }}
 QLabel#RunnerStatusChip[kind="warn"] {{
   color: {tokens.warn};
+  background: {_alpha(tokens.warn, 0.12)};
+  border-color: {_alpha(tokens.warn, 0.24)};
 }}
 QLabel#RunnerStatusChip[kind="crit"] {{
   color: {tokens.crit};
+  background: {_alpha(tokens.crit, 0.11)};
+  border-color: {_alpha(tokens.crit, 0.24)};
 }}
 QLabel#RunnerStatusChip[kind="info"] {{
   color: {tokens.info};
+  background: {_alpha(tokens.info, 0.10)};
+  border-color: {_alpha(tokens.info, 0.22)};
+}}
+QLabel#RunnerStatusChip[kind="muted"] {{
+  color: {tokens.text_muted};
 }}
 
 QFrame#SessionContext {{
@@ -209,16 +233,17 @@ QListWidget#SettingsNav {{
   background: {tokens.panel};
   border: 1px solid {border_soft};
   border-radius: {d.corner_radius + 6}px;
-  padding: 8px;
+  padding: 10px;
 }}
 QListWidget#SettingsNav::item {{
-  height: {max(d.nav_item_height + 2, d.input_height + 10)}px;
-  border-radius: {d.corner_radius}px;
-  padding: 0 12px;
+  height: {max(d.nav_item_height + 10, d.input_height + 14)}px;
+  border-radius: {d.corner_radius + 2}px;
+  padding: 0 14px;
+  margin: 0 0 6px 0;
 }}
 QListWidget#SettingsNav::item:selected {{
-  background: {accent_tint};
-  border: 1px solid {focus_ring};
+  background: {_alpha(tokens.accent, 0.16)};
+  border: 1px solid {_alpha(tokens.accent, 0.34)};
 }}
 QListWidget#SettingsNav::item:hover {{
   background: {surface_alt};
@@ -407,8 +432,8 @@ QToolButton#AppBarIconButton {{
   background: {tokens.panel2};
   border: 1px solid {border_soft};
   font-size: {d.font_size + 1}pt;
-  icon-size: {d.icon_size}px;
-  padding: 0;
+  icon-size: {max(15, d.icon_size - 1)}px;
+  padding: 4px;
 }}
 QToolButton#AppBarIconButton:hover {{
   background: {surface_alt};
@@ -440,10 +465,6 @@ QFrame#ResultRow {{
   background: {tokens.panel};
   border: 1px solid {border_soft};
   border-radius: {d.corner_radius}px;
-}}
-QLabel#SearchResultLabel {{
-  background: transparent;
-  color: {tokens.text};
 }}
 QLabel#ResultTitle {{
   font-weight: 63;
@@ -764,9 +785,9 @@ QToolTip {{
 }}
 
 QFrame#GlobalSearchPopup {{
-  background: {tokens.panel};
-  border: 1px solid {border_soft};
-  border-radius: {d.corner_radius + 2}px;
+  background: {_alpha(tokens.panel, 0.99)};
+  border: 1px solid {_alpha(tokens.border, 0.92)};
+  border-radius: {d.corner_radius + 6}px;
 }}
 QLabel#GlobalSearchEmpty {{
   color: {tokens.text_muted};
@@ -779,7 +800,7 @@ QListWidget#GlobalSearchList {{
 }}
 QListWidget#GlobalSearchList::item {{
   border-radius: {max(8, d.corner_radius - 4)}px;
-  padding: 8px 10px;
+  padding: 0;
   margin: 1px 0;
 }}
 QListWidget#GlobalSearchList::item:disabled {{
@@ -787,14 +808,39 @@ QListWidget#GlobalSearchList::item:disabled {{
   font-weight: 63;
   background: transparent;
   border: 0;
-  padding: 6px 2px;
+  padding: 6px 4px;
 }}
 QListWidget#GlobalSearchList::item:selected {{
-  background: {accent_tint};
-  border: 1px solid {focus_ring};
+  background: transparent;
+  border: 0;
 }}
 QListWidget#GlobalSearchList::item:hover {{
-  background: {surface_alt};
+  background: transparent;
+}}
+QFrame#GlobalSearchRow {{
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: {d.corner_radius + 2}px;
+}}
+QFrame#GlobalSearchRow[state="selected"] {{
+  background: {_alpha(tokens.accent, 0.15)};
+  border-color: {_alpha(tokens.accent, 0.34)};
+}}
+QLabel#GlobalSearchTitle {{
+  color: {tokens.text};
+  font-weight: 63;
+}}
+QLabel#GlobalSearchSubtitle {{
+  color: {tokens.text_muted};
+  font-size: {max(8, d.font_size - 1)}pt;
+}}
+QLabel#GlobalSearchTag {{
+  min-width: 58px;
+  background: {tokens.panel2};
+  border: 1px solid {border_soft};
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: {tokens.text_muted};
 }}
 
 QWidget:disabled {{

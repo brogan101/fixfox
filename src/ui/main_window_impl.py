@@ -436,7 +436,7 @@ class MainWindow(QMainWindow):
         "Fixes": "wrench",
         "Reports": "reports",
         "History": "history",
-        "Settings": "gear",
+        "Settings": "cog",
     }
 
     def __init__(self, *, startup_phase_cb: Callable[[str], None] | None = None) -> None:
@@ -543,7 +543,6 @@ class MainWindow(QMainWindow):
         self.nav_shell = self.app_shell.nav_shell
         self.nav = self.nav_shell
         self.nav.currentRowChanged.connect(self._on_nav)
-        self.nav_shell.help_requested.connect(lambda: self._open_settings_section("Feedback"))
 
         self.run_status_panel = self.app_shell.toolbar.run_status_panel
         self.app_identity = self.app_shell.toolbar.app_identity
@@ -557,9 +556,10 @@ class MainWindow(QMainWindow):
         self._quick_check_default_label = self.btn_quick_check.text()
         self.btn_cancel_task = self.app_shell.toolbar.btn_cancel_task
         self.btn_open_runner = self.app_shell.toolbar.btn_open_runner
-        self.btn_export = self.app_shell.toolbar.btn_export
         self.btn_panel_toggle = self.app_shell.toolbar.btn_panel_toggle
         self.btn_overflow = self.app_shell.toolbar.btn_overflow
+        self.run_status_session_chip = self.app_shell.toolbar.run_status_session_chip
+        self.run_status_attention_chip = self.app_shell.toolbar.run_status_attention_chip
         self.mode_basic_btn = self.app_shell.toolbar.mode_basic_btn
         self.mode_pro_btn = self.app_shell.toolbar.mode_pro_btn
 
@@ -573,7 +573,6 @@ class MainWindow(QMainWindow):
         self.btn_quick_check.clicked.connect(lambda: self.run_quick_check("Quick Check"))
         self.btn_quick_check.setShortcut("Ctrl+Shift+R")
         self.btn_open_runner.clicked.connect(self.open_tool_runner)
-        self.btn_export.clicked.connect(lambda: self.nav.setCurrentRow(self.NAV_ITEMS.index("Reports")))
         self.app_shell.toolbar.details_toggled.connect(lambda checked: self._set_concierge_collapsed(not checked, persist=True))
         self.btn_overflow.clicked.connect(self._open_header_overflow_menu)
         self.mode_basic_btn.setVisible(False)
@@ -1185,13 +1184,13 @@ class MainWindow(QMainWindow):
         else:
             status = str(self._last_run_status or "").strip().lower()
             if self._run_status_error or "fail" in status or "error" in status:
-                title = "Last run failed"
+                title = "Run failed"
             elif self._run_status_attention or "cancel" in status or "partial" in status:
-                title = "Needs attention"
+                title = "Attention needed"
             elif "success" in status or "ready" in status:
-                title = "Ready"
+                title = "Ready for the next step"
             else:
-                title = "Idle"
+                title = "Standing by"
             detail_line = self._last_run_line[:120].strip() or "No active task."
             if self._last_run_name:
                 detail = f"{self._last_run_name}: {detail_line}"
@@ -1229,6 +1228,23 @@ class MainWindow(QMainWindow):
                 self.run_status_chip.setProperty("kind", kind)
                 self.run_status_chip.style().unpolish(self.run_status_chip)
                 self.run_status_chip.style().polish(self.run_status_chip)
+        if hasattr(self, "run_status_attention_chip"):
+            if self._run_status_active:
+                attention_text = self._status_elapsed_text()
+                attention_kind = "info"
+            elif self._run_status_error:
+                attention_text = "Check logs"
+                attention_kind = "crit"
+            elif self._run_status_attention:
+                attention_text = "Review outputs"
+                attention_kind = "warn"
+            else:
+                attention_text = "Local-only"
+                attention_kind = "muted"
+            self.run_status_attention_chip.setText(attention_text)
+            self.run_status_attention_chip.setProperty("kind", attention_kind)
+            self.run_status_attention_chip.style().unpolish(self.run_status_attention_chip)
+            self.run_status_attention_chip.style().polish(self.run_status_attention_chip)
 
     def _set_quick_check_busy(self, busy: bool, spinner: str = "") -> None:
         if not hasattr(self, "btn_quick_check"):
@@ -1365,8 +1381,8 @@ class MainWindow(QMainWindow):
             "safety": "risk admin advanced rollback",
             "privacy": "sessions evidence logs local-only masking share-safe not collected storage path",
             "appearance": "theme density palette right panel scale ui drawer pin",
-            "advanced": "logs diagnostics data folder evidence",
-            "feedback": "bug ui feature message",
+            "diagnostics": "logs diagnostics data folder evidence database vacuum file index",
+            "support": "help support about version diagnostics reports feedback bundle export",
         }
         first_visible = -1
         for index in range(self.settings_nav.count()):
@@ -1374,7 +1390,7 @@ class MainWindow(QMainWindow):
             label = str(item.data(Qt.UserRole) or item.text()).lower()
             blob = f"{label} {desc.get(label, '')}"
             hide = bool(q and q not in blob)
-            if basic and label == "advanced":
+            if basic and label == "diagnostics":
                 hide = True
             item.setHidden(hide)
             if (not hide) and first_visible < 0:
@@ -1702,9 +1718,8 @@ class MainWindow(QMainWindow):
         mode_menu.addAction(m_basic)
         mode_menu.addAction(m_pro)
 
-        menu.addSection("Help")
-        menu.addAction("Docs", self._open_docs)
-        menu.addAction(f"About {APP_DISPLAY_NAME}", self._show_about_fixfox_dialog)
+        menu.addSection("Support")
+        menu.addAction("Open Support Hub", lambda: self._open_settings_section("Support"))
         if os.environ.get("FIXFOX_DEV_MODE", "1").strip() == "1":
             menu.addAction("Dump UI Tree", self._dump_ui_tree)
 
@@ -1824,6 +1839,7 @@ class MainWindow(QMainWindow):
         started = time.perf_counter()
         if idx < 0 or idx >= len(self.NAV_ITEMS):
             return
+        self._search_popup.hide_popup()
         self.pages.setCurrentIndex(idx)
         page = self.pages.currentWidget()
         if isinstance(page, QWidget):
@@ -2177,7 +2193,7 @@ class MainWindow(QMainWindow):
         if page == "History":
             return ("Reopen Selected Session", self.reopen_selected_session)
         if page == "Settings":
-            return ("Open Help Center", lambda: self._show_page_help("Settings", "Policy, privacy, and support guidance."))
+            return ("Open Support", lambda: self._open_settings_section("Support"))
         return ("Start Quick Check", lambda: self.run_quick_check("Quick Check"))
 
     def _diagnose_action(self) -> tuple[str, Callable[[], None]]:
@@ -3046,11 +3062,25 @@ class MainWindow(QMainWindow):
         if hasattr(self, "rep_empty_state"):
             self.rep_empty_state.setVisible(not has_session)
         if hasattr(self, "rep_steps"):
-            self.rep_steps.setVisible(has_session)
+            self.rep_steps.setVisible(True)
+            self.rep_steps.setEnabled(True)
+            if self.rep_steps.count() >= 3:
+                self.rep_steps.setTabEnabled(1, has_session)
+                self.rep_steps.setTabEnabled(2, has_session)
         if hasattr(self, "rep_generate"):
             self.rep_generate.setEnabled(has_session)
         if hasattr(self, "rep_generate_override"):
             self.rep_generate_override.setEnabled(has_session)
+        if hasattr(self, "rep_session_summary"):
+            if has_session:
+                findings = len(self.current_session.get("findings", []))
+                actions = len(self.current_session.get("actions", []))
+                evidence = len(self.current_session.get("evidence", {}).get("files", [])) if isinstance(self.current_session.get("evidence", {}), dict) else 0
+                self.rep_session_summary.sub.setText(
+                    f"Session {self.current_session.get('session_id', '')} | {findings} findings | {actions} actions | {evidence} evidence files"
+                )
+            else:
+                self.rep_session_summary.sub.setText("No active session loaded yet.")
 
     def _rebuild_report_tree(self) -> None:
         self.rep_tree.clear()
@@ -3596,7 +3626,7 @@ class MainWindow(QMainWindow):
         if hasattr(self, "tb_favorites"):
             self.tb_favorites.set_items(fav_adapters)
             if not fav_adapters:
-                self.tb_favorites.show_empty("star", "No favorite tools available in this mode.")
+                self.tb_favorites.show_empty("quick_check", "No favorite tools available in this mode.")
         if all_adapters and not guided_basic:
             valid_ids = {row.key for row in all_adapters}
             selected_id = self.selected_tool_id if self.selected_tool_id in valid_ids else all_adapters[0].key
@@ -4815,7 +4845,7 @@ class MainWindow(QMainWindow):
                 entries.append(FeedItemAdapter(key=f"runbook:{rb.id}", title=rb.title, subtitle=rb.desc, payload={"kind": "runbooks", "key": rb.id}, category="Runbook"))
         self.home_favorites.set_items(entries[:6] if len(entries) > 6 else entries)
         if not entries:
-            self.home_favorites.show_empty("*", "No quick actions in this mode. Switch to Pro to see more.")
+            self.home_favorites.show_empty("quick_check", "No quick actions in this mode. Switch to Pro to see more.")
 
     def _launch_home_favorite(self, payload: Any) -> None:
         if not isinstance(payload, dict):
@@ -4868,6 +4898,12 @@ class MainWindow(QMainWindow):
         self.ctx_share.setText(f"Share-safe: {'on' if self.rep_safe.isChecked() else 'off'}" if hasattr(self, "rep_safe") else "Share-safe: on")
         self.ctx_preset.setText(f"Preset: {self.rep_preset.currentText()}" if hasattr(self, "rep_preset") else "Preset: home_share")
         self.ctx_last.setText(f"Last run: {self.current_session.get('created_local', 'n/a')}")
+        if hasattr(self, "run_status_session_chip"):
+            session_id = str(self.current_session.get("session_id", "") or "none").strip()
+            self.run_status_session_chip.setText(f"Session {session_id}")
+            self.run_status_session_chip.setProperty("kind", "muted" if session_id == "none" else "info")
+            self.run_status_session_chip.style().unpolish(self.run_status_session_chip)
+            self.run_status_session_chip.style().polish(self.run_status_session_chip)
         self._sync_context_bar_visibility()
 
     def copy_session_summary(self) -> None:
