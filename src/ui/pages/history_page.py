@@ -39,6 +39,8 @@ class HistoryPage(PageScroll):
         )
         w.hist_callout = InlineCallout("History", "", level="info", density=w.settings_state.density)
         center_layout.addWidget(w.hist_callout)
+        w.hist_issue_summary = Card("Issue / Playbook History", "Previously selected issue families, playbooks, and escalation posture appear here when present in a session.")
+        center_layout.addWidget(w.hist_issue_summary)
         w.hist_search = QLineEdit()
         w.hist_search.setObjectName("SearchInput")
         w.hist_search.setPlaceholderText("Search sessions")

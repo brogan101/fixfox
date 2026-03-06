@@ -94,8 +94,23 @@ from ..core.sessions import (
 )
 from ..core.settings import AppSettings, load_settings, save_settings
 from ..core.script_tasks import list_script_tasks, run_script_task, script_task_map
+from ..core.support_catalog import (
+    catalog_stats as support_catalog_stats,
+    diagnostics_for_issue,
+    evidence_for_issue,
+    export_catalog_summary,
+    family_issue_counts,
+    fixes_for_issue,
+    issue_search_blob,
+    list_families as list_support_families,
+    playbooks_for_issue,
+    query_issues,
+    issue_map as support_issue_map,
+    support_fix_map,
+    support_playbook_map,
+)
 from ..core.toolbox import TOP_TOOLS, TOOL_DIRECTORY, launch_tool, search_tools
-from ..core.utils import resource_path
+from ..core.utils import open_uri, resource_path
 from ..core.version import APP_VERSION
 from ..core.workers import TaskWorker, WorkerConfig, start_worker
 from .app_qss import build_qss
@@ -617,6 +632,13 @@ class MainWindow(QMainWindow):
         self._mark_startup_phase("mainwindow:build_nav_pages")
         self._build_nav()
         self._build_pages()
+        self._populate_support_family_combos()
+        self._refresh_support_issue_library()
+        self._refresh_support_diagnose()
+        self._refresh_support_fix_library()
+        self._refresh_support_reports_summary()
+        self._refresh_support_history_summary()
+        self._refresh_support_settings_summary()
 
         self.concierge.collapsed_changed.connect(self._on_concierge)
         self.btn_cancel_task.clicked.connect(self._cancel_task)
@@ -1410,6 +1432,12 @@ class MainWindow(QMainWindow):
         self._refresh_toolbox()
         self._refresh_runbooks()
         self._refresh_home_favorites()
+        self._refresh_support_issue_library()
+        self._refresh_support_diagnose()
+        self._refresh_support_fix_library()
+        self._refresh_support_reports_summary()
+        self._refresh_support_history_summary()
+        self._refresh_support_settings_summary()
         self._update_weekly_status()
         self._update_context_labels()
         self._update_concierge()
@@ -1605,7 +1633,7 @@ class MainWindow(QMainWindow):
             self.nav.setCurrentRow(min(current_nav, len(self.NAV_ITEMS) - 1))
         self._apply_mode_visibility()
         if refresh_data:
-            self._refresh_home_history(); self._refresh_history(); self._refresh_run_center(); self._refresh_fixes(); self._refresh_toolbox(); self._refresh_runbooks(); self._refresh_home_favorites(); self._rebuild_diagnose_sections(self.current_session.get("findings", []))
+            self._refresh_home_history(); self._refresh_history(); self._refresh_run_center(); self._refresh_fixes(); self._refresh_toolbox(); self._refresh_runbooks(); self._refresh_home_favorites(); self._rebuild_diagnose_sections(self.current_session.get("findings", [])); self._refresh_support_issue_library(); self._refresh_support_diagnose(); self._refresh_support_fix_library(); self._refresh_support_reports_summary(); self._refresh_support_history_summary(); self._refresh_support_settings_summary()
         self._apply_responsive_layout()
         self._mark_startup_phase("mainwindow:apply_density_done")
         LOGGER.debug("density_apply_ms=%.2f density=%s", (time.perf_counter() - started) * 1000.0, density)
@@ -1747,6 +1775,8 @@ class MainWindow(QMainWindow):
         self.selected_finding = {}
         self._sync_context_bar_visibility()
         self._update_context_labels()
+        self._refresh_support_reports_summary()
+        self._refresh_support_history_summary()
         self._update_concierge()
         self.toasts.show_toast("Started a new session context.")
 
@@ -3090,6 +3120,11 @@ class MainWindow(QMainWindow):
             return
         r = QTreeWidgetItem(["Session", self.current_session.get("session_id", "")])
         r.addChild(QTreeWidgetItem(["Symptom", self.current_session.get("symptom", "")]))
+        support_context = self.current_session.get("support_context", {}) if isinstance(self.current_session.get("support_context", {}), dict) else {}
+        if support_context:
+            r.addChild(QTreeWidgetItem(["Issue", support_context.get("title", "")]))
+            r.addChild(QTreeWidgetItem(["Family", support_context.get("family_label", "")]))
+            r.addChild(QTreeWidgetItem(["Primary Playbook", support_context.get("primary_playbook_id", "")]))
         r.addChild(QTreeWidgetItem(["Findings", str(len(self.current_session.get("findings", [])))]))
         r.addChild(QTreeWidgetItem(["Actions", str(len(self.current_session.get("actions", [])))]))
         r.addChild(QTreeWidgetItem(["Preset", self.rep_preset.currentText()]))
@@ -3312,6 +3347,7 @@ class MainWindow(QMainWindow):
         findings = s.get("findings", [])
         actions = s.get("actions", [])
         evidence = s.get("evidence", {}).get("files", []) if isinstance(s.get("evidence", {}), dict) else []
+        support_context = s.get("support_context", {}) if isinstance(s.get("support_context", {}), dict) else {}
         top_rows = [str(row.get("title", "")).strip() for row in findings[:3] if str(row.get("title", "")).strip()]
         exports = "yes" if any(meta.session_id == sid and meta.last_export_path for meta in load_index()) else "no"
         lines = [
@@ -3322,11 +3358,19 @@ class MainWindow(QMainWindow):
             f"Export generated: {exports}",
             "Top findings:",
         ]
+        if support_context:
+            lines.insert(2, f"Issue family: {support_context.get('family_label', 'n/a')} | {support_context.get('title', 'n/a')}")
         if top_rows:
             lines.extend([f"- {row}" for row in top_rows])
         else:
             lines.append("- none")
         self.hist_detail.sub.setText("\n".join(lines))
+        if hasattr(self, "hist_issue_summary") and support_context:
+            self.hist_issue_summary.sub.setText(
+                f"Selected session issue: {support_context.get('title', 'n/a')}\n"
+                f"Family: {support_context.get('family_label', 'n/a')}\n"
+                f"Primary playbook: {support_context.get('primary_playbook_id', 'n/a')}"
+            )
         if hasattr(self, "hist_compare"):
             self.hist_compare.set_text("\n".join(lines))
         self._update_concierge()
@@ -3375,6 +3419,10 @@ class MainWindow(QMainWindow):
             self.toasts.show_toast(f"Session not found: {sid}")
             return
         self.current_session = s
+        support_context = s.get("support_context", {}) if isinstance(s.get("support_context", {}), dict) else {}
+        if support_context:
+            self.selected_support_issue_id = str(support_context.get("issue_id", "")).strip()
+            self.selected_support_playbook_id = str(support_context.get("primary_playbook_id", "")).strip()
         self.diag_summary.title.setText(f"Results for: {s.get('symptom', 'Quick Check')}")
         self.diag_summary.sub.setText("Session loaded. Review grouped findings and run a recommended fix.")
         top = s.get("findings", [])[:3]
@@ -3382,7 +3430,7 @@ class MainWindow(QMainWindow):
         self._rebuild_diagnose_sections(s.get("findings", []))
         self._update_diagnose_context({})
         self._update_status_from_session(s)
-        self._rebuild_report_tree(); self._update_redaction_preview(); self._refresh_evidence_items(); self._refresh_run_center(); self._update_context_labels(); self._update_concierge()
+        self._rebuild_report_tree(); self._update_redaction_preview(); self._refresh_evidence_items(); self._refresh_run_center(); self._update_context_labels(); self._refresh_support_issue_library(); self._refresh_support_diagnose(); self._refresh_support_fix_library(); self._refresh_support_reports_summary(); self._refresh_support_history_summary(); self._update_concierge()
 
     def _make_tool_row(self, item: FeedItemAdapter, density: str) -> QWidget:
         row = ToolRow(item.title, item.category or "tool", item.subtitle, payload=item.payload, density=density)
@@ -3902,6 +3950,329 @@ class MainWindow(QMainWindow):
         if key == "windows_links":
             return "Windows Links"
         return key.replace("_", " ").title() if key else "General"
+
+    def _support_family_filter_value(self, combo: Any) -> str:
+        if combo is None:
+            return ""
+        data = combo.currentData() if hasattr(combo, "currentData") else ""
+        if data:
+            return str(data)
+        text = combo.currentText().strip().lower() if hasattr(combo, "currentText") else ""
+        if text == "all families":
+            return ""
+        for family in list_support_families():
+            if text == family.title.lower():
+                return family.id
+        return ""
+
+    def _populate_support_family_combos(self) -> None:
+        rows = [("All Families", "")] + [(family.title, family.id) for family in list_support_families()]
+        for name in ("pb_issue_family", "diag_issue_family", "support_fix_family"):
+            combo = getattr(self, name, None)
+            if combo is None:
+                continue
+            current = combo.currentData() if hasattr(combo, "currentData") else ""
+            combo.blockSignals(True)
+            combo.clear()
+            for label, value in rows:
+                combo.addItem(label, value)
+            if current:
+                index = combo.findData(current)
+                combo.setCurrentIndex(index if index >= 0 else 0)
+            else:
+                combo.setCurrentIndex(0)
+            combo.blockSignals(False)
+
+    def _make_support_issue_row(self, item: FeedItemAdapter, density: str) -> QWidget:
+        issue = support_issue_map().get(str(item.payload or item.key))
+        subtitle = item.subtitle
+        category = item.category or "Issue"
+        if issue is not None:
+            category = issue.subfamily
+            subtitle = f"{issue.family_label} | {issue.severity} | {issue.workflow}"
+        row = ToolRow(item.title, category, subtitle, payload=item.payload, density=density)
+        row.open_clicked.connect(lambda payload: self._select_support_issue(str(payload), open_target="playbooks"))
+        return row
+
+    def _make_support_fix_row(self, item: FeedItemAdapter, density: str) -> QWidget:
+        fix = support_fix_map().get(str(item.payload or item.key))
+        if fix is None:
+            return QLabel(item.title)
+        row = FixRow(fix.title, fix.summary, fix.risk, payload=fix.id, density=density)
+        row.preview_clicked.connect(lambda payload: self._set_support_fix_selection(str(payload)))
+        row.run_clicked.connect(lambda payload: self._run_support_fix(str(payload)))
+        return row
+
+    def _set_support_context(self, issue_id: str, *, create_session: bool = False) -> None:
+        issue = support_issue_map().get(str(issue_id or "").strip())
+        if issue is None:
+            return
+        if create_session:
+            self._ensure_active_session(issue.title)
+        if not self.current_session:
+            return
+        primary = next(iter(issue.playbook_ids), "")
+        self.current_session["support_context"] = {
+            "issue_id": issue.id,
+            "family_id": issue.family_id,
+            "family_label": issue.family_label,
+            "subfamily": issue.subfamily,
+            "title": issue.title,
+            "primary_playbook_id": primary,
+        }
+        save_session(self.current_session)
+        self._history_dirty = True
+        self._refresh_support_reports_summary()
+        self._refresh_support_history_summary()
+
+    def _select_support_issue(self, issue_id: str, *, open_target: str = "") -> None:
+        issue = support_issue_map().get(str(issue_id or "").strip())
+        if issue is None:
+            return
+        self.selected_support_issue_id = issue.id
+        self.selected_support_playbook_id = next(iter(issue.playbook_ids), "")
+        if self.current_session:
+            self._set_support_context(issue.id, create_session=False)
+        if hasattr(self, "pb_issue_detail"):
+            self.pb_issue_detail.title.setText(issue.title)
+        if hasattr(self, "pb_issue_detail_text"):
+            self.pb_issue_detail_text.setText(
+                f"{issue.family_label} | {issue.subfamily} | severity={issue.severity} | workflow={issue.workflow}\n\n"
+                f"{issue.description}\nPermissions: {issue.permissions}\n"
+                f"Network required: {'yes' if issue.network_required else 'no'} | Reboot risk: {'yes' if issue.reboot_required else 'no'}"
+            )
+        if hasattr(self, "pb_issue_playbooks"):
+            plays = [f"{row.title} [{row.risk} | {row.automation} | ~{row.minutes}m]" for row in playbooks_for_issue(issue.id)]
+            self.pb_issue_playbooks.set_text("\n".join(plays) or "No playbooks mapped.")
+        if hasattr(self, "pb_issue_diagnostics"):
+            diags = [f"{row.title}: {row.source}" for row in diagnostics_for_issue(issue.id)]
+            self.pb_issue_diagnostics.set_text("\n".join(diags) or "No diagnostics mapped.")
+        if hasattr(self, "pb_issue_fixes"):
+            fixes = [f"{row.title} [{row.risk} | {row.automation}] - {row.summary}" for row in fixes_for_issue(issue.id)]
+            self.pb_issue_fixes.set_text("\n".join(fixes) or "No fixes mapped.")
+        self._refresh_support_fix_library()
+        self._refresh_support_diagnose()
+        self._refresh_support_reports_summary()
+        self._refresh_support_history_summary()
+        if open_target == "diagnose":
+            self.nav.setCurrentRow(self.NAV_ITEMS.index("Diagnose"))
+        elif open_target == "fixes":
+            self.nav.setCurrentRow(self.NAV_ITEMS.index("Fixes"))
+        elif open_target == "playbooks":
+            self.nav.setCurrentRow(self.NAV_ITEMS.index("Playbooks"))
+
+    def _dispatch_support_action(self, action_ref: str) -> None:
+        value = str(action_ref or "").strip()
+        if not value:
+            return
+        if value.startswith("runbook:"):
+            runbook_id = value.split(":", 1)[1]
+            if self._playbooks_available():
+                self.nav.setCurrentRow(self.NAV_ITEMS.index("Playbooks"))
+                if hasattr(self, "pb_segment"):
+                    self.pb_segment.setCurrentText("Runbooks")
+                self._select_runbook(runbook_id)
+                self.run_selected_runbook(True)
+            return
+        if value.startswith("task:"):
+            self._run_script_task(value.split(":", 1)[1], dry_run=False)
+            return
+        if value.startswith("fix_action:"):
+            self.run_fix_action(value.split(":", 1)[1])
+            return
+        if value.startswith("route:"):
+            route = value.split(":", 1)[1].strip().lower()
+            if route == "reports":
+                self.nav.setCurrentRow(self.NAV_ITEMS.index("Reports"))
+            elif route == "diagnose":
+                self.nav.setCurrentRow(self.NAV_ITEMS.index("Diagnose"))
+            elif route == "fixes":
+                self.nav.setCurrentRow(self.NAV_ITEMS.index("Fixes"))
+            elif route == "playbooks":
+                self.nav.setCurrentRow(self.NAV_ITEMS.index("Playbooks"))
+            return
+        if value.startswith("uri:"):
+            open_uri(value.split(":", 1)[1])
+            return
+        self._show_page_help("Guided Support Flow", value.replace("manual:", "").replace("_", " ").strip())
+
+    def _run_selected_support_playbook(self) -> None:
+        issue = support_issue_map().get(str(getattr(self, "selected_support_issue_id", "")).strip())
+        if issue is None:
+            self.toasts.show_toast("Select an issue first.")
+            return
+        self._set_support_context(issue.id, create_session=True)
+        playbook = support_playbook_map().get(str(getattr(self, "selected_support_playbook_id", "")).strip())
+        if playbook is None and issue.playbook_ids:
+            playbook = support_playbook_map().get(issue.playbook_ids[0])
+        if playbook is None:
+            self.toasts.show_toast("No mapped support playbook.")
+            return
+        self.selected_support_playbook_id = playbook.id
+        self._dispatch_support_action(playbook.primary_action_ref)
+
+    def _open_selected_support_playbook(self) -> None:
+        issue = support_issue_map().get(str(getattr(self, "selected_support_issue_id", "")).strip())
+        if issue is None or not issue.playbook_ids:
+            self.toasts.show_toast("No mapped support playbook.")
+            return
+        self.selected_support_playbook_id = issue.playbook_ids[0]
+        self.nav.setCurrentRow(self.NAV_ITEMS.index("Playbooks"))
+
+    def _set_support_fix_selection(self, fix_id: str) -> None:
+        fix = support_fix_map().get(str(fix_id or "").strip())
+        if fix is None:
+            return
+        self.selected_support_fix_id = fix.id
+        if hasattr(self, "support_fix_guidance"):
+            self.support_fix_guidance.set_text(
+                f"Risk: {fix.risk}\nAutomation: {fix.automation}\nPermissions: {fix.permissions}\nRestart: {fix.restart}\n\n"
+                f"Rollback: {fix.rollback}\nEvidence: {fix.evidence}\nValidation:\n- " + "\n- ".join(fix.validation)
+            )
+
+    def _run_support_fix(self, fix_id: str) -> None:
+        fix = support_fix_map().get(str(fix_id or "").strip())
+        issue_id = str(getattr(self, "selected_support_issue_id", "")).strip()
+        if fix is None:
+            self.toasts.show_toast("Support fix not found.")
+            return
+        if issue_id:
+            self._set_support_context(issue_id, create_session=True)
+        self.selected_support_fix_id = fix.id
+        self._dispatch_support_action(fix.action_ref)
+
+    def _run_selected_support_fix(self) -> None:
+        self._run_support_fix(str(getattr(self, "selected_support_fix_id", "")).strip())
+
+    def _refresh_support_issue_library(self) -> None:
+        self._populate_support_family_combos()
+        if not hasattr(self, "pb_issue_list"):
+            return
+        family_id = self._support_family_filter_value(getattr(self, "pb_issue_family", None))
+        query = self.pb_issue_search.text().strip() if hasattr(self, "pb_issue_search") else ""
+        stats = support_catalog_stats()
+        counts = family_issue_counts()
+        if hasattr(self, "pb_issue_stats"):
+            family_text = f" | {counts.get(family_id, 0)} in selected family" if family_id else ""
+            self.pb_issue_stats.setText(
+                f"{stats.issue_count} issue classes | {stats.playbook_count} shared playbooks | "
+                f"{stats.diagnostic_count} diagnostics | {stats.fix_count} fix actions{family_text}"
+            )
+        rows = query_issues(query, family_id=family_id, limit=120)
+        adapters = [
+            FeedItemAdapter(key=row.id, title=row.title, subtitle=f"{row.family_label} | {row.subfamily} | {row.severity}", payload=row.id, category=row.subfamily, status=row.severity)
+            for row in rows
+        ]
+        self.pb_issue_list.set_items(adapters)
+        if adapters:
+            current = str(getattr(self, "selected_support_issue_id", "")).strip()
+            target = current if current in {row.key for row in adapters} else adapters[0].key
+            self._select_support_issue(str(target))
+
+    def _refresh_support_diagnose(self) -> None:
+        self._populate_support_family_combos()
+        layout = getattr(self, "diag_issue_list_layout", None)
+        if layout is None:
+            return
+        self._clear_layout(layout)
+        family_id = self._support_family_filter_value(getattr(self, "diag_issue_family", None))
+        query = self.diag_issue_summary_text.text().strip() if hasattr(self, "diag_issue_summary_text") else ""
+        rows = list(query_issues(query, family_id=family_id, limit=5))
+        if not rows:
+            layout.addWidget(EmptyState("diagnose", "No issue-family triage entries match the current Diagnose filters."))
+            return
+        for issue in rows:
+            actions = QWidget()
+            actions_layout = QHBoxLayout(actions)
+            actions_layout.setContentsMargins(0, 0, 0, 0)
+            actions_layout.setSpacing(spacing("xs"))
+            use_btn = SoftButton("Use Issue")
+            run_btn = PrimaryButton("Run Playbook")
+            use_btn.clicked.connect(lambda _checked=False, issue_id=issue.id: self._select_support_issue(issue_id, open_target="diagnose"))
+            run_btn.clicked.connect(lambda _checked=False, issue_id=issue.id: (self._select_support_issue(issue_id, open_target="diagnose"), self._run_selected_support_playbook()))
+            actions_layout.addWidget(use_btn)
+            actions_layout.addWidget(run_btn)
+            actions_layout.addStretch(1)
+            card = Card(issue.title, f"{issue.family_label} | {issue.subfamily} | {issue.severity}", right_widget=actions)
+            diag_lines = [f"- {row.title}" for row in diagnostics_for_issue(issue.id)[:3]]
+            if diag_lines:
+                for line in diag_lines:
+                    card.body_layout().addWidget(QLabel(line))
+            layout.addWidget(card)
+        layout.addStretch(1)
+
+    def _refresh_support_fix_library(self) -> None:
+        self._populate_support_family_combos()
+        if not hasattr(self, "support_fix_list"):
+            return
+        family_id = self._support_family_filter_value(getattr(self, "support_fix_family", None))
+        query = self.support_fix_search.text().strip() if hasattr(self, "support_fix_search") else ""
+        selected_issue = support_issue_map().get(str(getattr(self, "selected_support_issue_id", "")).strip())
+        if selected_issue is None or (family_id and selected_issue.family_id != family_id) or (query and query.lower() not in issue_search_blob(selected_issue)):
+            rows = query_issues(query, family_id=family_id, limit=1)
+            selected_issue = rows[0] if rows else None
+            if selected_issue is not None:
+                self.selected_support_issue_id = selected_issue.id
+        if selected_issue is None:
+            self.support_fix_list.show_empty("wrench", "No support issue selected.")
+            return
+        fixes = fixes_for_issue(selected_issue.id)
+        adapters = [
+            FeedItemAdapter(key=row.id, title=row.title, subtitle=row.summary, payload=row.id, category=row.risk, status=row.automation)
+            for row in fixes
+        ]
+        self.support_fix_list.set_items(adapters)
+        if hasattr(self, "support_fix_detail"):
+            self.support_fix_detail.title.setText(f"Fix Flow: {selected_issue.title}")
+        if hasattr(self, "support_fix_detail_text"):
+            self.support_fix_detail_text.setText(
+                f"{selected_issue.family_label} | {selected_issue.subfamily}\n"
+                f"Mapped playbooks: {', '.join(selected_issue.playbook_ids)}\n"
+                f"Evidence plans: {', '.join(selected_issue.evidence_plan_ids)}"
+            )
+        if adapters:
+            self._set_support_fix_selection(adapters[0].key)
+
+    def _refresh_support_reports_summary(self) -> None:
+        if not hasattr(self, "rep_issue_summary"):
+            return
+        context = {}
+        if self.current_session:
+            context = self.current_session.get("support_context", {}) if isinstance(self.current_session.get("support_context", {}), dict) else {}
+        issue_id = str(context.get("issue_id", getattr(self, "selected_support_issue_id", ""))).strip()
+        issue = support_issue_map().get(issue_id)
+        if issue is None:
+            self.rep_issue_summary.sub.setText("No issue-family context selected yet.")
+            return
+        self.rep_issue_summary.title.setText(f"Issue-family Reporting: {issue.title}")
+        self.rep_issue_summary.sub.setText(
+            f"{issue.family_label} | {issue.subfamily}\n"
+            f"Playbooks: {', '.join(issue.playbook_ids)}\n"
+            f"Evidence: {', '.join(issue.evidence_plan_ids)}\n"
+            f"Escalation: {issue.escalation[0] if issue.escalation else 'n/a'}"
+        )
+
+    def _refresh_support_history_summary(self) -> None:
+        if not hasattr(self, "hist_issue_summary"):
+            return
+        issue = support_issue_map().get(str(getattr(self, "selected_support_issue_id", "")).strip())
+        if issue is None:
+            self.hist_issue_summary.sub.setText("Previously selected issue families, playbooks, and escalation posture appear here when present in a session.")
+            return
+        self.hist_issue_summary.title.setText("Issue / Playbook History")
+        self.hist_issue_summary.sub.setText(
+            f"Current issue focus: {issue.title}\nFamily: {issue.family_label}\nPrimary playbook: {issue.playbook_ids[0] if issue.playbook_ids else 'n/a'}"
+        )
+
+    def _refresh_support_settings_summary(self) -> None:
+        if not hasattr(self, "s_support_catalog_summary"):
+            return
+        stats = support_catalog_stats()
+        self.s_support_catalog_summary.setText(
+            f"Support catalog: {stats.issue_count} issue classes across {stats.family_count} families, "
+            f"{stats.playbook_count} shared playbooks, {stats.diagnostic_count} diagnostics, "
+            f"and {stats.fix_count} mapped fixes."
+        )
 
     def _refresh_runbooks(self) -> None:
         guided_basic = self.layout_policy_state.show_playbooks_guided_basic
@@ -4495,6 +4866,14 @@ class MainWindow(QMainWindow):
                 self._dispatch_search_selection("task", v.split(".", 1)[1])
         elif k == "session":
             self._load_session(v); self.nav.setCurrentRow(self.NAV_ITEMS.index("History"))
+        elif k == "issue":
+            self._select_support_issue(v, open_target="playbooks")
+        elif k == "support_playbook":
+            playbook = support_playbook_map().get(v)
+            if playbook is not None:
+                self.selected_support_playbook_id = playbook.id
+                self.nav.setCurrentRow(self.NAV_ITEMS.index("Playbooks"))
+                self._show_page_help(playbook.title, playbook.purpose)
         elif k == "fix":
             self.nav.setCurrentRow(self.NAV_ITEMS.index("Fixes")); self._select_fix(v)
         elif k == "runbook":

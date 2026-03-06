@@ -11,6 +11,7 @@ from .play_registry import list_play_entries
 from .registry import CAPABILITIES
 from .route_registry import list_routes
 from .runbooks import RUNBOOKS
+from .support_catalog import list_issues, list_support_playbooks
 from .script_tasks import list_script_tasks
 from .toolbox import TOOL_DIRECTORY
 
@@ -79,6 +80,13 @@ def _build_static_rows() -> list[_IndexedRow]:
         rows.append(_to_indexed(SearchItem("fix", fix.key, fix.title, fix.description)))
     for runbook in RUNBOOKS:
         rows.append(_to_indexed(SearchItem("runbook", runbook.id, runbook.title, runbook.desc)))
+    for issue in list_issues():
+        alias_text = ", ".join(issue.aliases[:4])
+        subtitle = f"{issue.family_label} | {issue.subfamily} | {issue.severity} | {alias_text}"
+        rows.append(_to_indexed(SearchItem("issue", issue.id, issue.title, subtitle)))
+    for playbook in list_support_playbooks():
+        subtitle = f"{playbook.risk} | {playbook.automation} | ~{playbook.minutes}m | {', '.join(playbook.symptoms[:3])}"
+        rows.append(_to_indexed(SearchItem("support_playbook", playbook.id, playbook.title, subtitle)))
     for task in list_script_tasks():
         rows.append(_to_indexed(SearchItem("task", task.id, task.title, f"{task.desc} [{task.category}]")))
     for tool in TOOL_DIRECTORY:

@@ -349,6 +349,13 @@ def main() -> int:
         _capture_shell(window, search_shot, include_popup=True)
         captured.append(str(search_shot.relative_to(REPO_ROOT)).replace("\\", "/"))
 
+        window.top_search.setText("internet not working")
+        window._refresh_global_search_results()
+        _drain(app, cycles=3)
+        support_search_shot = out_dir / "search_common_symptom_results.png"
+        _capture_shell(window, support_search_shot, include_popup=True)
+        captured.append(str(support_search_shot.relative_to(REPO_ROOT)).replace("\\", "/"))
+
         no_results_query = "zz_fixfox_no_results_zz"
         window.top_search.setText(no_results_query)
         window._refresh_global_search_results()
@@ -395,6 +402,44 @@ def main() -> int:
             _capture_widget(window.nav, nav_state_shot)
             captured.append(str(nav_state_shot.relative_to(REPO_ROOT)).replace("\\", "/"))
 
+        playbooks_idx = window.NAV_ITEMS.index("Playbooks")
+        window.nav.setCurrentRow(playbooks_idx)
+        _drain(app, cycles=3)
+        if hasattr(window, "pb_issue_search"):
+            window.pb_issue_search.setText("internet not working")
+            _drain(app, cycles=3)
+        playbook_issue_shot = out_dir / "playbooks_issue_detail.png"
+        _capture_shell(window, playbook_issue_shot)
+        captured.append(str(playbook_issue_shot.relative_to(REPO_ROOT)).replace("\\", "/"))
+        if hasattr(window, "pb_issue_family"):
+            idx = window.pb_issue_family.findData("network")
+            if idx >= 0:
+                window.pb_issue_family.setCurrentIndex(idx)
+                _drain(app, cycles=3)
+                family_shot = out_dir / "playbooks_family_drilldown.png"
+                _capture_shell(window, family_shot)
+                captured.append(str(family_shot.relative_to(REPO_ROOT)).replace("\\", "/"))
+
+        diagnose_idx = window.NAV_ITEMS.index("Diagnose")
+        window.nav.setCurrentRow(diagnose_idx)
+        _drain(app, cycles=3)
+        if hasattr(window, "diag_issue_summary_text"):
+            window.diag_issue_summary_text.setText("teams camera")
+            _drain(app, cycles=3)
+        diagnose_shot = out_dir / "diagnose_issue_triage.png"
+        _capture_shell(window, diagnose_shot)
+        captured.append(str(diagnose_shot.relative_to(REPO_ROOT)).replace("\\", "/"))
+
+        fixes_idx = window.NAV_ITEMS.index("Fixes")
+        window.nav.setCurrentRow(fixes_idx)
+        _drain(app, cycles=3)
+        if hasattr(window, "support_fix_search"):
+            window.support_fix_search.setText("printer offline")
+            _drain(app, cycles=3)
+        fix_flow_shot = out_dir / "fix_flow_guidance.png"
+        _capture_shell(window, fix_flow_shot)
+        captured.append(str(fix_flow_shot.relative_to(REPO_ROOT)).replace("\\", "/"))
+
         if hasattr(window, "s_ui_scale"):
             window.s_ui_scale.setValue(125)
             _drain(app, cycles=3)
@@ -403,6 +448,19 @@ def main() -> int:
             scale_shot = out_dir / "scale_125_settings.png"
             _capture_shell(window, scale_shot)
             captured.append(str(scale_shot.relative_to(REPO_ROOT)).replace("\\", "/"))
+
+        window.nav.setCurrentRow(settings_idx)
+        _drain(app, cycles=3)
+        if hasattr(window, "settings_nav"):
+            support_idx = window.settings_nav.findItems("Support", Qt.MatchExactly)
+            if support_idx:
+                row = window.settings_nav.row(support_idx[0])
+                if row >= 0:
+                    window.settings_nav.setCurrentRow(row)
+                    _drain(app, cycles=3)
+                    settings_support = out_dir / "settings_support_help.png"
+                    _capture_shell(window, settings_support)
+                    captured.append(str(settings_support.relative_to(REPO_ROOT)).replace("\\", "/"))
 
         window.run_quick_check("Quick Check")
         deadline = time.time() + 75

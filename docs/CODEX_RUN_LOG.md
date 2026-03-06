@@ -765,3 +765,74 @@ src/ui/style/qss_builder.py         |  45 +++---
   - `src/ui/widgets.py`
   - `src/ui/style/qss_builder.py`
   - `src/ui/main_window_impl.py`
+
+## 2026-03-06 17:13:10 -05:00 - Full Playbook / Diagnose / Fix Implementation Pass
+- Starting commit: `2de4c975212c90fa058c98069af445eab1e17d6d`
+- Branch: `main`
+- Proof harness:
+  - `git fetch --all`
+  - `git rev-parse HEAD`
+  - `git status --short --branch`
+  - `python --version` failed in this shell because the Windows Store alias resolution is broken
+  - `pip --version` failed because `pip` is not on `PATH`
+  - execution route for this run: `.venv\Scripts\python.exe` and `.venv\Scripts\python.exe -m pip`
+- Python version: `Python 3.14.3`
+- Pip version: `pip 26.0.1`
+- Goals for this run:
+  - implement a canonical issue-family engine covering all 200 requested issue classes
+  - map issue classes to shared playbooks, reusable diagnostics, safe fixes, guided flows, escalation paths, and evidence bundles
+  - make Playbooks, Diagnose, Fixes, Reports, History, and Settings issue-aware and operationally useful
+  - extend search so plain-English symptom phrasing routes to the right issue family and playbook
+  - add integrity tests and fresh screenshot proof for the new support catalog
+- Planned architecture for playbooks / fixes / diagnostics:
+  - add typed support-catalog models for issue families, issue classes, diagnostics, fix actions, shared playbooks, and evidence plans
+  - keep execution paths real by referencing existing `script_tasks`, `runbooks`, `fix_action`s, evidence collectors, and settings/report flows
+  - use shared playbooks for repeated support patterns (identity, network, VPN, printer, browser, Outlook, Teams, sync, shell, performance, update, integrity, enterprise posture, backup/export)
+  - drive UI from the catalog instead of hardcoding separate per-page issue content
+  - persist issue/playbook context into session/history/report surfaces where possible
+- High-risk files/modules:
+  - `src/core/runbooks.py`
+  - `src/core/fixes.py`
+  - `src/core/search.py`
+  - `src/core/play_registry.py`
+  - `src/core/sessions.py`
+  - `src/core/report.py`
+  - `src/core/evidence_collector.py`
+  - `src/ui/main_window_impl.py`
+  - `src/ui/pages/playbooks_page.py`
+  - `src/ui/pages/diagnose_page.py`
+  - `src/ui/pages/fixes_page.py`
+  - `src/ui/pages/reports_page.py`
+  - `src/ui/pages/history_page.py`
+  - `src/ui/pages/settings_page.py`
+- Latest repo screenshot folder identified:
+  - `docs/screenshots/20260306_170526`
+- Issue family coverage plan:
+  - implement all families A-T as one searchable taxonomy with 200 concrete issue classes
+  - cover issues through a smaller reusable set of shared playbooks, diagnostics, and fix flows instead of 200 one-off code paths
+  - ensure every issue entry has aliases, evidence expectations, risk labels, validation guidance, and at least one diagnostic path plus a fix/guided/escalation route
+
+## 2026-03-06 18:00:00 -05:00 - Support Engine Verification Summary
+- Implemented:
+  - `src/core/support_catalog.py` as the canonical issue-family, playbook, diagnostic, fix, and evidence registry
+  - search integration for issue classes and support playbooks
+  - issue-aware Playbooks, Diagnose, Fixes, Reports, History, and Settings surfaces
+  - support catalog audit script and registry integrity tests
+- Coverage:
+  - 200 issue classes
+  - 20 families
+  - 31 shared playbooks
+  - 38 reusable diagnostics
+  - 48 support fix actions / guided flows / escalation paths
+- Verification executed:
+  - `.venv\Scripts\python.exe -m py_compile src\core\support_catalog.py src\core\search.py src\ui\main_window_impl.py ...`
+  - `.venv\Scripts\python.exe scripts\support_catalog_audit.py`
+  - `.venv\Scripts\python.exe -m unittest src.tests.test_support_catalog`
+  - `.venv\Scripts\python.exe -m src.tests.smoke`
+  - `.venv\Scripts\python.exe scripts\qss_sanity_check.py`
+  - `.venv\Scripts\python.exe scripts\font_sanity_check.py`
+  - `.venv\Scripts\python.exe scripts\verify_requirements.py`
+  - `.venv\Scripts\python.exe scripts\ui_walkthrough.py`
+- Fresh proof:
+  - latest walkthrough/verifier screenshot set: `docs/screenshots/20260306_175451`
+  - support catalog report: `docs/support_catalog_report.json`
