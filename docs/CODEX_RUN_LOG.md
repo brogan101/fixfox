@@ -662,3 +662,63 @@ src/ui/style/qss_builder.py         |  45 +++---
   - `src/ui/main_window_impl.py`
   - `docs/CODEX_RUN_LOG.md`
   - `docs/REPO_CLEANUP_NOTES.md`
+
+## 2026-03-06 15:00:00 -05:00 - Final Stabilization + Launch/Product Hardening Pass
+- Starting commit: `4357940458ba4f3dbb38477fdd8ffc33e787790f`
+- Branch: `main`
+- Proof harness:
+  - `git fetch --all`
+  - `git rev-parse HEAD`
+  - `git status --short --branch`
+  - `python --version`
+  - `pip --version` failed because `pip` is not on `PATH`
+  - `python -m pip --version` failed because the default `python.exe` resolution on this machine is not usable for module execution
+  - Execution route for this run: `.venv\Scripts\python.exe` and `.venv\Scripts\python.exe -m pip`
+- Python version: `Python 3.14.3`
+- Pip version: `pip 26.0.1`
+- Goals:
+  - remove onboarding from the shipped runtime, settings surface, tests, and docs
+  - add a branded splash/loading experience and measure startup/page-switch timings against explicit budgets
+  - harden crash logging, support bundle proof, persistence proof, and packaging metadata consistency
+  - fill/polish thin pages, reduce duplicate actions, and regenerate the walkthrough/sanity proof bundle from this run
+- Scope summary:
+  - `src/app.py`
+  - `src/core/*`
+  - `src/ui/*`
+  - `scripts/ui_walkthrough.py`
+  - packaging/build/version metadata
+  - tester-facing docs and generated artifact policy
+- High-risk areas to inspect:
+  - startup/bootstrap and splash sequencing
+  - live onboarding references in runtime code, settings UI, tests, and verification docs
+  - page completeness and duplicate entry points across Home/Playbooks/Reports/History/Settings
+  - supportability paths: crash logs, diagnostics export, persistence/migration, and packaged branding
+
+## 2026-03-06 15:30:00 -05:00 - Final Stabilization Proof Summary
+- Implemented:
+  - removed onboarding runtime code and settings affordances
+  - added branded splash/startup surface and startup/page-switch perf instrumentation
+  - added support-bundle metadata payloads, atomic settings writes, crash-report writer, and packaged brand/version cleanup
+  - refreshed walkthrough generation so splash, Home, Playbooks, History, Reports, Settings, and warnings/clipping artifacts are regenerated from this run
+- Verification executed:
+  - `.venv\Scripts\python.exe scripts\qss_sanity_check.py`
+  - `.venv\Scripts\python.exe scripts\font_sanity_check.py`
+  - `.venv\Scripts\python.exe -m unittest src.tests.test_unit`
+  - `.venv\Scripts\python.exe -m unittest src.tests.test_ui_layout_sanity`
+  - `.venv\Scripts\python.exe -m unittest src.tests.test_search_nonblocking`
+  - `.venv\Scripts\python.exe -m src.tests.smoke`
+  - `.venv\Scripts\python.exe scripts\perf_probe.py`
+  - `.venv\Scripts\python.exe scripts\verify_requirements.py`
+  - `.venv\Scripts\python.exe scripts\ui_walkthrough.py`
+  - `powershell -ExecutionPolicy Bypass -File scripts\build_exe.ps1`
+  - packaged EXE metadata check via `Get-Item dist\FixFox.exe | Select-Object -ExpandProperty VersionInfo`
+  - packaged EXE launch smoke via `Start-Process dist\FixFox.exe`
+- Current artifacts:
+  - walkthrough dir: `C:\Users\btheobald\Desktop\IT Core\docs\screenshots\20260306_152608`
+  - verifier dir: `C:\Users\btheobald\Desktop\IT Core\docs\screenshots\20260306_152514`
+  - perf budget report: `C:\Users\btheobald\Desktop\IT Core\docs\perf_budget_report.json`
+  - smoke launch report: `C:\Users\btheobald\Desktop\IT Core\docs\smoke_launch_report.json`
+- Current gate call:
+  - launch/crash/supportability/persistence/package checks are materially improved and verified
+  - explicit perf budgets are still not met consistently (`startup.splash_visible_ms`, `startup.main_shell_visible_ms`, `startup.first_interactive_ms`, first `History` open)
+  - release verdict for this run remains `NOT GOOD TO TEST` until the remaining startup/history latency gap is closed or explicitly waived

@@ -137,7 +137,6 @@ class UiLayoutSanityTests(unittest.TestCase):
 
     def test_no_ascii_arrow_labels_in_ui_strings(self) -> None:
         targets = (
-            Path("src/ui/components/onboarding.py"),
             Path("src/ui/pages/playbooks_page.py"),
             Path("src/ui/pages/reports_page.py"),
             Path("src/ui/pages/settings_page.py"),

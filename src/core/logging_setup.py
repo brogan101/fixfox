@@ -8,6 +8,7 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from types import TracebackType
 
+from .brand import APP_DISPLAY_NAME
 from .paths import ensure_dirs
 
 LOG_NAME = "fixfox"
@@ -27,6 +28,14 @@ def _dev_log_file() -> Path:
 
 def _crash_file() -> Path:
     return ensure_dirs()["logs"] / "crash.log"
+
+
+def write_crash_report(text: str) -> Path:
+    crash_path = _crash_file()
+    with crash_path.open("a", encoding="utf-8") as f:
+        f.write(str(text or ""))
+        f.write("\n")
+    return crash_path
 
 
 def configure_logging() -> logging.Logger:
@@ -78,10 +87,7 @@ def install_global_exception_handler(logger: logging.Logger | None = None) -> No
     ) -> None:
         text = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
         active_logger.exception("Unhandled exception: %s", exc_value)
-        crash_path = _crash_file()
-        with crash_path.open("a", encoding="utf-8") as f:
-            f.write(text)
-            f.write("\n")
+        crash_path = write_crash_report(text)
         try:
             from PySide6.QtWidgets import QApplication, QMessageBox
 
@@ -89,11 +95,14 @@ def install_global_exception_handler(logger: logging.Logger | None = None) -> No
             if app is not None:
                 box = QMessageBox()
                 box.setIcon(QMessageBox.Critical)
-                box.setWindowTitle("Fix Fox - Unexpected Error")
-                box.setText("An unexpected error occurred.")
-                box.setInformativeText(f"Crash log saved to:\n{crash_path}")
+                box.setWindowTitle(f"{APP_DISPLAY_NAME} - Unexpected Error")
+                box.setText(f"{APP_DISPLAY_NAME} hit an unexpected error and needs attention.")
+                box.setInformativeText(
+                    "A crash report was saved so the issue can be reviewed.\n"
+                    f"Saved to:\n{crash_path}"
+                )
                 box.setDetailedText(text)
-                copy_btn = box.addButton("Copy Error", QMessageBox.ActionRole)
+                copy_btn = box.addButton("Copy Error Summary", QMessageBox.ActionRole)
                 open_btn = box.addButton("Open Logs Folder", QMessageBox.ActionRole)
                 close_btn = box.addButton(QMessageBox.Close)
                 box.exec()

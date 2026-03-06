@@ -27,8 +27,8 @@ class ReportsPage(PageScroll):
         layout.addWidget(
             build_page_header(
                 "Reports",
-                "Export validated packs with share-safe masking.",
-                help_text="Use the 3-step flow: configure, preview evidence/redaction, then generate and validate.",
+                "Create validated support bundles with share-safe masking.",
+                help_text="Use the 3-step flow: configure, preview evidence/redaction, then create and validate the bundle.",
                 on_help=w._show_page_help,
                 cta=details_btn,
             )
@@ -37,8 +37,8 @@ class ReportsPage(PageScroll):
         layout.addWidget(w.rep_callout)
 
         export_flow = Card(
-            "Export Flow",
-            "1) Choose session  2) Choose export type  3) Configure masking  4) Generate export",
+            "Support Bundle Flow",
+            "1) Choose session  2) Choose bundle type  3) Configure masking  4) Create and validate",
         )
         layout.addWidget(export_flow)
 
@@ -74,7 +74,7 @@ class ReportsPage(PageScroll):
         w.rep_preset_hint = QLabel("Basic mode is locked to Home Share preset.")
         w.rep_preset_hint.setObjectName("SubTitle")
         w.rep_preset_hint.setWordWrap(True)
-        step1_layout.addWidget(Card("Step 2: Choose Export Type", "Pick export policy and masking defaults.", right_widget=w.rep_preset))
+        step1_layout.addWidget(Card("Step 2: Choose Bundle Type", "Pick support bundle policy and masking defaults.", right_widget=w.rep_preset))
         step1_layout.addWidget(w.rep_preset_hint)
         step1_layout.addWidget(w.rep_safe)
         step1_layout.addWidget(w.rep_ip)
@@ -94,9 +94,9 @@ class ReportsPage(PageScroll):
         redaction_card.body_layout().addWidget(w.rep_preview)
         redaction_card.body_layout().addWidget(w.rep_token_map)
         w.rep_tree = QTreeWidget()
-        w.rep_tree.setHeaderLabels(["Export Preview", "Value"])
+        w.rep_tree.setHeaderLabels(["Bundle Preview", "Value"])
         w.rep_tree.currentItemChanged.connect(lambda item, _prev: w._on_report_tree_item_selected(item))
-        tree_card = Card("Export Tree Preview", "Review what will be included.")
+        tree_card = Card("Bundle Tree Preview", "Review what will be included.")
         tree_card.body_layout().addWidget(w.rep_tree)
         w.rep_evidence_status = QTreeWidget()
         w.rep_evidence_status.setHeaderLabels(["Evidence", "Status", "Notes"])
@@ -119,15 +119,15 @@ class ReportsPage(PageScroll):
         step3_layout = QVBoxLayout(step3)
         step3_layout.setContentsMargins(0, 0, 0, 0)
         step3_layout.setSpacing(spacing("md"))
-        w.rep_generate = PrimaryButton("Generate Export")
+        w.rep_generate = PrimaryButton("Create Support Bundle")
         w.rep_generate.clicked.connect(w.export_current_session)
-        w.rep_generate_override = SoftButton("Generate (Allow Warnings)")
+        w.rep_generate_override = SoftButton("Create Bundle (Allow Warnings)")
         w.rep_generate_override.clicked.connect(w.export_current_session_allow_warnings)
-        w.rep_status = Card("Step 4: Generate and Validate", "No export yet.")
-        w.rep_actions = Card("Post-export Actions", "Available after export.")
-        open_folder = SoftButton("Open Report Folder")
+        w.rep_status = Card("Step 4: Create and Validate", "No support bundle yet.")
+        w.rep_actions = Card("Post-bundle Actions", "Available after the bundle is created.")
+        open_folder = SoftButton("Open Bundle Folder")
         open_folder.clicked.connect(w.open_last_export_folder)
-        copy_path = SoftButton("Copy Export Path")
+        copy_path = SoftButton("Copy Bundle Path")
         copy_path.clicked.connect(w.copy_last_export_path)
         copy_short = SoftButton("Copy Ticket Summary (Short)")
         copy_short.clicked.connect(lambda: w.copy_ticket_summary(True))

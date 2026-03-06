@@ -106,7 +106,6 @@ from .components.rows import BaseRow, FindingRow, FixRow, SessionRow, ToolRow, r
 from .components.tool_runner import ToolRunnerWindow
 from .components.global_search import GlobalSearchPopup
 from .components.app_shell import AppShellFrame
-from .components.onboarding import OnboardingFlow
 from .components.motion import animate_opacity
 from .icons import clear_icon_cache, get_icon
 from .layout_guardrails import (
@@ -277,9 +276,9 @@ class HelpCenterDialog(QDialog):
                 "Goals and sessions:\n"
                 "- Start from Home goals to create a session.\n"
                 "- Sessions track findings, actions, evidence, and exports.\n\n"
-                "Exports and share-safe:\n"
+                "Support bundles and share-safe:\n"
                 "- Reports can mask user/device/IP tokens before sharing.\n"
-                "- Export packs are generated locally.\n\n"
+                "- Support bundles are generated locally.\n\n"
                 "Optional online actions:\n"
                 "- Opening Microsoft Get Help is optional and clearly labeled.\n"
                 "- Core diagnostics, fixes, runbooks, and exports work offline.\n\n"
@@ -485,7 +484,7 @@ class MainWindow(QMainWindow):
         self._syncing_settings = False
         self._search_debounce_timer = QTimer(self)
         self._search_debounce_timer.setSingleShot(True)
-        self._search_debounce_timer.setInterval(180)
+        self._search_debounce_timer.setInterval(120)
         self._search_debounce_timer.timeout.connect(self._refresh_global_search_results)
         self._search_worker: TaskWorker | None = None
         self._search_request_id = 0
@@ -516,6 +515,12 @@ class MainWindow(QMainWindow):
         self._persist_concierge_events = True
         self._auto_concierge_collapse = False
         self._startup_warmup_active = True
+        self._history_dirty = True
+        self._history_refresh_key: tuple[Any, ...] | None = None
+        self._toolbox_dirty = True
+        self._toolbox_refresh_key: tuple[Any, ...] | None = None
+        self._runbooks_dirty = True
+        self._runbooks_refresh_key: tuple[Any, ...] | None = None
         self._is_offscreen_platform = os.environ.get("QT_QPA_PLATFORM", "").strip().lower() in {"offscreen", "minimal"}
         self.layout_overlay: LayoutDebugOverlay | None = None
         self.run_bus_event.connect(self._handle_run_bus_event)
@@ -524,7 +529,7 @@ class MainWindow(QMainWindow):
             replay_buffered=False,
         )
 
-        self.setWindowTitle("Fix Fox")
+        self.setWindowTitle(APP_DISPLAY_NAME)
         window_icon = QIcon(resource_path(ICON_ICO))
         if window_icon.isNull():
             window_icon = QIcon(resource_path(ICON_PNG))
@@ -647,7 +652,6 @@ class MainWindow(QMainWindow):
         self._set_concierge_collapsed(True, persist=False)
         # Keep startup deterministic: side sheet must remain hidden until user explicitly opens it.
         QTimer.singleShot(250, lambda: self._set_concierge_collapsed(True, persist=False))
-        QTimer.singleShot(0, self._show_onboarding_if_needed)
         self._run_ui_structure_audit_once()
         self._mark_startup_phase("mainwindow:init_complete")
 
@@ -677,7 +681,7 @@ class MainWindow(QMainWindow):
         self.ctx_share = QLabel("Share-safe: on")
         self.ctx_preset = QLabel("Preset: home_share")
         self.ctx_last = QLabel("Last run: n/a")
-        b_export = SoftButton("Export"); b_export.clicked.connect(lambda: self.nav.setCurrentRow(self.NAV_ITEMS.index("Reports")))
+        b_export = SoftButton("Support Bundle"); b_export.clicked.connect(lambda: self.nav.setCurrentRow(self.NAV_ITEMS.index("Reports")))
         b_copy = SoftButton("Copy Summary"); b_copy.clicked.connect(self.copy_session_summary)
         b_end = SoftButton("End Session"); b_end.clicked.connect(self.end_session)
         min_btn = min_button_size(self.settings_state.density)
@@ -808,9 +812,6 @@ class MainWindow(QMainWindow):
         if not query:
             self._cancel_active_search_worker()
             self._search_popup.hide_popup()
-            return
-        if os.environ.get("QT_QPA_PLATFORM", "").strip().lower() == "offscreen":
-            self._dispatch_global_search()
             return
         self._search_debounce_timer.start()
 
@@ -1398,18 +1399,6 @@ class MainWindow(QMainWindow):
         self._update_concierge()
         self.toasts.show_toast("Settings reset to defaults.")
 
-    def reset_onboarding_flow(self) -> None:
-        if self.settings_state.ui_mode != "pro":
-            self.toasts.show_toast("Reset onboarding is available in Pro mode.")
-            if hasattr(self, "b_reset_onboarding"):
-                self.b_reset_onboarding.setEnabled(False)
-            return
-        self.settings_state.onboarding_completed = False
-        save_settings(self.settings_state)
-        if hasattr(self, "b_reset_onboarding"):
-            self.b_reset_onboarding.setEnabled(True)
-        self.toasts.show_toast("Onboarding reset. It will appear on next launch.")
-
     def _export_settings_json(self) -> None:
         if self.settings_state.ui_mode != "pro":
             self.toasts.show_toast("Export Settings JSON is available in Pro mode.")
@@ -1638,10 +1627,10 @@ class MainWindow(QMainWindow):
             f"Commit: {commit}\n\n"
             "Local-only by design. No telemetry and no automatic cloud transfer.\n\n"
             f"Logs path: {local_paths['logs']}\n"
-            f"Exports path: {local_paths['exports']}"
+            f"Support bundles: {local_paths['exports']}"
         )
         msg = QMessageBox(self)
-        msg.setWindowTitle("About Fix Fox")
+        msg.setWindowTitle(f"About {APP_DISPLAY_NAME}")
         msg.setText(text)
         mark = QPixmap(resource_path("assets/brand/fixfox_mark.png")).scaled(48, 48, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         if not mark.isNull():
@@ -1657,8 +1646,8 @@ class MainWindow(QMainWindow):
         menu.addSection("Session")
         menu.addAction("New Session", self._start_new_session)
         menu.addAction("Open Session", self._open_session_file)
-        menu.addAction("Export", lambda: self.nav.setCurrentRow(self.NAV_ITEMS.index("Reports")))
-        menu.addAction("Open Exports Folder", self.open_last_export_folder)
+        menu.addAction("Support Bundle", lambda: self.nav.setCurrentRow(self.NAV_ITEMS.index("Reports")))
+        menu.addAction("Open Bundles Folder", self.open_last_export_folder)
 
         menu.addSection("View")
         details_toggle = QAction("Toggle Details Panel", self)
@@ -1715,7 +1704,7 @@ class MainWindow(QMainWindow):
 
         menu.addSection("Help")
         menu.addAction("Docs", self._open_docs)
-        menu.addAction("About Fix Fox", self._show_about_fixfox_dialog)
+        menu.addAction(f"About {APP_DISPLAY_NAME}", self._show_about_fixfox_dialog)
         if os.environ.get("FIXFOX_DEV_MODE", "1").strip() == "1":
             menu.addAction("Dump UI Tree", self._dump_ui_tree)
 
@@ -1831,45 +1820,6 @@ class MainWindow(QMainWindow):
         if isinstance(sender, QWidget):
             m.exec(sender.mapToGlobal(sender.rect().bottomLeft()))
 
-    def _show_onboarding_if_needed(self) -> None:
-        if os.environ.get("FIXFOX_SKIP_ONBOARDING", "").strip() == "1":
-            return
-        force = os.environ.get("FIXFOX_FORCE_ONBOARDING", "").strip() == "1"
-        if (not force) and os.environ.get("QT_QPA_PLATFORM", "").strip().lower() in {"offscreen", "minimal"}:
-            return
-        if self.settings_state.onboarding_completed:
-            return
-        d = OnboardingFlow(
-            self,
-            theme_mode=self.settings_state.theme_mode,
-            density=self.settings_state.density,
-            ui_mode=self.settings_state.ui_mode,
-            apply_preferences=self._apply_onboarding_preferences,
-            can_resume_session=True,
-        )
-        completed = d.exec() == QDialog.Accepted and d.completed
-        self.settings_state.onboarding_completed = bool(completed)
-        save_settings(self.settings_state)
-        if not completed:
-            return
-        if d.result_action == "quick_check":
-            self.run_quick_check("Quick Check")
-        elif d.result_action == "settings":
-            self._open_settings_section("Appearance")
-        elif d.result_action == "resume":
-            self.nav.setCurrentRow(self.NAV_ITEMS.index("History"))
-        else:
-            self.nav.setCurrentRow(self.NAV_ITEMS.index("Home"))
-        self.toasts.show_toast("You're set up.", timeout_ms=3200)
-
-    def _apply_onboarding_preferences(self, theme_mode: str, density: str, ui_mode: str) -> None:
-        self.settings_state.theme_mode = normalize_mode(theme_mode)
-        self.settings_state.density = normalize_density(density)
-        self.settings_state.ui_mode = "pro" if str(ui_mode).strip().lower() == "pro" else "basic"
-        self._apply_theme()
-        self._sync_ui_mode_controls()
-        self._apply_mode_visibility()
-
     def _on_nav(self, idx: int) -> None:
         started = time.perf_counter()
         if idx < 0 or idx >= len(self.NAV_ITEMS):
@@ -1900,6 +1850,7 @@ class MainWindow(QMainWindow):
         self._sync_shell_status_bar()
         self._update_concierge()
         elapsed_ms = (time.perf_counter() - started) * 1000.0
+        PERF_RECORDER.record(f"ui.page_switch.{page_name.strip().lower()}_ms", elapsed_ms)
         if page_name == "Settings":
             PERF_RECORDER.record("ui.open_settings_ms", elapsed_ms)
         elif page_name == "Playbooks":
@@ -2048,7 +1999,7 @@ class MainWindow(QMainWindow):
 
     def _run_ui_self_check(self) -> None:
         report_path = logs_dir() / f"ui_self_check_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
-        lines: list[str] = [f"Fix Fox UI self-check @ {_now_local()}"]
+        lines: list[str] = [f"{APP_DISPLAY_NAME} UI self-check @ {_now_local()}"]
         failures = 0
         checks = 0
         current_index = self.nav.currentRow()
@@ -2194,7 +2145,7 @@ class MainWindow(QMainWindow):
                 )
             return ("Playbook Detail", "Select a tool or runbook to see action details.")
         if page == "Reports":
-            return ("Export Context", "Build a validated pack, verify masking, and copy ticket summaries.")
+            return ("Reports Context", "Build a validated support bundle, verify masking, and copy ticket summaries.")
         if page == "History":
             return ("Case Context", "Reopen, compare, and re-export prior sessions.")
         if page == "Settings":
@@ -2222,7 +2173,7 @@ class MainWindow(QMainWindow):
                 return ("Run Selected Runbook", lambda: self.run_selected_runbook(True))
             return ("Open Tool Directory", lambda: self.nav.setCurrentRow(self.NAV_ITEMS.index("Playbooks")))
         if page == "Reports":
-            return ("Generate Export", self.export_current_session)
+            return ("Create Support Bundle", self.export_current_session)
         if page == "History":
             return ("Reopen Selected Session", self.reopen_selected_session)
         if page == "Settings":
@@ -3016,6 +2967,7 @@ class MainWindow(QMainWindow):
             return
         self.current_session.setdefault("actions", []).append(action)
         save_session(self.current_session)
+        self._history_dirty = True
         self._refresh_run_center()
 
     def export_current_session(self) -> None:
@@ -3044,7 +2996,7 @@ class MainWindow(QMainWindow):
         def task(progress_cb: Any, partial_cb: Any, log_cb: Any, cancel_event: Any, timeout_s: int) -> dict[str, Any]:
             del partial_cb, timeout_s
             if cancel_event.is_set():
-                return {"cancelled": True, "code": 130, "user_message": "Export cancelled before start."}
+                return {"cancelled": True, "code": 130, "user_message": "Support bundle cancelled before start."}
             progress_cb(20, "Preparing export")
             log_cb(f"Generating preset: {self.rep_preset.currentText()}")
             res = export_session(
@@ -3056,28 +3008,29 @@ class MainWindow(QMainWindow):
                 allow_validator_override=allow_validator_override,
             )
             if cancel_event.is_set():
-                return {"cancelled": True, "code": 130, "user_message": "Export cancelled."}
+                return {"cancelled": True, "code": 130, "user_message": "Support bundle cancelled."}
             progress_cb(100, "Done")
-            log_cb(f"Export complete: {res.zip_path}")
+            log_cb(f"Support bundle complete: {res.zip_path}")
             return {"zip": str(res.zip_path), "folder": str(res.folder_path), "short": res.ticket_summary_short, "detail": res.ticket_summary_detailed, "ok": res.validation_passed, "warn": res.validation_warnings}
 
         self._start_task(
-            "Export",
+            "Support Bundle",
             task,
             self._on_export,
             timeout_s=80,
-            plain_summary="Builds a validated support pack from the active session.",
+            plain_summary="Builds a validated support bundle from the active session.",
             details_text=f"Preset={self.rep_preset.currentText()} ShareSafe={self.rep_safe.isChecked()} MaskIP={self.rep_ip.isChecked()} AllowWarnings={allow_validator_override}",
-            next_steps="Copy ticket summary or open report folder when complete. If validation fails, export stays blocked unless you explicitly allow warnings.",
+            next_steps="Copy ticket summary or open the bundle folder when complete. If validation fails, export stays blocked unless you explicitly allow warnings.",
             rerun_cb=(self.export_current_session_allow_warnings if allow_validator_override else self.export_current_session),
             run_metadata={"kind": "export", "capability_id": f"export_preset.{self.rep_preset.currentText()}", "export_preset": self.rep_preset.currentText()},
         )
 
     def _on_export(self, payload: dict[str, Any]) -> None:
         if payload.get("cancelled"):
-            self.toasts.show_toast("Export cancelled.")
+            self.toasts.show_toast("Support bundle cancelled.")
             return
         self.last_export = payload
+        self._history_dirty = True
         if self.current_session:
             self.current_session["last_export_preset"] = self.rep_preset.currentText()
             self.current_session["last_export_path"] = payload.get("zip", "")
@@ -3086,7 +3039,7 @@ class MainWindow(QMainWindow):
         self.rep_status.sub.setText(f"Validation {'passed' if payload.get('ok') else 'warnings'}: {payload.get('zip', '')}")
         if hasattr(self, "rep_steps"):
             self.rep_steps.setCurrentIndex(2)
-        self._refresh_history(); self._refresh_home_history(); self._refresh_run_center(); self._refresh_evidence_items(); self._update_concierge(); self.toasts.show_toast("Export complete.")
+        self._refresh_history(); self._refresh_home_history(); self._refresh_run_center(); self._refresh_evidence_items(); self._update_concierge(); self.toasts.show_toast("Support bundle ready.")
 
     def _sync_reports_empty_state(self) -> None:
         has_session = bool(self.current_session and self.current_session.get("session_id"))
@@ -3269,6 +3222,9 @@ class MainWindow(QMainWindow):
     def _refresh_history(self) -> None:
         q = self.hist_search.text().strip().lower() if hasattr(self, "hist_search") else ""
         scope = self.hist_scope.currentText().strip().lower() if hasattr(self, "hist_scope") else "all sessions"
+        refresh_key = (q, scope)
+        if (not self._history_dirty) and self._history_refresh_key == refresh_key:
+            return
         adapters: list[FeedItemAdapter] = []
         rows: list[Any] = []
         try:
@@ -3300,6 +3256,8 @@ class MainWindow(QMainWindow):
                 )
             )
         self.hist_list.set_items(adapters)
+        self._history_refresh_key = refresh_key
+        self._history_dirty = False
 
     def _selected_sid(self) -> str:
         item = self.hist_list.list_widget.currentItem()
@@ -3579,6 +3537,20 @@ class MainWindow(QMainWindow):
             return allow_long
 
         visible_tool_ids = self._visible_ids_for_prefix("tool.")
+        refresh_key = (
+            guided_basic,
+            q,
+            selected,
+            category_filter,
+            allow_safe,
+            allow_admin,
+            allow_restart,
+            allow_long,
+            tuple(sorted(visible_tool_ids)),
+            tuple(self.settings_state.favorites_tools or []),
+        )
+        if (not self._toolbox_dirty) and self._toolbox_refresh_key == refresh_key:
+            return
         top_adapters = [
             FeedItemAdapter(
                 key=t.id,
@@ -3636,6 +3608,8 @@ class MainWindow(QMainWindow):
         if guided_basic:
             self.selected_tool_id = ""
             self.selected_task_id = ""
+        self._toolbox_refresh_key = refresh_key
+        self._toolbox_dirty = False
         self._refresh_script_tasks()
         self._refresh_runbooks()
 
@@ -3904,6 +3878,9 @@ class MainWindow(QMainWindow):
         visible_runbook_ids = self._visible_ids_for_prefix("runbook.")
         q = self.tb_search.text().strip().lower() if hasattr(self, "tb_search") else ""
         audience = self.rb_audience.currentText().strip().lower() if hasattr(self, "rb_audience") else "all audiences"
+        refresh_key = (guided_basic, q, audience, tuple(sorted(visible_runbook_ids)))
+        if (not self._runbooks_dirty) and self._runbooks_refresh_key == refresh_key:
+            return
         adapters: list[FeedItemAdapter] = []
         for r in RUNBOOKS:
             if r.id not in visible_runbook_ids:
@@ -3945,6 +3922,8 @@ class MainWindow(QMainWindow):
             self._set_runbook_selection(self.rb_selected_id, open_details=not self._startup_warmup_active)
         if guided_basic and adapters:
             self.rb_selected_id = ""
+        self._runbooks_refresh_key = refresh_key
+        self._runbooks_dirty = False
 
     def _set_runbook_selection(self, rid: str, *, open_details: bool = False) -> None:
         if not rid:
@@ -4274,6 +4253,7 @@ class MainWindow(QMainWindow):
             changed = True
         if changed:
             save_session(self.current_session)
+            self._history_dirty = True
 
     def _task_next_steps(self, task: Any) -> str:
         category = str(getattr(task, "category", "")).lower()
@@ -4807,6 +4787,8 @@ class MainWindow(QMainWindow):
         else:
             self.settings_state.favorites_runbooks = rows
         save_settings(self.settings_state)
+        self._toolbox_dirty = True
+        self._runbooks_dirty = True
         self._refresh_home_favorites()
         self.toasts.show_toast("Favorites updated.")
 
@@ -4925,7 +4907,7 @@ class MainWindow(QMainWindow):
     def open_last_export_folder(self) -> None:
         p = self.last_export.get("folder", "")
         if not p:
-            self.toasts.show_toast("No export folder yet.")
+            self.toasts.show_toast("No support bundle folder yet.")
             return
         if os.name == "nt":
             os.startfile(p)
@@ -4933,7 +4915,7 @@ class MainWindow(QMainWindow):
     def copy_last_export_path(self) -> None:
         p = self.last_export.get("zip", "")
         if not p:
-            self.toasts.show_toast("No export path yet.")
+            self.toasts.show_toast("No support bundle path yet.")
             return
         self._copy_text(p)
 
@@ -5112,6 +5094,8 @@ class MainWindow(QMainWindow):
         self._refresh_db_info_label()
         self._update_context_labels()
         self._sync_shell_status_bar()
+        self._toolbox_dirty = True
+        self._runbooks_dirty = True
         self.toasts.show_toast("Settings saved.")
 
     def _flush_settings_changes(self) -> None:

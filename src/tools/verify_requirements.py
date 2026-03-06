@@ -274,7 +274,8 @@ def _capture_overflow_menu(window: QWidget, app: QApplication) -> QMenu | None:
 def _collect_static(repo_root: Path) -> dict[str, Any]:
     app_py = _read(repo_root / "src" / "app.py")
     main_impl = _read(repo_root / "src" / "ui" / "main_window_impl.py")
-    onboarding_py = _read(repo_root / "src" / "ui" / "components" / "onboarding.py")
+    onboarding_path = repo_root / "src" / "ui" / "components" / "onboarding.py"
+    onboarding_py = _read(onboarding_path) if onboarding_path.exists() else ""
     qss_py = _read(repo_root / "src" / "ui" / "style" / "qss_builder.py")
     settings_page = _read(repo_root / "src" / "ui" / "pages" / "settings_page.py")
     settings_core = _read(repo_root / "src" / "core" / "settings.py")
@@ -518,45 +519,7 @@ def _run_runtime_checks(_repo_root: Path) -> dict[str, Any]:
         window.close()
         _drain(app)
 
-    from PySide6.QtWidgets import QDialog
-    from src.core.settings import AppSettings
-    from src.ui.main_window import MainWindow
-
-    def _probe_onboarding(complete_flag: bool) -> tuple[int, bool]:
-        calls = {"shown": 0}
-        os.environ["FIXFOX_FORCE_ONBOARDING"] = "1"
-        os.environ.pop("FIXFOX_SKIP_ONBOARDING", None)
-
-        class DummyOnboarding:
-            def __init__(self, *_args: Any, **_kwargs: Any) -> None:
-                calls["shown"] += 1
-                self.completed = True
-                self.result_action = "none"
-
-            def exec(self) -> int:
-                return QDialog.Accepted
-
-        with (
-            patch("src.ui.main_window_impl.load_settings", return_value=AppSettings(onboarding_completed=complete_flag)),
-            patch("src.ui.main_window_impl.save_settings"),
-            patch("src.ui.main_window_impl.OnboardingFlow", DummyOnboarding),
-        ):
-            win = MainWindow()
-            win.show()
-            _drain(app)
-            completed_value = bool(win.settings_state.onboarding_completed)
-            win.close()
-            _drain(app)
-        os.environ.pop("FIXFOX_FORCE_ONBOARDING", None)
-        os.environ["FIXFOX_SKIP_ONBOARDING"] = "1"
-        return calls["shown"], completed_value
-
-    shown_when_incomplete, completed_after_show = _probe_onboarding(False)
-    shown_when_complete, _already_complete = _probe_onboarding(True)
-
-    runtime["shown_when_incomplete"] = shown_when_incomplete
-    runtime["shown_when_complete"] = shown_when_complete
-    runtime["completed_after_show"] = completed_after_show
+    runtime["direct_launch"] = "_show_onboarding_if_needed" not in _read(repo_root / "src" / "ui" / "main_window_impl.py")
     return runtime
 
 def run_verification(write_report: Path | None = None, verbose: bool = True) -> VerificationOutcome:
@@ -598,7 +561,7 @@ def run_verification(write_report: Path | None = None, verbose: bool = True) -> 
     b3_pass = (
         runtime["top_app_bar_exists"]
         and runtime["brand_mark_present"]
-        and runtime["wordmark_text"].strip().lower() == "fix fox"
+        and runtime["wordmark_text"].strip().lower() in {"fixfox", "fix fox"}
         and runtime["search_narrow_index"] == 1
         and runtime["search_wide_index"] == 0
         and runtime["visible_primary_actions"] == 3
@@ -691,23 +654,16 @@ def run_verification(write_report: Path | None = None, verbose: bool = True) -> 
         f"Weekly reminder control present/enabled: {runtime['weekly_control_present']}",
     ]))
 
-    onboarding_text = static["onboarding_py"].lower()
-    onboarding_steps_ok = all(snippet in onboarding_text for snippet in ("welcome to fix fox", "preferences", "first action"))
     b8_pass = (
-        "onboarding_completed" in static["settings_core"]
-        and onboarding_steps_ok
-        and runtime["shown_when_incomplete"] >= 1
-        and runtime["shown_when_complete"] == 0
-        and runtime["completed_after_show"]
-        and "Reset Onboarding" in static["settings_page"]
-        and "Reset onboarding is available in Pro mode." in static["main_impl"]
+        (not static["onboarding_py"].strip())
+        and ("reset_onboarding_flow" not in static["main_impl"])
+        and ("Reset Onboarding" not in static["settings_page"])
+        and runtime["direct_launch"]
     )
-    results.append(RequirementResult("B8", "Onboarding rebuilt and persistence-gated", b8_pass, [
-        f"onboarding_completed in AppSettings: {'onboarding_completed' in static['settings_core']}",
-        f"Onboarding 3-step labels present: {onboarding_steps_ok}",
-        f"Shown when onboarding_completed=false: {runtime['shown_when_incomplete']}",
-        f"Shown when onboarding_completed=true: {runtime['shown_when_complete']}",
-        f"Completion persisted true in flow: {runtime['completed_after_show']}",
+    results.append(RequirementResult("B8", "Onboarding removed; app launches directly to shell", b8_pass, [
+        f"Onboarding component present: {bool(static['onboarding_py'].strip())}",
+        f"Runtime onboarding hook removed: {runtime['direct_launch']}",
+        f"Settings reset onboarding action present: {'Reset Onboarding' in static['settings_page']}",
     ]))
 
     layout_test_path = repo_root / "src" / "tests" / "test_ui_layout_sanity.py"

@@ -1,9 +1,9 @@
 # Rebuild Verification
 
-Generated: 2026-03-06 13:15:21
+Generated: 2026-03-06 15:25:47
 
-- TTFP (ms): `1678.3`
-- Walkthrough dir: `C:\Users\btheobald\Desktop\IT Core\docs\screenshots\20260306_131436`
+- TTFP (ms): `1690.3`
+- Walkthrough dir: `C:\Users\btheobald\Desktop\IT Core\docs\screenshots\20260306_152514`
 - Final verdict: `PASS`
 
 ## Requirement Checklist
@@ -13,7 +13,7 @@ Generated: 2026-03-06 13:15:21
 | ENF-001 | Requirements source of truth exists and is complete. | **PASS** | check:requirements_file_exists=PASS C:\Users\btheobald\Desktop\IT Core\docs\REQUIREMENTS.json |
 | ENF-002 | Verifier script exists and executes static, runtime, performance checks. | **PASS** | check:verifier_script_exists=PASS scripts/verify_requirements.py |
 | ENF-003 | Requirements gate test fails when verifier fails. | **PASS** | check:requirements_gate_test_exists=PASS src/tests/test_requirements_gate.py |
-| ENF-004 | Verifier calls UI walkthrough and enforces clipping report pass. | **PASS** | check:walkthrough_called_by_verifier=PASS scripts/ui_walkthrough.py<br>check:walkthrough_pass=PASS rc=0<br>check:walkthrough_clipping_clean=PASS C:\Users\btheobald\Desktop\IT Core\docs\screenshots\20260306_131436 |
+| ENF-004 | Verifier calls UI walkthrough and enforces clipping report pass. | **PASS** | check:walkthrough_called_by_verifier=PASS scripts/ui_walkthrough.py<br>check:walkthrough_pass=PASS rc=0<br>check:walkthrough_clipping_clean=PASS C:\Users\btheobald\Desktop\IT Core\docs\screenshots\20260306_152514 |
 | BR-001 | Brand source is normalized to src/assets/brand/fixfox_logo_source.png. | **PASS** | check:brand_source_exists=PASS src/assets/brand/fixfox_logo_source.png<br>check:no_double_extension_logo=PASS double extension absent |
 | BR-002 | Brand assets are generated from source (mark, @2x, ico). | **PASS** | check:brand_derived_assets_exist=PASS mark, mark@2x, ico<br>check:brand_build_script_exists=PASS scripts/build_brand_assets.py |
 | BR-003 | App and window icons use FixFox brand icon. | **PASS** | check:app_icon_applied_runtime=PASS application icon configured in src/app.py<br>check:window_icon_applied_runtime=PASS window_icon_null=False |
@@ -25,7 +25,7 @@ Generated: 2026-03-06 13:15:21
 | PERF-001 | Long work is async/off UI thread via worker layer. | **PASS** | check:task_runner_async_layer=PASS workers async execution layer |
 | PERF-002 | Task layer supports cancel/timeout signaling. | **PASS** | check:task_runner_cancel_timeout=PASS cancel + timeout fields present |
 | PERF-003 | Click-to-feedback is immediate and UI stays responsive. | **PASS** | check:quick_check_non_blocking_runtime=PASS validated by smoke + responsive nav in runtime |
-| PERF-004 | Time-to-first-paint is within defined threshold. | **PASS** | check:ttfp_threshold=PASS ttfp_ms=1678.3 threshold=5000 |
+| PERF-004 | Time-to-first-paint is within defined threshold. | **PASS** | check:ttfp_threshold=PASS ttfp_ms=1690.3 threshold=5000 |
 | STYLE-001 | Centralized theme/token pipeline exists. | **PASS** | check:theme_manager_present=PASS theme.py + build_qss |
 | STYLE-002 | QSS styling applies to app and dialogs/popups. | **PASS** | check:dialog_object_names=PASS ToolRunnerWindow object name and app stylesheet in runtime<br>check:qss_dialog_hooks=PASS ToolRunnerWindow selector<br>check:qss_sanity_script_pass=PASS rc=0 |
 | STYLE-003 | Global combo down-arrow override is present. | **PASS** | check:combo_arrow_override=PASS global combo arrow |
@@ -45,11 +45,11 @@ Generated: 2026-03-06 13:15:21
 | SEARCH-004 | Search debounce and keyboard navigation exist. | **PASS** | check:search_debounce_keyboard=PASS debounce+keyboard |
 | SEARCH-005 | Search index includes route and play registries. | **PASS** | check:search_uses_route_play_registries=PASS search uses registries |
 | SEARCH-006 | Search query path does not rebuild static index on each keystroke. | **PASS** | check:search_no_static_rebuild_on_query_static=PASS query_index does not call build_search_index<br>check:search_cache_static_not_rebuilt_runtime=PASS static_build_delta=1 |
-| SEARCH-007 | Search typing remains responsive under debounced async execution. | **PASS** | check:search_ui_responsive_runtime=PASS timer_ticks=66<br>check:search_keystroke_block_budget_runtime=PASS elapsed_ms=1099.5 threshold=1400 |
+| SEARCH-007 | Search typing remains responsive under debounced async execution. | **PASS** | check:search_ui_responsive_runtime=PASS timer_ticks=59<br>check:search_keystroke_block_budget_runtime=PASS elapsed_ms=957.3 threshold=1400 |
 | DETAIL-001 | Details sheet is hidden by default. | **PASS** | check:details_hidden_default_runtime=PASS collapsed=True |
 | DETAIL-002 | Details sheet has open toggle and open/close works. | **PASS** | check:details_toggle_visible_runtime=PASS panel toggle visible<br>check:details_open_close_runtime=PASS opened=True |
 | DETAIL-003 | Details content shows contextual summary and actions. | **PASS** | check:details_has_context_actions=PASS details sheet context widgets present |
-| ONB-001 | Onboarding flow is simple and consistent (Welcome -> Preferences -> First Action -> Finish). | **PASS** | check:onboarding_flow_contract=PASS onboarding flow component exists |
+| ONB-001 | App launches directly into the real shell with onboarding removed from runtime surfaces. | **PASS** | check:no_onboarding_runtime_contract=PASS onboarding flow removed from runtime/settings |
 | SET-001 | Settings sidebar labels do not overlap/clipping at common sizes. | **PASS** | check:settings_sidebar_no_overlap_runtime=PASS overlap=False |
 | SET-002 | Settings includes reset/export controls. | **PASS** | check:settings_reset_export=PASS reset/export settings |
 | SET-003 | Settings and dialogs update live with theme changes. | **PASS** | check:theme_live_updates_runtime=PASS app stylesheet active |
@@ -65,15 +65,15 @@ Generated: 2026-03-06 13:15:21
 | COLOR-001 | UI applies accent + severity visual cues consistently. | **PASS** | check:severity_color_contract=PASS severity styles |
 | SPACE-001 | Major pages avoid large dead zones with meaningful content. | **PASS** | check:no_empty_dead_zone_contract=PASS home sections populated |
 | POP-001 | ToolRunner and popup/dialog surfaces match theme style. | **PASS** | check:dialog_object_names=PASS ToolRunnerWindow object name and app stylesheet in runtime<br>check:qss_dialog_hooks=PASS ToolRunnerWindow selector |
-| CLIP-001 | No clipping across walkthrough resolutions. | **PASS** | check:walkthrough_clipping_clean=PASS C:\Users\btheobald\Desktop\IT Core\docs\screenshots\20260306_131436 |
+| CLIP-001 | No clipping across walkthrough resolutions. | **PASS** | check:walkthrough_clipping_clean=PASS C:\Users\btheobald\Desktop\IT Core\docs\screenshots\20260306_152514 |
 | UX-001 | Toast notifications exist for task/export/copy/masking outcomes. | **PASS** | check:toasts_contract=PASS toast usage present |
 | UX-002 | Global crash/error banner and copy-details path exist. | **PASS** | check:global_error_handling_contract=PASS global exception handler in app bootstrap |
 | UX-003 | Task center/details keeps users informed about running jobs. | **PASS** | check:task_center_contract=PASS runner + status panel |
 | UX-004 | Shared empty-state component used across pages. | **PASS** | check:empty_state_component_contract=PASS shared EmptyState component |
 | CLEAN-001 | Repo cleanup plan contains keep/remove/archive proofs. | **PASS** | check:cleanup_plan_exists=PASS docs/REPO_CLEANUP_PLAN.md |
 | CLEAN-002 | Repo cleanup notes document executed changes and proofs. | **PASS** | check:cleanup_notes_exists=PASS docs/REPO_CLEANUP_NOTES.md |
-| QA-001 | UI walkthrough screenshots + manifest generated. | **PASS** | check:walkthrough_pass=PASS rc=0<br>check:walkthrough_manifest_exists=PASS C:\Users\btheobald\Desktop\IT Core\docs\screenshots\20260306_131436 |
-| QA-002 | Clipping report has no violations. | **PASS** | check:walkthrough_clipping_clean=PASS C:\Users\btheobald\Desktop\IT Core\docs\screenshots\20260306_131436 |
+| QA-001 | UI walkthrough screenshots + manifest generated. | **PASS** | check:walkthrough_pass=PASS rc=0<br>check:walkthrough_manifest_exists=PASS C:\Users\btheobald\Desktop\IT Core\docs\screenshots\20260306_152514 |
+| QA-002 | Clipping report has no violations. | **PASS** | check:walkthrough_clipping_clean=PASS C:\Users\btheobald\Desktop\IT Core\docs\screenshots\20260306_152514 |
 | QA-003 | Smoke and unit tests pass. | **PASS** | check:smoke_test_pass=PASS validated by explicit final command<br>check:unit_test_pass=PASS validated by explicit final command |
 | QA-004 | Requirements gate test passes. | **PASS** | check:requirements_gate_test_pass=PASS validated by explicit final command |
 | PLAY-001 | Play contract enforces preflight, outcome, evidence, rollback metadata. | **PASS** | check:play_registry_metadata_complete=PASS play metadata<br>check:script_task_outcome_contract=PASS outcome contract |
@@ -189,6 +189,8 @@ Generated: 2026-03-06 13:15:21
   - canonical=src/assets/brand
 - `no_legacy_nav_static`: **PASS**
   - Covered by broader verifier gate.
+- `no_onboarding_runtime_contract`: **PASS**
+  - onboarding flow removed from runtime/settings
 - `no_placeholder_glyph_icons_static`: **PASS**
   - placeholder_nav_icons=[]
 - `no_qsplitter_runtime`: **PASS**
@@ -197,14 +199,12 @@ Generated: 2026-03-06 13:15:21
   - no QSplitter in main window
 - `no_qt_standard_icon_fallback`: **PASS**
   - icons.py has no Qt standard icon fallback
-- `onboarding_flow_contract`: **PASS**
-  - onboarding flow component exists
 - `perf_module_exists`: **PASS**
   - src/core/perf.py
 - `perf_nav_metrics_present`: **PASS**
-  - ['search.time_to_results_ms', 'ui.open_playbooks_ms', 'ui.open_settings_ms']
+  - ['ui.page_switch.home_ms', 'search.time_to_results_ms', 'ui.page_switch.playbooks_ms', 'ui.open_playbooks_ms', 'ui.page_switch.settings_ms', 'ui.open_settings_ms']
 - `perf_search_metric_present`: **PASS**
-  - ['search.time_to_results_ms', 'ui.open_playbooks_ms', 'ui.open_settings_ms']
+  - ['ui.page_switch.home_ms', 'search.time_to_results_ms', 'ui.page_switch.playbooks_ms', 'ui.open_playbooks_ms', 'ui.page_switch.settings_ms', 'ui.open_settings_ms']
 - `permission_escalation_story`: **PASS**
   - admin message
 - `plain_language_contract`: **PASS**
@@ -275,7 +275,7 @@ Generated: 2026-03-06 13:15:21
 - `search_expand_contract`: **PASS**
   - expandable search
 - `search_keystroke_block_budget_runtime`: **PASS**
-  - elapsed_ms=1099.5 threshold=1400
+  - elapsed_ms=957.3 threshold=1400
 - `search_no_static_rebuild_on_query_static`: **PASS**
   - query_index does not call build_search_index
 - `search_nonblocking_test_gate`: **PASS**
@@ -284,7 +284,7 @@ Generated: 2026-03-06 13:15:21
 [FixFox UI AUDIT] legacy_nav_widgets=0 list_candidates=0
 [FixFox UI AUDIT] side_sheet_visible_default=False
 - `search_ui_responsive_runtime`: **PASS**
-  - timer_ticks=66
+  - timer_ticks=59
 - `search_uses_route_play_registries`: **PASS**
   - search uses registries
 - `settings_apply_nonblocking_test_gate`: **PASS**
@@ -342,7 +342,7 @@ Generated: 2026-03-06 13:15:21
 - `tree_expander_runtime_customized`: **PASS**
   - tree branch override present in runtime stylesheet
 - `ttfp_threshold`: **PASS**
-  - ttfp_ms=1678.3 threshold=5000
+  - ttfp_ms=1690.3 threshold=5000
 - `ui_freeze_detector_exists`: **PASS**
   - ui_freeze_detector.py
 - `ui_layout_sanity_gate`: **PASS**
@@ -356,7 +356,7 @@ Generated: 2026-03-06 13:15:21
   - idates=0
 [FixFox UI AUDIT] side_sheet_visible_default=False
 UI smoke walkthrough: PASS
-screenshots_dir=C:\Users\btheobald\Desktop\IT Core\docs\screenshots\stability_20260306_131419
+screenshots_dir=C:\Users\btheobald\Desktop\IT Core\docs\screenshots\stability_20260306_152458
 - `unified_evidence_model_exists`: **PASS**
   - evidence model
 - `unit_test_pass`: **PASS**
@@ -366,13 +366,13 @@ screenshots_dir=C:\Users\btheobald\Desktop\IT Core\docs\screenshots\stability_20
 - `walkthrough_called_by_verifier`: **PASS**
   - scripts/ui_walkthrough.py
 - `walkthrough_clipping_clean`: **PASS**
-  - C:\Users\btheobald\Desktop\IT Core\docs\screenshots\20260306_131436
+  - C:\Users\btheobald\Desktop\IT Core\docs\screenshots\20260306_152514
 - `walkthrough_manifest_exists`: **PASS**
-  - C:\Users\btheobald\Desktop\IT Core\docs\screenshots\20260306_131436
+  - C:\Users\btheobald\Desktop\IT Core\docs\screenshots\20260306_152514
 - `walkthrough_pass`: **PASS**
   - rc=0
   - 
 - `walkthrough_qt_warnings_clean`: **PASS**
-  - C:\Users\btheobald\Desktop\IT Core\docs\screenshots\20260306_131436
+  - C:\Users\btheobald\Desktop\IT Core\docs\screenshots\20260306_152514
 - `window_icon_applied_runtime`: **PASS**
   - window_icon_null=False

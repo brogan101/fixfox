@@ -21,6 +21,7 @@ from src.core.diagnostics.font_sanity import run_font_sanity
 from src.core.diagnostics.qt_warnings import install_qt_message_handler, read_qt_warnings
 from src.core.qt_runtime import ensure_qt_runtime_env, is_fatal_qt_warning, is_font_warning, is_qss_warning
 from src.ui.main_window import MainWindow
+from src.ui.splash import build_splash_pixmap
 
 
 def _drain(app: QApplication, cycles: int = 5, delay: float = 0.05) -> None:
@@ -198,10 +199,11 @@ def main() -> int:
     failures: list[str] = []
     clipping_issues: list[str] = []
     captured: list[str] = []
-    sizes = [(1024, 768), (1280, 720), (1600, 900)]
+    sizes = [(1024, 768), (1280, 720), (1600, 900), (1920, 1080)]
     search_visible_ms = 0
     normal_page_sizes: dict[str, tuple[int, int]] = {}
     maximized_growth: dict[str, dict[str, list[int]]] = {}
+    page_switch_timings: dict[str, list[int]] = {}
 
     font_result = run_font_sanity(
         report_path=out_dir / "font_sanity_report.txt",
@@ -239,6 +241,9 @@ def main() -> int:
     ensure_qt_runtime_env()
     cleanup = install_qt_message_handler(str(qt_warning_path))
     app = QApplication.instance() or QApplication([])
+    splash_shot = out_dir / "startup_splash.png"
+    build_splash_pixmap(status_text="Loading workspace...").save(str(splash_shot), "PNG")
+    captured.append(str(splash_shot.relative_to(REPO_ROOT)).replace("\\", "/"))
     window: MainWindow | None = None
     try:
         window = MainWindow()
@@ -254,8 +259,11 @@ def main() -> int:
             window.resize(width, height)
             _drain(app, cycles=6)
             for idx, page in enumerate(getattr(window, "NAV_ITEMS", ())):
+                started = time.perf_counter()
                 window.nav.setCurrentRow(idx)
                 _drain(app, cycles=5)
+                elapsed_ms = int((time.perf_counter() - started) * 1000.0)
+                page_switch_timings.setdefault(page, []).append(elapsed_ms)
                 if hasattr(window, "pages") and window.pages.currentIndex() != idx:
                     failures.append(f"page failed to load: {page} at {width}x{height}")
                     continue
@@ -395,6 +403,14 @@ def main() -> int:
         "font_sanity_ok": font_result.ok,
         "font_sanity_failures": font_result.failures,
         "maximized_growth": maximized_growth,
+        "page_switch_timings_ms": {
+            page: {
+                "samples": samples,
+                "avg_ms": round(sum(samples) / max(1, len(samples)), 2),
+                "max_ms": max(samples),
+            }
+            for page, samples in page_switch_timings.items()
+        },
         "failure_count": len(failures),
         "failures": failures,
     }

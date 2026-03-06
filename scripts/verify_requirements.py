@@ -341,7 +341,6 @@ def _collect_static(checks: dict[str, CheckResult]) -> None:
     )
     forbidden_hits: list[str] = []
     for file_path in (
-        REPO_ROOT / "src/ui/components/onboarding.py",
         REPO_ROOT / "src/ui/pages/playbooks_page.py",
         REPO_ROOT / "src/ui/pages/reports_page.py",
         REPO_ROOT / "src/ui/pages/settings_page.py",
@@ -393,7 +392,12 @@ def _collect_static(checks: dict[str, CheckResult]) -> None:
     checks["severity_color_contract"] = CheckResult('kind="crit"' in qss and 'kind="warn"' in qss, ["severity styles"])
     checks["no_empty_dead_zone_contract"] = CheckResult("Recent Sessions" in _read(REPO_ROOT / "src/ui/pages/home_page.py"), ["home sections populated"])
     checks["plain_language_contract"] = CheckResult("What we checked:" in script_tasks and "Technical appendix:" in script_tasks, ["plain + technical split"])
-    checks["onboarding_flow_contract"] = CheckResult((REPO_ROOT / "src/ui/components/onboarding.py").exists(), ["onboarding flow component exists"])
+    checks["no_onboarding_runtime_contract"] = CheckResult(
+        (not (REPO_ROOT / "src/ui/components/onboarding.py").exists())
+        and ("reset_onboarding_flow" not in main)
+        and ("Reset Onboarding" not in settings_page),
+        ["onboarding flow removed from runtime/settings"],
+    )
     checks["play_registry_metadata_complete"] = CheckResult(all(x in _read(REPO_ROOT / "src/core/play_registry.py") for x in ["risk_badge", "estimated_minutes", "automation_level"]), ["play metadata"])
     checks["script_task_outcome_contract"] = CheckResult(all(x in script_tasks for x in ["preflight", "outcome", "before_snapshot", "after_snapshot", "rollback_notice"]), ["outcome contract"])
     checks["route_registry_exists"] = CheckResult((REPO_ROOT / "src/core/route_registry.py").exists(), ["route registry"])

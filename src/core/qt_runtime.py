@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from .utils import resource_path
 
 FATAL_QT_WARNING_PATTERNS: tuple[str, ...] = (
     "could not parse application stylesheet",
@@ -28,7 +29,7 @@ def _repo_root() -> Path:
 
 
 def bundled_font_dir() -> Path:
-    return _repo_root() / "src" / "assets" / "fonts"
+    return Path(resource_path("assets/fonts"))
 
 
 def ensure_qt_runtime_env(logger: Any | None = None) -> dict[str, str]:
@@ -47,9 +48,19 @@ def ensure_qt_runtime_env(logger: Any | None = None) -> dict[str, str]:
     return updates
 
 
+def is_ignorable_qt_warning(message: str) -> bool:
+    text = str(message or "").strip().lower()
+    if "cannot find font directory" not in text:
+        return False
+    custom_font_dir = os.environ.get("QT_QPA_FONTDIR", "").strip()
+    return bool(custom_font_dir) and Path(custom_font_dir).exists()
+
+
 def is_fatal_qt_warning(message: str) -> bool:
     text = str(message or "").strip().lower()
     if not text:
+        return False
+    if is_ignorable_qt_warning(text):
         return False
     if NON_FATAL_QPROPERTY_WARNING in text:
         return False
@@ -59,6 +70,8 @@ def is_fatal_qt_warning(message: str) -> bool:
 def is_font_warning(message: str) -> bool:
     text = str(message or "").strip().lower()
     if not text:
+        return False
+    if is_ignorable_qt_warning(text):
         return False
     return any(token in text for token in FONT_WARNING_PATTERNS)
 

@@ -1,20 +1,24 @@
 from __future__ import annotations
 
 import json
+import logging
+from datetime import datetime
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Any
 
 from .paths import settings_path
 
+LOGGER = logging.getLogger("fixfox.settings")
+SETTINGS_VERSION = 2
+
 
 @dataclass
 class AppSettings:
+    config_version: int = SETTINGS_VERSION
     share_safe_default: bool = True
     mask_ip_default: bool = False
     right_panel_open: bool = False
-    onboarding_completed: bool = False
-    onboarding_goal: str = "speed"
     diagnostic_mode: bool = False
     safe_only_mode: bool = True
     show_admin_tools: bool = False
@@ -43,6 +47,7 @@ class AppSettings:
     details_drawer_pinned: bool = True
 
     def normalized(self) -> "AppSettings":
+        self.config_version = SETTINGS_VERSION
         self.ui_mode = "pro" if str(self.ui_mode).strip().lower() == "pro" else "basic"
         try:
             scale = int(self.ui_scale_pct)
@@ -99,23 +104,50 @@ def _coerce_settings(data: dict[str, Any]) -> AppSettings:
     return AppSettings(**base).normalized()
 
 
+def _backup_corrupt_settings(path: Path) -> None:
+    if not path.exists():
+        return
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup = path.with_name(f"{path.stem}.corrupt_{stamp}{path.suffix}")
+    try:
+        path.replace(backup)
+        LOGGER.warning("settings_corrupt_backup=%s", backup)
+    except Exception as exc:
+        LOGGER.warning("settings_corrupt_backup_failed path=%s error=%s", path, exc)
+
+
 def load_settings() -> AppSettings:
     path = settings_path()
     if not path.exists():
         return AppSettings().normalized()
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
+    except Exception as exc:
+        LOGGER.warning("settings_load_failed path=%s error=%s", path, exc)
+        _backup_corrupt_settings(path)
         return AppSettings().normalized()
     if not isinstance(payload, dict):
+        LOGGER.warning("settings_payload_invalid_type path=%s type=%s", path, type(payload).__name__)
+        _backup_corrupt_settings(path)
         return AppSettings().normalized()
     return _coerce_settings(payload)
+
+
+def export_settings_snapshot(settings: AppSettings) -> dict[str, Any]:
+    normalized = settings.normalized()
+    payload = asdict(normalized)
+    for key in ("window_x", "window_y", "window_width", "window_height", "splitter_sizes"):
+        payload.pop(key, None)
+    return payload
 
 
 def save_settings(settings: AppSettings) -> Path:
     path = settings_path()
     normalized = settings.normalized()
-    path.write_text(json.dumps(asdict(normalized), indent=2), encoding="utf-8")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = path.with_suffix(".tmp")
+    temp_path.write_text(json.dumps(asdict(normalized), indent=2), encoding="utf-8")
+    temp_path.replace(path)
     try:
         from .db import replace_all_favorites, set_file_index_roots
 

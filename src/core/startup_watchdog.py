@@ -13,7 +13,7 @@ from typing import Any
 from PySide6.QtCore import QEvent, QObject, QTimer, QtMsgType, qInstallMessageHandler
 from PySide6.QtWidgets import QApplication, QWidget
 
-from .qt_runtime import is_fatal_qt_warning
+from .qt_runtime import is_fatal_qt_warning, is_ignorable_qt_warning
 
 LOGGER = logging.getLogger("fixfox.startup")
 WATCHDOG_LOGGER = logging.getLogger("fixfox.watchdog")
@@ -169,6 +169,8 @@ class StartupWatchdog(QObject):
     def install_qt_message_handler(self) -> None:
         def _handler(msg_type: QtMsgType, context: Any, message: str) -> None:
             del context
+            if is_ignorable_qt_warning(message):
+                return
             text = f"qt[{_qt_msg_name(msg_type)}] {message}"
             msg_lower = str(message or "").lower()
             self._append_qt(text)

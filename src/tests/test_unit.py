@@ -4,19 +4,18 @@ import json
 import os
 import time
 import unittest
-from unittest.mock import patch
 from pathlib import Path
 
 from src.core.diagnostics import quick_check
 from src.core.errors import classify_exit
 from src.core.exporter import export_session, validate_export_folder
+from src.core.logging_setup import write_crash_report
 from src.core.masking import MaskingOptions, mask_text
-from src.core.onboarding import OnboardingState
 from src.core.play_registry import CATEGORY_ICON_MAP, list_play_entries
 from src.core.registry import CAPABILITIES
 from src.core.runbooks import execute_runbook
 from src.core.script_tasks import run_script_task
-from src.core.settings import AppSettings
+from src.core.settings import AppSettings, SETTINGS_VERSION, export_settings_snapshot
 from src.ui.layout_guardrails import should_auto_collapse_right_panel
 
 
@@ -85,6 +84,13 @@ class ErrorMappingTests(unittest.TestCase):
         assert err is not None
         self.assertTrue(bool(err.user_message.strip()))
         self.assertGreaterEqual(len(err.suggested_next_steps), 1)
+
+
+class CrashLoggingTests(unittest.TestCase):
+    def test_crash_report_is_written(self) -> None:
+        path = write_crash_report("unit crash marker")
+        self.assertTrue(path.exists())
+        self.assertIn("unit crash marker", path.read_text(encoding="utf-8", errors="ignore"))
 
 
 class GuardrailTests(unittest.TestCase):
@@ -170,15 +176,6 @@ class PlayRegistryContractTests(unittest.TestCase):
             self.assertTrue(icon_svg.exists() or icon_png.exists(), msg=f"missing icon asset for category={category} icon={icon_name}")
 
 
-class OnboardingTests(unittest.TestCase):
-    def test_skip_and_dont_show_again(self) -> None:
-        state = OnboardingState()
-        self.assertTrue(state.should_show())
-        state.mark_skipped(dont_show_again=True)
-        self.assertTrue(state.completed)
-        self.assertFalse(state.should_show())
-
-
 class SettingsTests(unittest.TestCase):
     def test_ui_scale_is_clamped_on_normalize(self) -> None:
         low = AppSettings(ui_scale_pct=10).normalized()
@@ -188,66 +185,20 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(high.ui_scale_pct, 125)
         self.assertEqual(ok.ui_scale_pct, 110)
 
-
-class OnboardingLaunchTests(unittest.TestCase):
-    def setUp(self) -> None:
-        os.environ["QT_QPA_PLATFORM"] = "offscreen"
-        os.environ["FIXFOX_FORCE_ONBOARDING"] = "1"
-        os.environ.pop("FIXFOX_SKIP_ONBOARDING", None)
-
-    def tearDown(self) -> None:
-        os.environ.pop("FIXFOX_FORCE_ONBOARDING", None)
-
-    def test_onboarding_shown_when_incomplete(self) -> None:
-        from PySide6.QtWidgets import QApplication, QDialog
-        from src.ui.main_window import MainWindow
-
-        calls: dict[str, int] = {"shown": 0}
-
-        class DummyOnboarding:
-            def __init__(self, *args, **kwargs) -> None:
-                del args, kwargs
-                calls["shown"] += 1
-                self.completed = True
-                self.result_action = "none"
-
-            def exec(self) -> int:
-                return QDialog.Accepted
-
-        with (
-            patch("src.ui.main_window_impl.load_settings", return_value=AppSettings(onboarding_completed=False)),
-            patch("src.ui.main_window_impl.save_settings"),
-            patch("src.ui.main_window_impl.OnboardingFlow", DummyOnboarding),
-        ):
-            app = QApplication.instance() or QApplication([])
-            window = MainWindow()
-            app.processEvents()
-            window.close()
-            app.processEvents()
-        self.assertEqual(calls["shown"], 1)
-
-    def test_onboarding_not_shown_when_completed(self) -> None:
-        from PySide6.QtWidgets import QApplication
-        from src.ui.main_window import MainWindow
-
-        calls: dict[str, int] = {"shown": 0}
-
-        class DummyOnboarding:
-            def __init__(self, *args, **kwargs) -> None:
-                del args, kwargs
-                calls["shown"] += 1
-
-        with (
-            patch("src.ui.main_window_impl.load_settings", return_value=AppSettings(onboarding_completed=True)),
-            patch("src.ui.main_window_impl.save_settings"),
-            patch("src.ui.main_window_impl.OnboardingFlow", DummyOnboarding),
-        ):
-            app = QApplication.instance() or QApplication([])
-            window = MainWindow()
-            app.processEvents()
-            window.close()
-            app.processEvents()
-        self.assertEqual(calls["shown"], 0)
+    def test_settings_snapshot_is_safe_for_support_bundle(self) -> None:
+        settings = AppSettings(
+            window_x=20,
+            window_y=40,
+            window_width=1440,
+            window_height=960,
+            splitter_sizes=[72, 860, 340],
+            ui_mode="pro",
+        )
+        payload = export_settings_snapshot(settings)
+        self.assertEqual(payload["config_version"], SETTINGS_VERSION)
+        self.assertEqual(payload["ui_mode"], "pro")
+        self.assertNotIn("window_x", payload)
+        self.assertNotIn("splitter_sizes", payload)
 
 
 class SearchPerformanceTests(unittest.TestCase):

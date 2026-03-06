@@ -15,7 +15,7 @@ PALETTE_ORDER = ("fixfox", "graphite", "high_contrast")
 _UI_SCALE_PERCENT = 100
 
 PALETTE_LABELS: dict[str, str] = {
-    "fixfox": "Fix Fox",
+    "fixfox": "FixFox",
     "graphite": "Graphite",
     "high_contrast": "High Contrast",
 }
@@ -28,7 +28,8 @@ PALETTE_ALIASES: dict[str, str] = {
     "fixfox_graphite": "graphite",
     "Fix Fox M3": "fixfox",
     "Fix Fox": "fixfox",
-    "Fix Fox Graphite": "graphite",
+    "FixFox": "fixfox",
+    "FixFox Graphite": "graphite",
     "Graphite": "graphite",
     "High Contrast": "high_contrast",
     "high-contrast": "high_contrast",

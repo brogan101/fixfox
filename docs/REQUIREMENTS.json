@@ -49,7 +49,7 @@
     { "id": "DETAIL-002", "title": "Details sheet has open toggle and open/close works.", "proof": ["check:details_toggle_visible_runtime", "check:details_open_close_runtime"], "status": "pending" },
     { "id": "DETAIL-003", "title": "Details content shows contextual summary and actions.", "proof": ["check:details_has_context_actions"], "status": "pending" },
 
-    { "id": "ONB-001", "title": "Onboarding flow is simple and consistent (Welcome -> Preferences -> First Action -> Finish).", "proof": ["check:onboarding_flow_contract"], "status": "pending" },
+    { "id": "ONB-001", "title": "App launches directly into the real shell with onboarding removed from runtime surfaces.", "proof": ["check:no_onboarding_runtime_contract"], "status": "pending" },
     { "id": "SET-001", "title": "Settings sidebar labels do not overlap/clipping at common sizes.", "proof": ["check:settings_sidebar_no_overlap_runtime"], "status": "pending" },
     { "id": "SET-002", "title": "Settings includes reset/export controls.", "proof": ["check:settings_reset_export"], "status": "pending" },
     { "id": "SET-003", "title": "Settings and dialogs update live with theme changes.", "proof": ["check:theme_live_updates_runtime"], "status": "pending" },

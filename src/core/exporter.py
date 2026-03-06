@@ -3,8 +3,10 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import os
 import re
 import shutil
+import sys
 import zipfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -13,10 +15,13 @@ from typing import Any
 
 from .brand import APP_TAGLINE, EXPORT_PREFIX, ICON_PNG, REPORT_TITLE
 from .db import record_export_artifacts
+from .logging_setup import log_path, logs_dir
 from .masking import MaskingOptions, mask_text
 from .paths import ensure_dirs
 from .report import render_html
+from .settings import export_settings_snapshot, load_settings
 from .utils import resource_path
+from .version import APP_CHANNEL, APP_VERSION
 
 
 PRESETS = ("home_share", "ticket", "full")
@@ -148,6 +153,17 @@ def _write_diagnostics_log(path: Path, session: dict[str, Any]) -> None:
     if len(lines) == 5:
         lines.append("No findings.")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _write_text_snapshot(path: Path, text: str, mask_options: MaskingOptions) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(mask_text(str(text or ""), mask_options), encoding="utf-8")
+
+
+def _copy_optional_log(src: Path, dst: Path, mask_options: MaskingOptions) -> None:
+    if not src.exists() or not src.is_file():
+        return
+    _write_text_snapshot(dst, src.read_text(encoding="utf-8", errors="ignore"), mask_options)
 
 
 def _copy_brand_icon(report_dir: Path) -> str:
@@ -284,6 +300,46 @@ def _build_manifest(folder: Path, preset: str, share_safe: bool, session_id: str
     }
 
 
+def _support_metadata(
+    session: dict[str, Any],
+    *,
+    preset: str,
+    share_safe: bool,
+    include_logs: bool,
+) -> dict[str, Any]:
+    settings = export_settings_snapshot(load_settings())
+    evidence_rows = _as_evidence_rows(session)
+    return {
+        "app": {
+            "name": "FixFox",
+            "version": APP_VERSION,
+            "channel": APP_CHANNEL,
+            "python": sys.version.split()[0],
+            "platform": sys.platform,
+        },
+        "bundle": {
+            "preset": preset,
+            "share_safe": bool(share_safe),
+            "include_logs": bool(include_logs),
+            "generated_utc": datetime.now(timezone.utc).isoformat(),
+        },
+        "session": {
+            "session_id": str(session.get("session_id", "")),
+            "symptom": str(session.get("symptom", "")),
+            "findings": len(session.get("findings", [])),
+            "actions": len(session.get("actions", [])),
+            "evidence_files": len(evidence_rows),
+            "last_export_path": str(session.get("last_export_path", "")),
+        },
+        "paths": {
+            "app_data": str(ensure_dirs()["base"]),
+            "logs": str(logs_dir()),
+            "active_log": str(log_path()),
+        },
+        "settings_snapshot": settings,
+    }
+
+
 def _write_hashes(folder: Path) -> Path:
     lines: list[str] = []
     for f in sorted(folder.rglob("*")):
@@ -339,6 +395,8 @@ def validate_export_folder(
         "logs/diagnostics.txt",
         "manifest/manifest.json",
         "manifest/hashes.txt",
+        "support/app_info.json",
+        "support/session_summary.json",
     }
     actual_files = {
         str(p.relative_to(folder)).replace("\\", "/")
@@ -417,10 +475,11 @@ def export_session(
 
     report_dir = folder / "report"
     data_dir = folder / "data"
-    logs_dir = folder / "logs"
+    logs_dir_path = folder / "logs"
     evidence_dir = folder / "evidence"
     manifest_dir = folder / "manifest"
-    for p in (report_dir, data_dir, logs_dir, evidence_dir, manifest_dir):
+    support_dir = folder / "support"
+    for p in (report_dir, data_dir, logs_dir_path, evidence_dir, manifest_dir, support_dir):
         p.mkdir(parents=True, exist_ok=True)
 
     raw_tokens = [
@@ -443,10 +502,44 @@ def export_session(
     _write_findings_csv(report_dir / "findings.csv", payload.get("findings", []))
 
     (data_dir / "session.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    _write_actions_log(logs_dir / "actions.txt", payload.get("actions", []))
-    _write_diagnostics_log(logs_dir / "diagnostics.txt", payload)
-    (logs_dir / "ticket_summary_short.txt").write_text(short_summary + "\n", encoding="utf-8")
-    (logs_dir / "ticket_summary_detailed.txt").write_text(detailed_summary + "\n", encoding="utf-8")
+    _write_actions_log(logs_dir_path / "actions.txt", payload.get("actions", []))
+    _write_diagnostics_log(logs_dir_path / "diagnostics.txt", payload)
+    (logs_dir_path / "ticket_summary_short.txt").write_text(short_summary + "\n", encoding="utf-8")
+    (logs_dir_path / "ticket_summary_detailed.txt").write_text(detailed_summary + "\n", encoding="utf-8")
+    support_info = _support_metadata(
+        payload,
+        preset=preset,
+        share_safe=share_safe,
+        include_logs=include_logs,
+    )
+    _write_text_snapshot(
+        support_dir / "app_info.json",
+        json.dumps(support_info, indent=2),
+        mask_options,
+    )
+    _write_text_snapshot(
+        support_dir / "session_summary.json",
+        json.dumps(
+            {
+                "ticket_summary_short": short_summary,
+                "ticket_summary_detailed": detailed_summary,
+                "evidence_files": len(_as_evidence_rows(payload)),
+            },
+            indent=2,
+        ),
+        mask_options,
+    )
+    if include_logs or preset in {"ticket", "full"}:
+        _copy_optional_log(log_path(), support_dir / "fixfox.log", mask_options)
+        _copy_optional_log(logs_dir() / "crash.log", support_dir / "crash.log", mask_options)
+        env_lines = [
+            f"OS={os.name}",
+            f"Platform={sys.platform}",
+            f"Python={sys.version.split()[0]}",
+            f"Preset={preset}",
+            f"ShareSafe={share_safe}",
+        ]
+        _write_text_snapshot(support_dir / "environment.txt", "\n".join(env_lines) + "\n", mask_options)
 
     _copy_evidence(payload, evidence_dir, mask_options, preset=preset, include_logs=include_logs)
 

@@ -70,7 +70,7 @@ class GlobalSearchPopup(QFrame):
             if q:
                 self.empty.setText("No matches. Try a goal, tool, runbook, fix, or session id.")
             else:
-                self.empty.setText("Type to search Fix Fox actions.")
+                self.empty.setText("Type to search FixFox actions.")
             self.empty.show()
             self.results.hide()
         else:

@@ -7,6 +7,7 @@ from typing import Callable
 
 from PySide6.QtCore import QtMsgType, qInstallMessageHandler
 
+from ..qt_runtime import is_ignorable_qt_warning
 
 def _msg_type_name(msg_type: QtMsgType) -> str:
     if msg_type == QtMsgType.QtDebugMsg:
@@ -32,6 +33,8 @@ def install_qt_message_handler(log_path: str, *, echo_to_console: bool | None = 
 
     def _handler(msg_type: QtMsgType, context: object, message: str) -> None:
         del context
+        if is_ignorable_qt_warning(message):
+            return
         line = f"[{_msg_type_name(msg_type)}] {message}".rstrip()
         with path.open("a", encoding="utf-8", errors="ignore") as handle:
             handle.write(line + "\n")

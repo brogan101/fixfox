@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import signal
 import sys
+import time
 
 INSTALL_CMD = "py -m pip install -r requirements.txt"
 MISSING_DEPS = {"PySide6", "psutil"}
@@ -16,7 +17,7 @@ def _ensure_repo_on_sys_path() -> None:
 
 
 def _show_dependency_error() -> None:
-    app_display_name = "Fix Fox"
+    app_display_name = "FixFox"
     try:
         from .core.brand import APP_DISPLAY_NAME
         app_display_name = APP_DISPLAY_NAME
@@ -73,6 +74,7 @@ def _load_runtime_imports():
         from .ui.font_utils import font_asset_candidates
         from .ui.theme import resolve_theme_tokens, set_ui_scale_percent
         from .ui.shell import AppShell
+        from .ui.splash import FixFoxSplashScreen
     except ImportError:
         _ensure_repo_on_sys_path()
         from src.core.brand import APP_NAME, ICON_ICO, ICON_PNG
@@ -89,6 +91,7 @@ def _load_runtime_imports():
         from src.ui.font_utils import font_asset_candidates
         from src.ui.theme import resolve_theme_tokens, set_ui_scale_percent
         from src.ui.shell import AppShell
+        from src.ui.splash import FixFoxSplashScreen
     return (
         QIcon,
         QApplication,
@@ -110,6 +113,7 @@ def _load_runtime_imports():
         resolve_theme_tokens,
         set_ui_scale_percent,
         AppShell,
+        FixFoxSplashScreen,
     )
 
 
@@ -210,6 +214,7 @@ def main():
             resolve_theme_tokens,
             set_ui_scale_percent,
             AppShell,
+            FixFoxSplashScreen,
         ) = _load_runtime_imports()
     except (ImportError, ModuleNotFoundError) as exc:
         if _is_missing_required_dependency(exc):
@@ -221,17 +226,13 @@ def main():
     install_global_exception_handler(logger)
     PERF_RECORDER.reset()
     PERF_RECORDER.set_meta("entrypoint", "src.app.main")
+    launch_started = time.perf_counter()
     startup_watchdog = install_startup_watchdog()
     startup_watchdog.mark("logging_ready")
     ensure_qt_runtime_env(logger)
     PERF_RECORDER.set_meta("watchdog_log", str(startup_watchdog.watchdog_log_path))
     PERF_RECORDER.set_meta("qt_log", str(startup_watchdog.qt_log_path))
     logger.info("Starting %s", APP_NAME)
-    try:
-        startup_watchdog.mark("initialize_db")
-        initialize_db()
-    except Exception as exc:
-        logger.warning("DB initialization warning: %s", exc)
 
     from PySide6.QtCore import QTimer, Qt
 
@@ -246,7 +247,20 @@ def main():
     if app_icon.isNull():
         app_icon = QIcon(resource_path(ICON_PNG))
     app.setWindowIcon(app_icon)
+    startup_watchdog.mark("show_splash")
+    splash = FixFoxSplashScreen(status_text="Loading workspace...")
+    splash.setWindowIcon(app_icon)
+    splash.show()
+    app.processEvents()
+    PERF_RECORDER.record("startup.splash_visible_ms", (time.perf_counter() - launch_started) * 1000.0)
+    try:
+        startup_watchdog.mark("initialize_db")
+        splash.update_status("Preparing local database...")
+        initialize_db()
+    except Exception as exc:
+        logger.warning("DB initialization warning: %s", exc)
     startup_watchdog.mark("load_font")
+    splash.update_status("Loading fonts and visual system...")
     _load_bundled_font(logger, font_asset_candidates)
     try:
         startup_watchdog.mark("ensure_desktop_logo")
@@ -258,13 +272,31 @@ def main():
     set_ui_scale_percent(getattr(settings, "ui_scale_pct", 100))
     tokens = resolve_theme_tokens(settings.theme_palette, settings.theme_mode)
     startup_watchdog.mark("apply_stylesheet")
+    splash.update_status("Applying theme and restoring preferences...")
     app.setStyleSheet(build_qss(tokens, settings.theme_mode, settings.density))
     startup_watchdog.mark("build_main_window")
-    w = AppShell(startup_phase_cb=startup_watchdog.set_phase)
+    splash.update_status("Building FixFox shell...")
+    interactive_recorded = {"done": False}
+
+    def _record_first_interactive() -> None:
+        if interactive_recorded["done"]:
+            return
+        interactive_recorded["done"] = True
+        PERF_RECORDER.record("startup.first_interactive_ms", (time.perf_counter() - launch_started) * 1000.0)
+
+    def _startup_phase_router(phase: str) -> None:
+        startup_watchdog.set_phase(phase)
+        if phase == "mainwindow:warmup_complete":
+            _record_first_interactive()
+
+    w = AppShell(startup_phase_cb=_startup_phase_router)
+    w._startup_started_perf = launch_started
     startup_watchdog.attach_window(w)
     startup_watchdog.mark("show_window")
     w.show()
-    freeze_detector: UIFreezeDetector | None = UIFreezeDetector(watchdog_log_path=startup_watchdog.watchdog_log_path)
+    QTimer.singleShot(0, _record_first_interactive)
+    splash.finish(w)
+    freeze_detector = UIFreezeDetector(watchdog_log_path=startup_watchdog.watchdog_log_path)
     QTimer.singleShot(0, freeze_detector.start)
     QTimer.singleShot(0, lambda: _apply_windows11_corner_hint(w))
     if hasattr(signal, "SIGINT"):
@@ -293,6 +325,7 @@ def main():
             pass
         if startup_watchdog.first_paint_ms > 0:
             PERF_RECORDER.record("startup.ttfp_ms", startup_watchdog.first_paint_ms)
+            PERF_RECORDER.record("startup.main_shell_visible_ms", startup_watchdog.first_paint_ms)
         if startup_watchdog.qt_fatal_lines:
             PERF_RECORDER.set_meta("qt_fatal_warnings", startup_watchdog.qt_fatal_lines[:8])
         report = PERF_RECORDER.write_report()

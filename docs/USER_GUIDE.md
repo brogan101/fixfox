@@ -1,9 +1,14 @@
-# Fix Fox User Guide
+# FixFox User Guide
 
 ## 1. Start
 ```powershell
 .venv\Scripts\python.exe -m src.app
 ```
+
+- Launch behavior:
+  - FixFox opens directly into the main shell.
+  - A branded splash screen appears immediately while the shell and saved settings load.
+  - There is no separate onboarding flow.
 
 ## 2. Home-First Workflow
 1. Open Home and choose a goal card:
@@ -13,7 +18,7 @@
    - Printer Rescue
 2. Review findings in Diagnose.
 3. Run safe fixes or runbooks from Playbooks/Fixes.
-4. Export from Reports (`Home Share Pack` for normal sharing).
+4. Create a support bundle from Reports (`home_share` for normal sharing, `ticket` for escalation).
 
 ## 3. Quick Actions and Search
 - Pin commonly used actions to Home Quick Actions.
@@ -27,11 +32,11 @@ All long operations run in ToolRunner with:
 - export shortcut
 - artifact save/copy actions
 
-## 5. Reports and Exports
+## 5. Reports and Support Bundles
 Reports is a 3-step flow:
 1. Configure (preset + masking + logs)
 2. Preview (redaction + evidence checklist)
-3. Generate (validation + post-export actions)
+3. Create bundle (validation + post-bundle actions)
 
 Presets:
 - `home_share`: light, share-safe default
@@ -47,7 +52,16 @@ Presets:
 - Capture checklist is maintained in:
   - `packaging/listing/screenshots_plan.md`
 
-## 8. Desktop Logo Utility
+## 8. Logs and Support
+- Logs:
+  - `%LOCALAPPDATA%\FixFox\logs\fixfox.log`
+  - `%LOCALAPPDATA%\FixFox\logs\crash.log`
+- Settings:
+  - `%LOCALAPPDATA%\FixFox\state\settings.json`
+- Support bundles:
+  - `%LOCALAPPDATA%\FixFox\exports`
+
+## 9. Desktop Logo Utility
 - Settings -> Advanced includes:
   - `Create Desktop Logo` (no overwrite)
   - `Recreate Desktop Logo` (overwrite)

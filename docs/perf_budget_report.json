@@ -1,0 +1,90 @@
+{
+  "budgets_ms": {
+    "startup.splash_visible_ms": 500.0,
+    "startup.main_shell_visible_ms": 2000.0,
+    "startup.first_interactive_ms": 3000.0,
+    "page_switch.ideal_ms": 150.0,
+    "page_switch.max_ms": 300.0
+  },
+  "startup": {
+    "startup.splash_visible_ms": 1041.229,
+    "startup.main_shell_visible_ms": 2340.682,
+    "startup.first_interactive_ms": 6749.161,
+    "startup.ttfp_ms": 2340.682,
+    "perf_report": "C:\\Users\\btheobald\\Desktop\\IT Core\\logs\\perf_20260306_152005.json"
+  },
+  "page_switch": {
+    "pages": {
+      "Home": {
+        "samples_ms": [
+          72.33,
+          115.45,
+          133.79
+        ],
+        "avg_ms": 107.19,
+        "max_ms": 133.79
+      },
+      "Playbooks": {
+        "samples_ms": [
+          90.91,
+          70.25,
+          74.58
+        ],
+        "avg_ms": 78.58,
+        "max_ms": 90.91
+      },
+      "Diagnose": {
+        "samples_ms": [
+          71.82,
+          123.95,
+          70.79
+        ],
+        "avg_ms": 88.85,
+        "max_ms": 123.95
+      },
+      "Fixes": {
+        "samples_ms": [
+          141.66,
+          405.94,
+          118.3
+        ],
+        "avg_ms": 221.97,
+        "max_ms": 405.94
+      },
+      "Reports": {
+        "samples_ms": [
+          135.84,
+          153.45,
+          187.91
+        ],
+        "avg_ms": 159.07,
+        "max_ms": 187.91
+      },
+      "History": {
+        "samples_ms": [
+          770.99,
+          112.69,
+          107.11
+        ],
+        "avg_ms": 330.27,
+        "max_ms": 770.99
+      },
+      "Settings": {
+        "samples_ms": [
+          120.87,
+          91.99,
+          85.66
+        ],
+        "avg_ms": 99.5,
+        "max_ms": 120.87
+      }
+    },
+    "overall_max_ms": 770.99
+  },
+  "budget_pass": {
+    "splash": false,
+    "shell": false,
+    "interactive": false,
+    "page_switch": false
+  }
+}

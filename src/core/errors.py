@@ -52,7 +52,7 @@ def ensure_next_steps(steps: Iterable[str] | None) -> list[str]:
     return [
         "Review the technical details in the Details tab.",
         "Try the related safe tool or runbook from Playbooks.",
-        "Export a support pack for escalation.",
+        "Create a support bundle for escalation.",
     ]
 
 
@@ -85,7 +85,7 @@ def classify_exit(code: int, stderr: str = "") -> ToolError | None:
             user_message="This operation needs administrator permissions.",
             technical_message=details or "Permission denied.",
             suggested_next_steps=[
-                "Run Fix Fox as administrator.",
+                "Run FixFox as administrator.",
                 "Use dry-run first to preview commands.",
                 "Use a non-admin safe alternative when possible.",
             ],

@@ -15,12 +15,12 @@ VSVersionInfo(
       StringTable(
         '040904B0',
         [
-          StringStruct('CompanyName', 'Fix Fox'),
-          StringStruct('FileDescription', 'Fix Fox'),
+          StringStruct('CompanyName', 'FixFox'),
+          StringStruct('FileDescription', 'FixFox'),
           StringStruct('FileVersion', '0.9.0-beta1'),
           StringStruct('InternalName', 'FixFox'),
           StringStruct('OriginalFilename', 'FixFox.exe'),
-          StringStruct('ProductName', 'Fix Fox'),
+          StringStruct('ProductName', 'FixFox'),
           StringStruct('ProductVersion', '0.9.0-beta1')
         ]
       )

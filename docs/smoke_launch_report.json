@@ -1,0 +1,49 @@
+{
+  "base": "c:\\Users\\btheobald\\Desktop\\IT Core\\.smoke_tmp\\launch_cases",
+  "settings_path": "c:\\Users\\btheobald\\Desktop\\IT Core\\.smoke_tmp\\launch_cases\\LocalAppData\\FixFox\\state\\settings.json",
+  "cases": [
+    {
+      "name": "first_launch",
+      "exit_code": 0,
+      "terminated_early": false,
+      "timeout_hit": false,
+      "duration_ms": 5716.8,
+      "perf_report": "",
+      "perf_metrics": {}
+    },
+    {
+      "name": "second_launch_after_settings_change",
+      "exit_code": 0,
+      "terminated_early": false,
+      "timeout_hit": false,
+      "duration_ms": 7495.4,
+      "perf_report": "",
+      "perf_metrics": {}
+    },
+    {
+      "name": "interrupted_launch",
+      "exit_code": 1,
+      "terminated_early": true,
+      "timeout_hit": false,
+      "duration_ms": 1504.68,
+      "perf_report": "",
+      "perf_metrics": {}
+    },
+    {
+      "name": "launch_after_interrupted_run",
+      "exit_code": 0,
+      "terminated_early": false,
+      "timeout_hit": false,
+      "duration_ms": 7102.91,
+      "perf_report": "",
+      "perf_metrics": {}
+    }
+  ],
+  "settings_created_after_first_launch": true,
+  "persisted_after_second_launch": {
+    "theme_mode": "dark",
+    "ui_scale_pct": 112,
+    "ui_mode": "pro",
+    "config_version": 2
+  }
+}

@@ -13,9 +13,9 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from src.ui.main_window import MainWindow
-from src.ui.components.onboarding import OnboardingFlow
 from src.ui.components.tool_runner import ToolRunnerWindow
 from src.ui.icons import get_icon
+from src.ui.splash import build_splash_pixmap
 
 REQUIRED_ICONS = [
     "home",
@@ -95,11 +95,8 @@ def main() -> int:
     app.processEvents()
     _assert(window._search_popup.isVisible(), "Search popup closed unexpectedly while typing", failures)
 
-    onboarding = OnboardingFlow(parent=window)
-    onboarding.show()
-    app.processEvents()
-    for btn in (onboarding.back_btn, onboarding.next_btn, onboarding.finish_btn):
-        _assert(not _is_clipped(btn), f"Onboarding button clipped: {btn.text()}", failures)
+    splash_pixmap = build_splash_pixmap(status_text="Audit probe")
+    _assert(not splash_pixmap.isNull(), "Splash pixmap did not render", failures)
 
     for btn in (window.btn_quick_check, window.btn_panel_toggle, window.btn_export):
         _assert(not _is_clipped(btn), f"Top bar control clipped: {btn.objectName() or btn.text()}", failures)
@@ -113,7 +110,6 @@ def main() -> int:
     _assert(not _is_clipped(runner.tabs.tabBar()), "Tool runner tabs clipped", failures)
     _assert(not _is_clipped(runner.btn_export), "Tool runner export button clipped", failures)
 
-    onboarding.close()
     runner.close()
     window.close()
     app.processEvents()

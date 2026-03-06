@@ -731,18 +731,6 @@ QProgressBar::chunk {{
   border-radius: {max(5, d.corner_radius - 5)}px;
 }}
 
-QDialog#OnboardingFlow {{
-  background: {tokens.bg0};
-}}
-QDialog#OnboardingFlow QFrame#OnboardingCard {{
-  background: {tokens.panel};
-  border: 1px solid {border_soft};
-  border-radius: {d.corner_radius + 4}px;
-}}
-QDialog#OnboardingFlow QStackedWidget#OnboardingStack {{
-  background: transparent;
-}}
-
 QFrame#AccordionHeader {{
   background: {tokens.panel2};
   border-radius: {d.corner_radius}px;
