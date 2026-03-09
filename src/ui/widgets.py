@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QTimer, Qt
-from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
-    QGraphicsDropShadowEffect,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -40,14 +38,6 @@ class Card(QFrame):
         self.layout_main.setSpacing(spacing("sm"))
         self.set_density(density)
         self._hovered = False
-        self._shadow = QGraphicsDropShadowEffect(self)
-        self._shadow.setOffset(0, 2)
-        self._shadow.setBlurRadius(10 if int(elevation) > 0 else 0)
-        self._shadow.setColor(QColor(9, 16, 28, 42))
-        self.setGraphicsEffect(self._shadow)
-        self._shadow_anim = QPropertyAnimation(self._shadow, b"blurRadius", self)
-        self._shadow_anim.setDuration(130)
-        self._shadow_anim.setEasingCurve(QEasingCurve.OutCubic)
 
         top = QHBoxLayout()
         self.title = QLabel(title)
@@ -78,10 +68,6 @@ class Card(QFrame):
         self.setProperty("hovered", "true")
         self.style().unpolish(self)
         self.style().polish(self)
-        self._shadow_anim.stop()
-        self._shadow_anim.setStartValue(self._shadow.blurRadius())
-        self._shadow_anim.setEndValue(18.0)
-        self._shadow_anim.start()
         super().enterEvent(event)
 
     def leaveEvent(self, event) -> None:  # type: ignore[override]
@@ -89,10 +75,6 @@ class Card(QFrame):
         self.setProperty("hovered", "false")
         self.style().unpolish(self)
         self.style().polish(self)
-        self._shadow_anim.stop()
-        self._shadow_anim.setStartValue(self._shadow.blurRadius())
-        self._shadow_anim.setEndValue(10.0)
-        self._shadow_anim.start()
         super().leaveEvent(event)
 
 

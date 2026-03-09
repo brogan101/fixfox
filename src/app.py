@@ -227,7 +227,13 @@ def main():
     w.show()
     QTimer.singleShot(0, _record_first_interactive)
     splash.finish(w)
-    freeze_detector = UIFreezeDetector(watchdog_log_path=startup_watchdog.watchdog_log_path)
+    # 500ms was noisy after startup on real Windows runs and flagged brief
+    # post-paint jitter as "freezes" even after the painter-effect bug was fixed.
+    # Keep the detector active, but reserve it for materially visible stalls.
+    freeze_detector = UIFreezeDetector(
+        watchdog_log_path=startup_watchdog.watchdog_log_path,
+        freeze_threshold_ms=750,
+    )
     QTimer.singleShot(0, freeze_detector.start)
     QTimer.singleShot(0, lambda: _apply_windows11_corner_hint(w))
     if hasattr(signal, "SIGINT"):

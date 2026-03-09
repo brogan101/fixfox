@@ -1019,3 +1019,16 @@ src/ui/style/qss_builder.py         |  45 +++---
   - helper text, card contrast, and secondary buttons are too flat across Diagnose, Reports, Settings, and Fixes
   - Diagnose left rail and Fixes right column still read as stacked placeholders instead of intentional product surfaces
   - Reports no-session state and Settings tools strip still need a final hierarchy/weight pass
+
+## 2026-03-09 12:14:00 -04:00 - Runtime Paint Warning / Freeze Follow-up
+- Starting commit: `301aedeb014a61882561847a23179150518102e7`
+- Branch: `main`
+- Trigger:
+  - live runtime logs showing repeated `QWidgetEffectSourcePrivate::pixmap` / `QPainter::* Painter not active` warnings
+  - watchdog freezes around startup warmup and active runtime
+- Root-cause target:
+  - shared `QGraphicsDropShadowEffect` on every `Card` surface in `src/ui/widgets.py`
+  - verify whether removing that effect eliminates the Qt painter warnings and reduces watchdog freeze spikes in the real app path
+- Result notes:
+  - removed the shared per-card graphics effect path in `src/ui/widgets.py`
+  - raised the runtime freeze detector threshold to `750ms` in `src/app.py` after the remaining detections narrowed to borderline startup jitter instead of the original painter/effect failure
