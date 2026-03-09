@@ -36,6 +36,28 @@ class ReportsPage(PageScroll):
         w.rep_callout = InlineCallout("Reports", "", level="warn", density=w.settings_state.density)
         layout.addWidget(w.rep_callout)
 
+        workspace_actions = QWidget()
+        workspace_actions_layout = QHBoxLayout(workspace_actions)
+        workspace_actions_layout.setContentsMargins(0, 0, 0, 0)
+        workspace_actions_layout.setSpacing(spacing("sm"))
+        run_quick_check = PrimaryButton("Run Quick Check")
+        run_quick_check.clicked.connect(lambda: w.run_quick_check("Quick Check"))
+        reopen_history = SoftButton("Reopen Session")
+        reopen_history.clicked.connect(lambda: w.nav.setCurrentRow(w.NAV_ITEMS.index("History")))
+        review_settings = SoftButton("Review Settings")
+        review_settings.clicked.connect(lambda: w.nav.setCurrentRow(w.NAV_ITEMS.index("Settings")))
+        workspace_actions_layout.addWidget(run_quick_check, 0)
+        workspace_actions_layout.addWidget(reopen_history, 0)
+        workspace_actions_layout.addWidget(review_settings, 0)
+        workspace_actions_layout.addStretch(1)
+        workspace = Card(
+            "Report Workspace",
+            "Prepare masking defaults, reopen a case, or run diagnostics before generating the final support bundle.",
+        )
+        workspace.body_layout().addWidget(QLabel("Reports stays useful before a session exists: stage bundle policy now, then validate evidence and export once a case is loaded."))
+        workspace.body_layout().addWidget(workspace_actions)
+        layout.addWidget(workspace)
+
         overview = QWidget()
         overview_layout = QVBoxLayout(overview)
         overview_layout.setContentsMargins(0, 0, 0, 0)

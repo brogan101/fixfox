@@ -3097,6 +3097,25 @@ class MainWindow(QMainWindow):
         has_session = bool(self.current_session and self.current_session.get("session_id"))
         if hasattr(self, "rep_empty_state"):
             self.rep_empty_state.setVisible(not has_session)
+        if hasattr(self, "rep_callout"):
+            if has_session:
+                finding_count = len(self.current_session.get("findings", [])) if isinstance(self.current_session, dict) else 0
+                evidence_count = (
+                    len(self.current_session.get("evidence", {}).get("files", []))
+                    if isinstance(self.current_session.get("evidence", {}), dict)
+                    else 0
+                )
+                self.rep_callout.set_message(
+                    "Bundle review ready",
+                    f"Active session loaded with {finding_count} findings and {evidence_count} evidence files. Review masking, then generate and validate the bundle.",
+                    level="info",
+                )
+            else:
+                self.rep_callout.set_message(
+                    "No active session loaded",
+                    "Run Quick Check or reopen a case from History, then return here to validate evidence and create the support bundle.",
+                    level="warn",
+                )
         if hasattr(self, "rep_steps"):
             self.rep_steps.setVisible(True)
             self.rep_steps.setEnabled(True)
@@ -4584,12 +4603,21 @@ class MainWindow(QMainWindow):
             return
         stats = support_catalog_stats()
         deep = deep_support_playbook_stats()
-        self.s_support_catalog_summary.setText(
+        catalog_summary = (
             f"Support catalog: {stats.issue_count} issue classes across {stats.family_count} families, "
             f"{stats.playbook_count} shared playbooks, {stats.diagnostic_count} diagnostics, "
             f"and {stats.fix_count} mapped fixes.\n"
             f"Deep script-backed playbooks: {deep.playbook_count} | shared primitives: {deep.shared_primitive_count} | support-bundle integrated: {deep.support_bundle_integrated_count}."
         )
+        self.s_support_catalog_summary.setText(catalog_summary)
+        if hasattr(self, "settings_tools_summary"):
+            mode = "Pro" if self.settings_state.ui_mode == "pro" else "Basic"
+            safety = "Safe-only on" if self.settings_state.safe_only_mode else "Safe-only off"
+            share_safe = "Share-safe on" if self.settings_state.share_safe_default else "Share-safe off"
+            self.settings_tools_summary.setText(
+                f"{mode} mode | {self.settings_state.density.title()} density | UI scale {int(getattr(self.settings_state, 'ui_scale_pct', 100))}% | "
+                f"{safety} | {share_safe} | Diagnostics, support, and export remain local-first."
+            )
 
     def _refresh_runbooks(self) -> None:
         guided_basic = self.layout_policy_state.show_playbooks_guided_basic

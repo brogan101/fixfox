@@ -988,3 +988,24 @@ src/ui/style/qss_builder.py         |  45 +++---
   - global search result type badges clipping/cropping for long kinds
   - reports/fixes summary surfaces looking too skeletal when no session/playbook run is present
   - support/settings still carrying redundant support/report entry points
+
+## 2026-03-09 11:24:16 -04:00 - Release Candidate UI Stabilization Pass
+- Starting commit: `27da03a27016c84258b7933d52f45ff6f60f2d45`
+- Branch: `main`
+- Proof harness:
+  - `git fetch --all`
+  - `git rev-parse HEAD`
+  - `git status --short --branch`
+  - `.venv\Scripts\python.exe --version`
+  - `.venv\Scripts\python.exe -m pip --version`
+- Python version: `Python 3.14.3`
+- Pip version: `pip 26.0.1`
+- Scope for this pass:
+  - post-runtime-fix release-candidate UI stabilization and leftover bug bash
+  - explicitly re-check the user-reported “content appears then disappears” regression against live persistence, navigation, search, and resize behavior
+- Current truth screenshots:
+  - latest walkthrough/verifier proof: `docs/screenshots/20260309_110844`
+- Current UI risk areas:
+  - Reports still reads too empty in the no-session path even though the flow is implemented
+  - Settings top tools area lacks stronger summary hierarchy and quick section jumping
+  - persistence proof is currently delay-based but should also validate nav/search round-trips so disappearing content cannot slip through

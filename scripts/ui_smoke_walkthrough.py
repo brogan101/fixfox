@@ -80,6 +80,7 @@ def _visible_text_profile(root: QWidget) -> dict[str, object]:
 
 
 def _page_persistence_probe(window: MainWindow, page: str, *, app: QApplication) -> dict[str, object]:
+    current_idx = window.pages.currentIndex() if getattr(window, "pages", None) is not None else -1
     target = window.pages.currentWidget() if getattr(window, "pages", None) is not None else window
     samples: list[dict[str, object]] = []
     for delay_ms in (0, 500, 1000, 2000):
@@ -88,9 +89,42 @@ def _page_persistence_probe(window: MainWindow, page: str, *, app: QApplication)
             _drain(app, cycles=2, delay=0.03)
         profile = _visible_text_profile(target)
         samples.append({"delay_ms": delay_ms, **profile})
+    transitions: list[dict[str, object]] = []
+    if current_idx >= 0 and len(getattr(window, "NAV_ITEMS", ())) > 1:
+        alternate_idx = 0 if current_idx != 0 else 1
+        if alternate_idx < len(window.NAV_ITEMS):
+            window.nav.setCurrentRow(alternate_idx)
+            _drain(app, cycles=3, delay=0.03)
+            window.nav.setCurrentRow(current_idx)
+            _drain(app, cycles=4, delay=0.03)
+            transitions.append({"phase": "nav_roundtrip", **_visible_text_profile(window.pages.currentWidget())})
+    if hasattr(window, "top_search") and hasattr(window, "_search_popup"):
+        window._focus_top_search()
+        window.top_search.setText("quick")
+        window._schedule_global_search()
+        _drain(app, cycles=4, delay=0.03)
+        window.top_search.clear()
+        window._search_popup.hide_popup()
+        if current_idx >= 0:
+            window.nav.setCurrentRow(current_idx)
+        _drain(app, cycles=4, delay=0.03)
+        transitions.append({"phase": "search_roundtrip", **_visible_text_profile(window.pages.currentWidget())})
+    if not window.isMaximized():
+        original_size = window.size()
+        shrink_width = max(1024, original_size.width() - 160)
+        shrink_height = max(720, original_size.height() - 100)
+        if shrink_width != original_size.width() or shrink_height != original_size.height():
+            window.resize(shrink_width, shrink_height)
+            _drain(app, cycles=3, delay=0.03)
+            window.resize(original_size)
+            if current_idx >= 0:
+                window.nav.setCurrentRow(current_idx)
+            _drain(app, cycles=4, delay=0.03)
+            transitions.append({"phase": "resize_roundtrip", **_visible_text_profile(window.pages.currentWidget())})
     baseline = int(samples[0]["count"]) if samples else 0
     ok = baseline >= 5 and all(int(sample["count"]) >= max(5, baseline // 2) for sample in samples[1:])
-    return {"page": page, "ok": ok, "samples": samples}
+    ok = ok and all(int(sample["count"]) >= max(5, baseline // 2) for sample in transitions)
+    return {"page": page, "ok": ok, "samples": samples, "transitions": transitions}
 
 
 def main() -> int:
