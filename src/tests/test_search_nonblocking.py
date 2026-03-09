@@ -8,6 +8,8 @@ from PySide6.QtCore import QTimer
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
+from src.ui.runtime_bootstrap import apply_runtime_ui_bootstrap
+
 
 class SearchNonBlockingTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -19,6 +21,7 @@ class SearchNonBlockingTests(unittest.TestCase):
         from src.ui.main_window import MainWindow
 
         app = QApplication.instance() or QApplication([])
+        apply_runtime_ui_bootstrap(app)
         window = MainWindow()
         window.show()
         ticks = {"count": 0}

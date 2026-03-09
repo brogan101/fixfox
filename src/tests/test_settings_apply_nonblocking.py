@@ -10,6 +10,7 @@ from PySide6.QtWidgets import QApplication
 
 from src.core.settings import AppSettings, load_settings, save_settings
 from src.ui.main_window import MainWindow
+from src.ui.runtime_bootstrap import apply_runtime_ui_bootstrap
 
 
 def _drain(app: QApplication, cycles: int = 6, delay: float = 0.03) -> None:
@@ -23,6 +24,7 @@ class SettingsApplyNonblockingTests(unittest.TestCase):
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
         os.environ["FIXFOX_SKIP_ONBOARDING"] = "1"
         app = QApplication.instance() or QApplication([])
+        apply_runtime_ui_bootstrap(app)
         original = AppSettings(**asdict(load_settings().normalized()))
         window = MainWindow()
         window.show()

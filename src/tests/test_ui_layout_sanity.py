@@ -11,6 +11,7 @@ from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QAbstractButton, QApplication, QLabel, QSplitter, QWidget
 
 from src.ui.main_window import MainWindow
+from src.ui.runtime_bootstrap import apply_runtime_ui_bootstrap
 
 LEGACY_NAV_OBJECTS = {"Nav", "NavList", "DrawerNav", "LegacyNav", "MainNav"}
 
@@ -63,6 +64,7 @@ class UiLayoutSanityTests(unittest.TestCase):
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
         os.environ["FIXFOX_SKIP_ONBOARDING"] = "1"
         self.app = QApplication.instance() or QApplication([])
+        apply_runtime_ui_bootstrap(self.app)
         self.window = MainWindow()
         self.window.show()
         self._drain_events()

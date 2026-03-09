@@ -8,6 +8,7 @@ from PySide6.QtWidgets import QApplication
 
 from src.core.run_events import RunEventType, get_run_event_bus
 from src.ui.main_window import MainWindow
+from src.ui.runtime_bootstrap import apply_runtime_ui_bootstrap
 
 
 def _drain(app: QApplication, cycles: int = 6, delay: float = 0.02) -> None:
@@ -21,6 +22,7 @@ class StatusIndicatorEventTests(unittest.TestCase):
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
         os.environ["FIXFOX_SKIP_ONBOARDING"] = "1"
         app = QApplication.instance() or QApplication([])
+        apply_runtime_ui_bootstrap(app)
         bus = get_run_event_bus()
         window = MainWindow()
         window.show()

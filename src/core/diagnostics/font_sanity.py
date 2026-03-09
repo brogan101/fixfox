@@ -8,15 +8,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QFontMetrics, QPixmap
+from PySide6.QtGui import QFont, QFontMetrics, QPixmap
 from PySide6.QtWidgets import QApplication, QLabel
 
-from ..qt_runtime import ensure_qt_runtime_env, is_fatal_qt_warning, is_font_warning, is_qss_warning
+from ..qt_runtime import is_fatal_qt_warning, is_font_warning, is_qss_warning
 from ..settings import load_settings
-from ...app import _load_bundled_font
-from ...ui.app_qss import build_qss
-from ...ui.font_utils import font_asset_candidates
-from ...ui.theme import resolve_theme_tokens, set_ui_scale_percent
+from ...ui.runtime_bootstrap import apply_runtime_ui_bootstrap
 from .qt_warnings import install_qt_message_handler, read_qt_warnings
 
 
@@ -30,6 +27,41 @@ class FontSanityResult:
     weight: int
     platform_name: str
     report_path: str = ""
+
+
+def probe_font_render(font: QFont, *, sample_text: str = "FixFox runtime readable text") -> list[str]:
+    failures: list[str] = []
+    metrics = QFontMetrics(font)
+    for glyph in ("A", "a", "1", "-", "FixFox"):
+        if not metrics.inFont(glyph[0]):
+            failures.append(f"Default application font cannot render '{glyph[0]}'.")
+
+    probe = QLabel(sample_text)
+    probe.setObjectName("FontSanityProbe")
+    probe.setFont(font)
+    probe.ensurePolished()
+    probe.adjustSize()
+    canvas = QPixmap(max(220, probe.width() + 24), max(56, probe.height() + 18))
+    canvas.fill(Qt.transparent)
+    probe.render(canvas)
+    image = canvas.toImage()
+    alpha_pixels = 0
+    unique_rgba: set[tuple[int, int, int, int]] = set()
+    for y in range(image.height()):
+        for x in range(image.width()):
+            color = image.pixelColor(x, y)
+            rgba = (color.red(), color.green(), color.blue(), color.alpha())
+            if rgba[3] > 0:
+                alpha_pixels += 1
+                unique_rgba.add(rgba)
+                if alpha_pixels > 32 and len(unique_rgba) > 1:
+                    break
+        if alpha_pixels > 32 and len(unique_rgba) > 1:
+            break
+    probe.close()
+    if alpha_pixels <= 32 or len(unique_rgba) <= 1:
+        failures.append(f"Rendered QLabel({sample_text!r}) probe appears blank or non-varying; tofu risk remains.")
+    return failures
 
 
 def run_font_sanity(
@@ -49,47 +81,15 @@ def run_font_sanity(
     weight = 0
     platform_name = platform.platform()
     try:
-        ensure_qt_runtime_env()
         app = QApplication.instance() or QApplication([])
         settings = load_settings().normalized()
-        set_ui_scale_percent(getattr(settings, "ui_scale_pct", 100))
-        _load_bundled_font(logging.getLogger("fixfox.font_sanity"), font_asset_candidates)
-        tokens = resolve_theme_tokens(settings.theme_palette, settings.theme_mode)
-        app.setStyleSheet(build_qss(tokens, settings.theme_mode, settings.density))
+        apply_runtime_ui_bootstrap(app, logger=logging.getLogger("fixfox.font_sanity"), settings=settings)
 
         font = app.font()
         font_family = font.family()
         point_size = float(font.pointSizeF() if font.pointSizeF() > 0 else font.pointSize())
         weight = int(font.weight())
-        metrics = QFontMetrics(font)
-        for glyph in ("A", "a", "1", "-"):
-            if not metrics.inFont(glyph):
-                failures.append(f"Default application font cannot render '{glyph}'.")
-
-        probe = QLabel("Fix Fox")
-        probe.setObjectName("FontSanityProbe")
-        probe.ensurePolished()
-        probe.adjustSize()
-        canvas = QPixmap(max(128, probe.width() + 24), max(48, probe.height() + 18))
-        canvas.fill(Qt.transparent)
-        probe.render(canvas)
-        image = canvas.toImage()
-        alpha_pixels = 0
-        unique_rgba: set[tuple[int, int, int, int]] = set()
-        for y in range(image.height()):
-            for x in range(image.width()):
-                color = image.pixelColor(x, y)
-                rgba = (color.red(), color.green(), color.blue(), color.alpha())
-                if rgba[3] > 0:
-                    alpha_pixels += 1
-                    unique_rgba.add(rgba)
-                    if alpha_pixels > 32 and len(unique_rgba) > 1:
-                        break
-            if alpha_pixels > 32 and len(unique_rgba) > 1:
-                break
-        probe.close()
-        if alpha_pixels <= 32 or len(unique_rgba) <= 1:
-            failures.append("Rendered QLabel('Fix Fox') probe appears blank or non-varying; tofu risk remains.")
+        failures.extend(probe_font_render(font))
     except Exception as exc:
         failures.append(f"Exception while checking font sanity: {exc}")
     finally:

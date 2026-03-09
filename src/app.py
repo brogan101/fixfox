@@ -70,9 +70,7 @@ def _load_runtime_imports():
         from .core.ui_freeze_detector import UIFreezeDetector
         from .core.settings import load_settings
         from .core.utils import resource_path
-        from .ui.app_qss import build_qss
-        from .ui.font_utils import font_asset_candidates
-        from .ui.theme import resolve_theme_tokens, set_ui_scale_percent
+        from .ui.runtime_bootstrap import apply_runtime_ui_bootstrap
         from .ui.shell import AppShell
         from .ui.splash import FixFoxSplashScreen
     except ImportError:
@@ -87,9 +85,7 @@ def _load_runtime_imports():
         from src.core.ui_freeze_detector import UIFreezeDetector
         from src.core.settings import load_settings
         from src.core.utils import resource_path
-        from src.ui.app_qss import build_qss
-        from src.ui.font_utils import font_asset_candidates
-        from src.ui.theme import resolve_theme_tokens, set_ui_scale_percent
+        from src.ui.runtime_bootstrap import apply_runtime_ui_bootstrap
         from src.ui.shell import AppShell
         from src.ui.splash import FixFoxSplashScreen
     return (
@@ -108,67 +104,10 @@ def _load_runtime_imports():
         UIFreezeDetector,
         load_settings,
         resource_path,
-        build_qss,
-        font_asset_candidates,
-        resolve_theme_tokens,
-        set_ui_scale_percent,
+        apply_runtime_ui_bootstrap,
         AppShell,
         FixFoxSplashScreen,
     )
-
-
-def _is_valid_font_blob(blob: bytes) -> bool:
-    if len(blob) <= 50 * 1024:
-        return False
-    magic = blob[:4]
-    return magic == b"\x00\x01\x00\x00" or magic == b"OTTO"
-
-
-def _load_bundled_font(logger, font_asset_candidates) -> str:
-    from PySide6.QtCore import QByteArray
-    from PySide6.QtGui import QFont, QFontDatabase
-    from PySide6.QtWidgets import QApplication
-
-    app = QApplication.instance()
-    if app is None:
-        return "Segoe UI"
-
-    qpa_platform = os.environ.get("QT_QPA_PLATFORM", "").strip().lower()
-    if sys.platform == "win32" and qpa_platform not in {"offscreen", "minimal"}:
-        family = "Segoe UI"
-        app.setFont(QFont(family))
-        logger.info("Selected UI font: %s (system)", family)
-        print(f"[FixFox] UI font: {family}")
-        return family
-
-    for path in font_asset_candidates("NotoSans-Regular.ttf"):
-        try:
-            if not path.exists():
-                continue
-            raw = path.read_bytes()
-            if not _is_valid_font_blob(raw):
-                logger.warning("Font validation failed for %s", path)
-                continue
-            font_id = QFontDatabase.addApplicationFontFromData(QByteArray(raw))
-            if font_id < 0:
-                logger.warning("Qt rejected font data from %s", path)
-                continue
-            families = QFontDatabase.applicationFontFamilies(font_id)
-            if not families:
-                logger.warning("Qt returned no families for %s", path)
-                continue
-            family = str(families[0]).strip() or "Segoe UI"
-            app.setFont(QFont(family))
-            logger.info("Selected UI font: %s (%s)", family, path)
-            print(f"[FixFox] UI font: {family}")
-            return family
-        except Exception as exc:
-            logger.warning("Font load failed for %s: %s", path, exc)
-    fallback = "Segoe UI"
-    app.setFont(QFont(fallback))
-    logger.info("Selected UI font fallback: %s", fallback)
-    print(f"[FixFox] UI font: {fallback}")
-    return fallback
 
 
 def _apply_windows11_corner_hint(widget) -> None:
@@ -209,10 +148,7 @@ def main():
             UIFreezeDetector,
             load_settings,
             resource_path,
-            build_qss,
-            font_asset_candidates,
-            resolve_theme_tokens,
-            set_ui_scale_percent,
+            apply_runtime_ui_bootstrap,
             AppShell,
             FixFoxSplashScreen,
         ) = _load_runtime_imports()
@@ -259,21 +195,16 @@ def main():
         initialize_db()
     except Exception as exc:
         logger.warning("DB initialization warning: %s", exc)
-    startup_watchdog.mark("load_font")
+    startup_watchdog.mark("load_settings")
+    settings = load_settings()
+    startup_watchdog.mark("apply_runtime_ui")
     splash.update_status("Loading fonts and visual system...")
-    _load_bundled_font(logger, font_asset_candidates)
+    apply_runtime_ui_bootstrap(app, logger=logger, settings=settings)
     try:
         startup_watchdog.mark("ensure_desktop_logo")
         ensure_logo_on_desktop(overwrite=False)
     except Exception as exc:
         logger.warning("Desktop logo setup skipped: %s", exc)
-    startup_watchdog.mark("load_settings")
-    settings = load_settings()
-    set_ui_scale_percent(getattr(settings, "ui_scale_pct", 100))
-    tokens = resolve_theme_tokens(settings.theme_palette, settings.theme_mode)
-    startup_watchdog.mark("apply_stylesheet")
-    splash.update_status("Applying theme and restoring preferences...")
-    app.setStyleSheet(build_qss(tokens, settings.theme_mode, settings.density))
     startup_watchdog.mark("build_main_window")
     splash.update_status("Building FixFox shell...")
     interactive_recorded = {"done": False}

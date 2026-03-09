@@ -10,14 +10,16 @@ from pathlib import Path
 from PySide6.QtCore import QPoint, Qt
 from PySide6.QtGui import QPainter, QPixmap
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QWidget
+from PySide6.QtWidgets import QAbstractButton, QApplication, QLabel, QLineEdit, QWidget
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from src.core.diagnostics.font_sanity import probe_font_render
 from src.ui.main_window import MainWindow
+from src.ui.runtime_bootstrap import apply_runtime_ui_bootstrap
 
 
 def _drain(app: QApplication, cycles: int = 5, delay: float = 0.05) -> None:
@@ -55,10 +57,48 @@ def _open_page(window: MainWindow, page_name: str) -> bool:
     return window.pages.currentIndex() == idx
 
 
+def _visible_text_profile(root: QWidget) -> dict[str, object]:
+    texts: list[str] = []
+    for widget in root.findChildren(QWidget):
+        if not widget.isVisible():
+            continue
+        value = ""
+        if isinstance(widget, QLabel):
+            value = widget.text().strip()
+        elif isinstance(widget, QAbstractButton):
+            value = f"{widget.text()} {widget.toolTip()}".strip()
+        elif isinstance(widget, QLineEdit):
+            value = widget.text().strip() or widget.placeholderText().strip()
+        if not value:
+            continue
+        collapsed = " ".join(value.split())
+        if len(collapsed) < 3:
+            continue
+        texts.append(collapsed)
+    deduped = list(dict.fromkeys(texts))
+    return {"count": len(deduped), "samples": deduped[:10]}
+
+
+def _page_persistence_probe(window: MainWindow, page: str, *, app: QApplication) -> dict[str, object]:
+    target = window.pages.currentWidget() if getattr(window, "pages", None) is not None else window
+    samples: list[dict[str, object]] = []
+    for delay_ms in (0, 500, 1000, 2000):
+        if delay_ms:
+            QTest.qWait(delay_ms)
+            _drain(app, cycles=2, delay=0.03)
+        profile = _visible_text_profile(target)
+        samples.append({"delay_ms": delay_ms, **profile})
+    baseline = int(samples[0]["count"]) if samples else 0
+    ok = baseline >= 5 and all(int(sample["count"]) >= max(5, baseline // 2) for sample in samples[1:])
+    return {"page": page, "ok": ok, "samples": samples}
+
+
 def main() -> int:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     os.environ["FIXFOX_SKIP_ONBOARDING"] = "1"
     app = QApplication.instance() or QApplication([])
+    bootstrap = apply_runtime_ui_bootstrap(app)
+    runtime_font_failures = probe_font_render(app.font())
     window = MainWindow()
     window.show()
     _drain(app, cycles=10)
@@ -68,9 +108,12 @@ def main() -> int:
     failures: list[str] = []
     captures: list[str] = []
     search_visible_ms = 0
+    page_persistence: dict[str, dict[str, object]] = {}
 
     try:
-        for page_name in ("Home", "Settings", "Playbooks", "Reports", "Diagnose"):
+        if runtime_font_failures:
+            failures.extend(runtime_font_failures)
+        for page_name in ("Home", "Playbooks", "Diagnose", "Fixes", "Reports", "History", "Settings"):
             if not _open_page(window, page_name):
                 failures.append(f"failed to open page: {page_name}")
                 continue
@@ -78,6 +121,14 @@ def main() -> int:
             shot = out_dir / f"{page_name.lower()}.png"
             _capture(window, shot)
             captures.append(str(shot.relative_to(REPO_ROOT)).replace("\\", "/"))
+            persistence = _page_persistence_probe(window, page_name, app=app)
+            page_persistence[page_name] = persistence
+            if not persistence["ok"]:
+                failures.append(f"page persistence failed: {page_name}")
+            if page_name == "Home":
+                delay_shot = out_dir / "home_persistence_2s.png"
+                _capture(window, delay_shot)
+                captures.append(str(delay_shot.relative_to(REPO_ROOT)).replace("\\", "/"))
 
         window._focus_top_search()
         _drain(app, cycles=2)
@@ -103,7 +154,13 @@ def main() -> int:
 
     manifest = {
         "timestamp": stamp,
+        "runtime_bootstrap": {
+            "font_family": bootstrap.font_family,
+            "stylesheet_length": bootstrap.stylesheet_length,
+            "ui_scale_pct": getattr(bootstrap.settings, "ui_scale_pct", 100),
+        },
         "search_dropdown_visible_ms": search_visible_ms,
+        "page_persistence": page_persistence,
         "screenshots": captures,
         "failures": failures,
     }

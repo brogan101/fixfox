@@ -10,10 +10,7 @@ from PySide6.QtWidgets import QApplication, QComboBox, QWidget
 
 from ..qt_runtime import ensure_qt_runtime_env, is_fatal_qt_warning, is_font_warning, is_qss_warning
 from ..settings import load_settings
-from ...app import _load_bundled_font
-from ...ui.app_qss import build_qss
-from ...ui.font_utils import font_asset_candidates
-from ...ui.theme import resolve_theme_tokens, set_ui_scale_percent
+from ...ui.runtime_bootstrap import apply_runtime_ui_bootstrap
 from .qt_warnings import install_qt_message_handler, read_qt_warnings
 
 
@@ -41,12 +38,12 @@ def run_qss_sanity(
         ensure_qt_runtime_env()
         app = QApplication.instance() or QApplication([])
         settings = load_settings().normalized()
-        set_ui_scale_percent(getattr(settings, "ui_scale_pct", 100))
-        _load_bundled_font(logging.getLogger("fixfox.qss_sanity"), font_asset_candidates)
-        tokens = resolve_theme_tokens(settings.theme_palette, settings.theme_mode)
-        qss = build_qss(tokens, settings.theme_mode, settings.density)
+        bootstrap = apply_runtime_ui_bootstrap(app, logger=logging.getLogger("fixfox.qss_sanity"), settings=settings)
+        qss = app.styleSheet()
         if not str(qss).strip():
             failures.append("QSS builder returned empty stylesheet.")
+        if bootstrap.stylesheet_length <= 0:
+            failures.append("Runtime bootstrap did not apply a stylesheet.")
         app.setStyleSheet(qss)
         probe = QWidget()
         combo = QComboBox(probe)

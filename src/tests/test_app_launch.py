@@ -8,6 +8,8 @@ from PySide6.QtCore import QtMsgType, QTimer, qInstallMessageHandler
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
+from src.ui.runtime_bootstrap import apply_runtime_ui_bootstrap
+
 
 class AppLaunchTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -29,6 +31,7 @@ class AppLaunchTests(unittest.TestCase):
 
         prev = qInstallMessageHandler(_handler)
         app = QApplication.instance() or QApplication([])
+        apply_runtime_ui_bootstrap(app)
         window = None
         ticks = {"count": 0}
         timer = QTimer()
@@ -39,6 +42,9 @@ class AppLaunchTests(unittest.TestCase):
 
             window = MainWindow()
             window.show()
+            for _ in range(4):
+                app.processEvents()
+                QTest.qWait(20)
             timer.start()
             deadline = time.monotonic() + 0.8
             max_step_ms = 0.0

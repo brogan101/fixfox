@@ -56,8 +56,10 @@ def _ui_module_smoke() -> None:
     from PySide6.QtWidgets import QApplication
     from src.ui.main_window import MainWindow
     from src.ui.components.rows import ToolRow
+    from src.ui.runtime_bootstrap import apply_runtime_ui_bootstrap
 
     app = QApplication.instance() or QApplication([])
+    apply_runtime_ui_bootstrap(app)
     window = MainWindow()
     bus = get_run_event_bus()
 

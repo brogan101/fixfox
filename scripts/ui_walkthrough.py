@@ -10,17 +10,18 @@ from pathlib import Path
 from PySide6.QtCore import QPoint, Qt
 from PySide6.QtGui import QPainter, QPixmap
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QAbstractButton, QApplication, QLabel, QToolButton, QWidget
+from PySide6.QtWidgets import QAbstractButton, QApplication, QLabel, QLineEdit, QToolButton, QWidget
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from src.core.diagnostics.font_sanity import run_font_sanity
+from src.core.diagnostics.font_sanity import probe_font_render, run_font_sanity
 from src.core.diagnostics.qt_warnings import install_qt_message_handler, read_qt_warnings
 from src.core.qt_runtime import ensure_qt_runtime_env, is_fatal_qt_warning, is_font_warning, is_qss_warning
 from src.ui.main_window import MainWindow
+from src.ui.runtime_bootstrap import apply_runtime_ui_bootstrap
 from src.ui.splash import build_splash_pixmap
 
 
@@ -71,6 +72,42 @@ def _measure_content(window: MainWindow) -> tuple[int, int]:
     if pages is None:
         return (0, 0)
     return (pages.width(), pages.height())
+
+
+def _visible_text_profile(root: QWidget) -> dict[str, object]:
+    texts: list[str] = []
+    for widget in root.findChildren(QWidget):
+        if not widget.isVisible():
+            continue
+        value = ""
+        if isinstance(widget, QLabel):
+            value = widget.text().strip()
+        elif isinstance(widget, QAbstractButton):
+            value = f"{widget.text()} {widget.toolTip()}".strip()
+        elif isinstance(widget, QLineEdit):
+            value = widget.text().strip() or widget.placeholderText().strip()
+        if not value:
+            continue
+        collapsed = " ".join(value.split())
+        if len(collapsed) < 3:
+            continue
+        texts.append(collapsed)
+    deduped = list(dict.fromkeys(texts))
+    return {"count": len(deduped), "samples": deduped[:12]}
+
+
+def _page_persistence_probe(window: MainWindow, page: str, *, app: QApplication) -> dict[str, object]:
+    samples: list[dict[str, object]] = []
+    target = window.pages.currentWidget() if getattr(window, "pages", None) is not None else window
+    for delay_ms in (0, 500, 1000, 2000):
+        if delay_ms:
+            QTest.qWait(delay_ms)
+            _drain(app, cycles=3, delay=0.04)
+        profile = _visible_text_profile(target)
+        samples.append({"delay_ms": delay_ms, **profile})
+    baseline = int(samples[0]["count"]) if samples else 0
+    ok = baseline >= 5 and all(int(sample["count"]) >= max(5, baseline // 2) for sample in samples[1:])
+    return {"page": page, "ok": ok, "samples": samples}
 
 
 def _capture_widget(widget: QWidget, path: Path) -> None:
@@ -214,6 +251,8 @@ def main() -> int:
     normal_page_sizes: dict[str, tuple[int, int]] = {}
     maximized_growth: dict[str, dict[str, list[int]]] = {}
     page_switch_timings: dict[str, list[int]] = {}
+    page_persistence: dict[str, dict[str, object]] = {}
+    runtime_bootstrap: dict[str, object] = {}
 
     font_result = run_font_sanity(
         report_path=out_dir / "font_sanity_report.txt",
@@ -251,6 +290,18 @@ def main() -> int:
     ensure_qt_runtime_env()
     cleanup = install_qt_message_handler(str(qt_warning_path))
     app = QApplication.instance() or QApplication([])
+    bootstrap_result = apply_runtime_ui_bootstrap(app)
+    runtime_font_failures = probe_font_render(app.font())
+    runtime_bootstrap = {
+        "font_family": bootstrap_result.font_family,
+        "stylesheet_length": bootstrap_result.stylesheet_length,
+        "ui_scale_pct": getattr(bootstrap_result.settings, "ui_scale_pct", 100),
+        "theme_mode": getattr(bootstrap_result.settings, "theme_mode", ""),
+        "theme_palette": getattr(bootstrap_result.settings, "theme_palette", ""),
+        "density": getattr(bootstrap_result.settings, "density", ""),
+    }
+    if runtime_font_failures:
+        failures.extend(runtime_font_failures)
     splash_shot = out_dir / "startup_splash.png"
     build_splash_pixmap(status_text="Loading workspace...").save(str(splash_shot), "PNG")
     captured.append(str(splash_shot.relative_to(REPO_ROOT)).replace("\\", "/"))
@@ -327,6 +378,14 @@ def main() -> int:
                     failures=failures,
                     clipping_issues=clipping_issues,
                 )
+                persistence = _page_persistence_probe(window, page, app=app)
+                page_persistence[page] = persistence
+                if not persistence["ok"]:
+                    failures.append(f"page persistence failed for {page}")
+                if page == "Home":
+                    persistence_shot = out_dir / "home_persistence_2s.png"
+                    _capture_shell(window, persistence_shot)
+                    captured.append(str(persistence_shot.relative_to(REPO_ROOT)).replace("\\", "/"))
             window.showNormal()
             window.resize(1024, 768)
             _drain(app, cycles=5)
@@ -551,6 +610,8 @@ def main() -> int:
         "font_sanity_ok": font_result.ok,
         "font_sanity_failures": font_result.failures,
         "maximized_growth": maximized_growth,
+        "runtime_bootstrap": runtime_bootstrap,
+        "page_persistence": page_persistence,
         "page_switch_timings_ms": {
             page: {
                 "samples": samples,

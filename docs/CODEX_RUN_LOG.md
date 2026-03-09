@@ -911,3 +911,58 @@ src/ui/style/qss_builder.py         |  45 +++---
 - Fresh proof:
   - latest walkthrough/verifier screenshot set: `docs/screenshots/20260306_183618`
   - deep playbook audit: `docs/support_playbook_audit.json`
+
+## 2026-03-09 09:33:41 -04:00 - Runtime State Split / Content Disappearance / Tofu Render Repair
+- Starting commit: `763942ab914c3bc4da0b62a15ed6b912d12e808e`
+- Branch: `main`
+- Proof harness:
+  - `git fetch --all`
+  - `git rev-parse HEAD`
+  - `git status --short --branch`
+  - `.venv\Scripts\python.exe --version`
+  - `.venv\Scripts\python.exe -m pip --version`
+- Python version: `Python 3.14.3`
+- Pip version: `pip 26.0.1`
+- Goals for this pass:
+  - eliminate the runtime split where one offscreen/stability path shows tofu-square text while the walkthrough path shows readable populated content
+  - verify whether content is actually flashing/disappearing after first paint versus being captured through a broken bootstrap/render path
+  - unify runtime bootstrap across app launch, walkthrough, stability capture, and runtime verification so every path applies the same font/theme/style state
+  - harden the screenshot/proof checks with runtime readable-text and persistence validation so a broken late-render path cannot pass again
+- Explicit focus:
+  - runtime state split / flash-then-disappear / tofu fallback rendering
+- Screenshot sets being compared:
+  - broken stability set: `docs/screenshots/stability_20260306_183600`
+  - populated walkthrough set: `docs/screenshots/20260306_183618`
+- High-risk files/modules:
+  - `src/app.py`
+  - `src/ui/runtime_bootstrap.py`
+  - `src/core/diagnostics/font_sanity.py`
+  - `scripts/ui_walkthrough.py`
+  - `scripts/ui_smoke_walkthrough.py`
+  - `scripts/verify_requirements.py`
+  - `src/tests/test_app_launch.py`
+  - `src/tests/test_search_nonblocking.py`
+  - `src/tests/test_ui_layout_sanity.py`
+  - `src/tests/test_settings_apply_nonblocking.py`
+  - `src/tests/test_status_indicator_events.py`
+  - `src/tests/smoke.py`
+
+## 2026-03-09 10:42:00 -04:00 - Runtime Split Verification Summary
+- Root cause confirmed:
+  - offscreen stability/runtime harnesses were constructing `QApplication` + `MainWindow` without the same runtime font/theme/style bootstrap used by the walkthrough and real app path
+  - the broken stability screenshots were therefore a bootstrap divergence, not missing page strings
+- Persistence findings:
+  - fresh stability and walkthrough manifests now record per-page visible-text counts at `0ms`, `500ms`, `1000ms`, and `2000ms`
+  - no top-level page collapsed into an empty/fallback shell during the persistence window
+- Fresh proof:
+  - stability bundle: `docs/screenshots/stability_20260309_093938`
+  - walkthrough bundle: `docs/screenshots/20260309_103334`
+  - verifier report: `docs/REBUILD_VERIFICATION.md`
+- Verification executed:
+  - `.venv\Scripts\python.exe scripts\ui_smoke_walkthrough.py`
+  - `.venv\Scripts\python.exe scripts\ui_walkthrough.py`
+  - `.venv\Scripts\python.exe -m unittest src.tests.test_app_launch src.tests.test_search_nonblocking src.tests.test_ui_layout_sanity src.tests.test_settings_apply_nonblocking src.tests.test_status_indicator_events`
+  - `.venv\Scripts\python.exe -m src.tests.smoke`
+  - `.venv\Scripts\python.exe scripts\qss_sanity_check.py`
+  - `.venv\Scripts\python.exe scripts\font_sanity_check.py`
+  - `.venv\Scripts\python.exe scripts\verify_requirements.py`
