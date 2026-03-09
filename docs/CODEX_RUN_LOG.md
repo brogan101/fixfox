@@ -1,0 +1,40 @@
+# CODEX RUN LOG
+
+## 2026-03-09 13:20 ET
+- Starting commit: `0e5a5dd70cc1e0ec4366ef0bcadbf2cb7c4a812a`
+- Branch: `main`
+- Goals for this run:
+  - deepen the support playbook engine without rebuilding the app shell
+  - expand the deep/script-backed family coverage around the existing 200-issue catalog
+  - fix the UI integration points needed to filter, browse, and understand the larger support catalog
+  - restore proof tooling, verification outputs, and release-facing documentation that were removed during repo trimming
+- Architecture plan:
+  - keep the existing typed support catalog and shared playbook registry as canonical
+  - extend `src/core/support_playbooks.py` with additional deep playbooks that reuse existing script-task primitives
+  - keep issue -> playbook mappings shared instead of one-off per issue-class
+  - use `src/ui/main_window_impl.py` as the single integration surface for catalog, filters, reports, history, and settings summaries
+- Playbook family plan:
+  - preserve the existing deep families
+  - deepen SSO/web auth, sync, storage, media, display/dock, enterprise posture, and meta triage paths
+  - keep full 200-issue coverage through shared family playbooks
+- UI integration plan:
+  - make the new scope filters on Playbooks / Diagnose / Fixes real
+  - improve playbook detail metadata so users can see issue coverage and release/build context
+  - surface release/build/support posture in Settings and About
+  - tighten search ranking so common help-desk phrasing lands on the deep support paths first
+- Release/readiness plan:
+  - restore a minimal README
+  - restore docs outputs and proof artifacts
+  - add a lightweight walkthrough screenshot generator and support audit script
+- High-risk files/modules:
+  - `src/core/support_playbooks.py`
+  - `src/core/search.py`
+  - `src/ui/main_window_impl.py`
+  - `src/ui/pages/playbooks_page.py`
+  - `src/ui/pages/diagnose_page.py`
+  - `src/ui/pages/fixes_page.py`
+- Verification plan:
+  - python compile checks
+  - catalog / mapping / search audit script
+  - unittest coverage for registry and search expectations
+  - headless UI walkthrough screenshots

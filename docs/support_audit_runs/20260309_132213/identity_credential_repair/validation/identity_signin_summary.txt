@@ -1,0 +1,32 @@
+Identity Sign-in Helper Summary
+
+What we checked:
+- Captured Windows identity context with whoami.
+- Captured Credential Manager inventory.
+- Captured dsreg device-registration status.
+- Captured Windows time-sync status.
+- Captured Windows Hello path existence hint.
+
+What we found:
+- credential_targets=5
+- hello_path_exists=False
+- AzureAdJoined : NO
+- DomainJoined : YES
+- WorkplaceJoined : NO
+- Leap Indicator: 0(no warning)
+- Stratum: 4 (secondary reference - syncd by (S)NTP)
+- Precision: -23 (119.209ns per tick)
+
+What we changed:
+- No credentials or sign-in state were changed automatically.
+
+Next steps:
+- Remove only stale credentials for the affected app or service.
+- Retest one affected app after sign-out/sign-in.
+- Escalate if device registration or MFA state looks unhealthy.
+
+Technical appendix:
+- whoami_code=0
+- cmdkey_code=0
+- dsreg_code=0
+- time_code=0

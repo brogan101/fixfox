@@ -1,0 +1,26 @@
+Outlook Profile Deep Helper Summary
+
+What we checked:
+- Collected Outlook and SearchIndexer process posture.
+- Collected Windows Search service posture.
+- Collected Outlook profile registry names.
+- Collected add-in names and OST/PST path-only inventory.
+
+What we found:
+- outlook_dir_exists=False
+- ost_files=0
+- pst_files=0
+- wsearch_code=0
+
+What we changed:
+- No Outlook profile, OST, or add-in state was changed automatically.
+
+Next steps:
+- Use Outlook safe mode to isolate add-ins before recreating the profile.
+- Keep the existing profile until the new profile is validated.
+- Escalate if mailbox-side state remains the blocker after local profile cleanup.
+
+Technical appendix:
+- process_code=1
+- profile_code=0
+- addins_code=0

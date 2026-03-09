@@ -1,0 +1,14 @@
+[
+    {
+        "source":  "CBS",
+        "pending":  false
+    },
+    {
+        "source":  "WU_AutoUpdate",
+        "pending":  false
+    },
+    {
+        "source":  "PendingFileRenameOperations",
+        "pending":  true
+    }
+]

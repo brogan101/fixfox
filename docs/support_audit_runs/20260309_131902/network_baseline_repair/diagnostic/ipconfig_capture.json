@@ -1,0 +1,11 @@
+{
+  "task_id": "task_ipconfig_all",
+  "title": "IP Config",
+  "command": [
+    "ipconfig",
+    "/all"
+  ],
+  "code": 0,
+  "stdout": "\nWindows IP Configuration\n\n   Host Name . . . . . . . . . . . . : SAF-SAFNET-BOX\n   Primary Dns Suffix  . . . . . . . : saf.sc.gov\n   Node Type . . . . . . . . . . . . : Hybrid\n   IP Routing Enabled. . . . . . . . : No\n   WINS Proxy Enabled. . . . . . . . : No\n   DNS Suffix Search List. . . . . . : saf.sc.gov\n\nEthernet adapter Ethernet0 2:\n\n   Connection-specific DNS Suffix  . : \n   Description . . . . . . . . . . . : vmxnet3 Ethernet Adapter\n   Physical Address. . . . . . . . . : 00-50-56-BC-77-E2\n   DHCP Enabled. . . . . . . . . . . : No\n   Autoconfiguration Enabled . . . . : Yes\n   Link-local IPv6 Address . . . . . : fe80::3018:6e8a:f16b:a732%8(Preferred) \n   IPv4 Address. . . . . . . . . . . : 10.1.31.19(Preferred) \n   Subnet Mask . . . . . . . . . . . : 255.255.255.0\n   Default Gateway . . . . . . . . . : 10.1.31.1\n   DHCPv6 IAID . . . . . . . . . . . : 369119318\n   DHCPv6 Client DUID. . . . . . . . : 00-01-01-00-31-05-82-06-00-50-56-BC-77-E2\n   DNS Servers . . . . . . . . . . . : 10.1.31.199\n                                       10.1.31.33\n   NetBIOS over Tcpip. . . . . . . . : Enabled",
+  "stderr": ""
+}

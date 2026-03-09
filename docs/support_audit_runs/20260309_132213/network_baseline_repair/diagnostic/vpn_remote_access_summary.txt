@@ -1,0 +1,25 @@
+VPN / Remote Access Helper Summary
+
+What we checked:
+- Collected VPN profile status with Get-VpnConnection.
+- Collected current rasdial state.
+- Collected VPN/virtual adapter inventory.
+- Captured route table for tunnel/path analysis.
+
+What we found:
+- vpn_query_code=0
+- rasdial_code=0
+- adapter_code=0
+- rasphone_exists=False
+
+What we changed:
+- No VPN profile or route state was changed automatically.
+
+Next steps:
+- Restart the VPN client and reconnect before escalating.
+- Retest one internal DNS name or UNC path after reconnect.
+- Escalate if the tunnel connects but internal routes/resources still fail.
+
+Technical appendix:
+- route_code=0
+- details_file=C:\Users\btheobald\Desktop\IT Core\docs\support_audit_runs\20260309_132213\network_baseline_repair\diagnostic\vpn_remote_access_details.txt

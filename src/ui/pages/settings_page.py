@@ -26,7 +26,7 @@ from ...core.brand_assets import ensure_logo_on_desktop
 from ...core.paths import ensure_dirs
 from ...core.registry import CAPABILITIES
 from ...core.runbooks import RUNBOOKS
-from ...core.version import APP_VERSION
+from ...core.version import APP_BUILD_DATE, APP_CHANNEL, APP_VERSION_LABEL
 from ...core.logging_setup import log_path, logs_dir
 from ..style import spacing
 from ..theme import available_palette_labels, resolve_density_tokens
@@ -85,7 +85,7 @@ class SettingsPage(PageScroll):
         tools_row_bottom.addStretch(1)
         tools_row_l.addLayout(tools_row_top)
         tools_row_l.addLayout(tools_row_bottom)
-        w.settings_tools_summary = QLabel("Mode, density, scale, and support posture will be summarized here.")
+        w.settings_tools_summary = QLabel("Mode, density, scale, release train, and support posture will be summarized here.")
         w.settings_tools_summary.setObjectName("SubTitle")
         w.settings_tools_summary.setWordWrap(True)
         tools_row_l.addWidget(w.settings_tools_summary)
@@ -289,7 +289,8 @@ class SettingsPage(PageScroll):
         c_adv.body_layout().addWidget(w._setting_hint("Creates FixFoxLogo.png on your Desktop for support docs/screenshots."))
         c_adv.body_layout().addWidget(b_logo_recreate)
         c_adv.body_layout().addWidget(QLabel("Operational summary"))
-        c_adv.body_layout().addWidget(w._setting_hint(f"{APP_DISPLAY_NAME} v{APP_VERSION}"))
+        c_adv.body_layout().addWidget(w._setting_hint(f"{APP_DISPLAY_NAME} {APP_VERSION_LABEL}"))
+        c_adv.body_layout().addWidget(w._setting_hint(f"Channel: {APP_CHANNEL} | Build date: {APP_BUILD_DATE}"))
         c_adv.body_layout().addWidget(w._setting_hint("Local-only design. No telemetry and no automatic cloud transfer."))
         c_adv.body_layout().addWidget(w._setting_hint(f"Capabilities: {len(CAPABILITIES)} | Runbooks: {len(RUNBOOKS)}"))
         pdl.addWidget(c_adv)
@@ -311,7 +312,8 @@ class SettingsPage(PageScroll):
         support_actions.body_layout().addWidget(b_export_diag)
         support_actions.body_layout().addWidget(w._setting_hint("Collect a fresh diagnostics set before exporting or escalating."))
         support_actions.body_layout().addWidget(b_about)
-        support_actions.body_layout().addWidget(w._setting_hint(f"Build info: {APP_DISPLAY_NAME} {APP_VERSION}"))
+        support_actions.body_layout().addWidget(w._setting_hint(f"Build info: {APP_DISPLAY_NAME} {APP_VERSION_LABEL}"))
+        support_actions.body_layout().addWidget(w._setting_hint(f"Release train: {APP_CHANNEL} | Build date: {APP_BUILD_DATE}"))
         w.s_support_catalog_summary = QLabel("Support catalog: loading...")
         w.s_support_catalog_summary.setWordWrap(True)
         support_actions.body_layout().addWidget(w.s_support_catalog_summary)

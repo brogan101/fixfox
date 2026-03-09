@@ -103,6 +103,7 @@ from ..core.support_catalog import (
     fixes_for_issue,
     issue_search_blob,
     list_families as list_support_families,
+    playbook_issue_counts,
     playbooks_for_issue,
     query_issues,
     issue_map as support_issue_map,
@@ -117,7 +118,7 @@ from ..core.support_playbooks import (
 )
 from ..core.toolbox import TOP_TOOLS, TOOL_DIRECTORY, launch_tool, search_tools
 from ..core.utils import open_uri, resource_path
-from ..core.version import APP_VERSION
+from ..core.version import APP_BUILD_DATE, APP_CHANNEL, APP_VERSION_LABEL
 from ..core.workers import TaskWorker, WorkerConfig, start_worker
 from .app_qss import build_qss
 from .components.accordion import AccordionSection
@@ -1670,10 +1671,10 @@ class MainWindow(QMainWindow):
             )
         except Exception:
             commit = os.environ.get("FIXFOX_COMMIT", "unknown").strip() or "unknown"
-        build_date = datetime.utcnow().strftime("%Y-%m-%d")
         text = (
-            f"{APP_DISPLAY_NAME} {APP_VERSION}\n"
-            f"Build date: {build_date}\n"
+            f"{APP_DISPLAY_NAME} {APP_VERSION_LABEL}\n"
+            f"Channel: {APP_CHANNEL}\n"
+            f"Build date: {APP_BUILD_DATE}\n"
             f"Commit: {commit}\n\n"
             "Local-only by design. No telemetry and no automatic cloud transfer.\n\n"
             f"Logs path: {local_paths['logs']}\n"
@@ -4011,6 +4012,29 @@ class MainWindow(QMainWindow):
                 return family.id
         return ""
 
+    @staticmethod
+    def _support_scope_filter_value(combo: Any) -> str:
+        if combo is None:
+            return "all"
+        data = combo.currentData() if hasattr(combo, "currentData") else ""
+        return str(data or "all").strip().lower() or "all"
+
+    def _issue_matches_support_scope(self, issue: Any, scope: str) -> bool:
+        scope_key = str(scope or "all").strip().lower()
+        if issue is None or scope_key in {"", "all"}:
+            return True
+        if scope_key == "deep":
+            return any(is_deep_support_playbook(playbook_id) for playbook_id in getattr(issue, "playbook_ids", ()))
+        if scope_key == "admin":
+            if str(getattr(issue, "permissions", "")).strip().lower() == "local admin":
+                return True
+            return any(str(row.permissions).strip().lower() == "local admin" for row in fixes_for_issue(issue.id))
+        if scope_key == "network":
+            return bool(getattr(issue, "network_required", False))
+        if scope_key == "restart":
+            return bool(getattr(issue, "reboot_required", False))
+        return True
+
     def _populate_support_family_combos(self) -> None:
         rows = [("All Families", "")] + [(family.title, family.id) for family in list_support_families()]
         for name in ("pb_issue_family", "diag_issue_family", "support_fix_family"):
@@ -4100,6 +4124,7 @@ class MainWindow(QMainWindow):
         playbook = support_playbook_map().get(str(getattr(self, "selected_support_playbook_id", "")).strip())
         issue = support_issue_map().get(str(getattr(self, "selected_support_issue_id", "")).strip())
         plan = deep_support_playbook_map().get(playbook.id) if playbook is not None else None
+        issue_counts = playbook_issue_counts()
         latest = self._latest_support_playbook_run(playbook.id if playbook is not None else "")
         if hasattr(self, "pb_playbook_detail") and playbook is None:
             self.pb_playbook_detail.title.setText("Deep Playbook Detail")
@@ -4125,6 +4150,7 @@ class MainWindow(QMainWindow):
                 self.pb_playbook_detail_text.setText(
                     f"{issue_line}{playbook.purpose}\n\n"
                     f"Risk: {playbook.risk} | Automation: {playbook.automation} | ~{playbook.minutes}m | Audience: {plan.audience}\n"
+                    f"Covers: {issue_counts.get(playbook.id, 0)} issue classes\n"
                     f"Aliases: {', '.join(plan.aliases[:4])}\n"
                     f"Support bundle integrated: {'yes' if plan.support_bundle_integrated else 'no'}{run_line}"
                 )
@@ -4211,7 +4237,11 @@ class MainWindow(QMainWindow):
                 f"Network required: {'yes' if issue.network_required else 'no'} | Reboot risk: {'yes' if issue.reboot_required else 'no'}"
             )
         if hasattr(self, "pb_issue_playbooks"):
-            plays = [f"{row.title} [{'Deep' if is_deep_support_playbook(row.id) else 'Mapped'} | {row.risk} | {row.automation} | ~{row.minutes}m]" for row in playbooks_for_issue(issue.id)]
+            issue_counts = playbook_issue_counts()
+            plays = [
+                f"{row.title} [{'Deep' if is_deep_support_playbook(row.id) else 'Mapped'} | covers {issue_counts.get(row.id, 0)} issues | {row.risk} | {row.automation} | ~{row.minutes}m]"
+                for row in playbooks_for_issue(issue.id)
+            ]
             self.pb_issue_playbooks.set_text("\n".join(plays) or "No playbooks mapped.")
         if hasattr(self, "pb_issue_diagnostics"):
             diags = [f"{row.title}: {row.source}" for row in diagnostics_for_issue(issue.id)]
@@ -4466,16 +4496,18 @@ class MainWindow(QMainWindow):
         if not hasattr(self, "pb_issue_list"):
             return
         family_id = self._support_family_filter_value(getattr(self, "pb_issue_family", None))
+        scope = self._support_scope_filter_value(getattr(self, "pb_issue_scope", None))
         query = self.pb_issue_search.text().strip() if hasattr(self, "pb_issue_search") else ""
         stats = support_catalog_stats()
         counts = family_issue_counts()
+        deep = deep_support_playbook_stats()
         if hasattr(self, "pb_issue_stats"):
             family_text = f" | {counts.get(family_id, 0)} in selected family" if family_id else ""
             self.pb_issue_stats.setText(
                 f"{stats.issue_count} issue classes | {stats.playbook_count} shared playbooks | "
-                f"{stats.diagnostic_count} diagnostics | {stats.fix_count} fix actions{family_text}"
+                f"{deep.playbook_count} deep playbooks | {stats.diagnostic_count} diagnostics | {stats.fix_count} fix actions{family_text}"
             )
-        rows = query_issues(query, family_id=family_id, limit=120)
+        rows = [row for row in query_issues(query, family_id=family_id, limit=120) if self._issue_matches_support_scope(row, scope)]
         adapters = [
             FeedItemAdapter(key=row.id, title=row.title, subtitle=f"{row.family_label} | {row.subfamily} | {row.severity}", payload=row.id, category=row.subfamily, status=row.severity)
             for row in rows
@@ -4493,8 +4525,9 @@ class MainWindow(QMainWindow):
             return
         self._clear_layout(layout)
         family_id = self._support_family_filter_value(getattr(self, "diag_issue_family", None))
+        scope = self._support_scope_filter_value(getattr(self, "diag_issue_scope", None))
         query = self.diag_issue_summary_text.text().strip() if hasattr(self, "diag_issue_summary_text") else ""
-        rows = list(query_issues(query, family_id=family_id, limit=5))
+        rows = [row for row in query_issues(query, family_id=family_id, limit=5) if self._issue_matches_support_scope(row, scope)]
         if not rows:
             layout.addWidget(EmptyState("diagnose", "No issue-family triage entries match the current Diagnose filters."))
             return
@@ -4523,10 +4556,16 @@ class MainWindow(QMainWindow):
         if not hasattr(self, "support_fix_list"):
             return
         family_id = self._support_family_filter_value(getattr(self, "support_fix_family", None))
+        scope = self._support_scope_filter_value(getattr(self, "support_fix_scope", None))
         query = self.support_fix_search.text().strip() if hasattr(self, "support_fix_search") else ""
         selected_issue = support_issue_map().get(str(getattr(self, "selected_support_issue_id", "")).strip())
-        if selected_issue is None or (family_id and selected_issue.family_id != family_id) or (query and query.lower() not in issue_search_blob(selected_issue)):
-            rows = query_issues(query, family_id=family_id, limit=1)
+        if (
+            selected_issue is None
+            or (family_id and selected_issue.family_id != family_id)
+            or (query and query.lower() not in issue_search_blob(selected_issue))
+            or (selected_issue is not None and not self._issue_matches_support_scope(selected_issue, scope))
+        ):
+            rows = [row for row in query_issues(query, family_id=family_id, limit=20) if self._issue_matches_support_scope(row, scope)]
             selected_issue = rows[0] if rows else None
             if selected_issue is not None:
                 self.selected_support_issue_id = selected_issue.id
@@ -4613,7 +4652,8 @@ class MainWindow(QMainWindow):
             f"Support catalog: {stats.issue_count} issue classes across {stats.family_count} families, "
             f"{stats.playbook_count} shared playbooks, {stats.diagnostic_count} diagnostics, "
             f"and {stats.fix_count} mapped fixes.\n"
-            f"Deep script-backed playbooks: {deep.playbook_count} | shared primitives: {deep.shared_primitive_count} | support-bundle integrated: {deep.support_bundle_integrated_count}."
+            f"Deep script-backed playbooks: {deep.playbook_count} | shared primitives: {deep.shared_primitive_count} | support-bundle integrated: {deep.support_bundle_integrated_count}.\n"
+            f"Release train: {APP_CHANNEL} | Build: {APP_VERSION_LABEL} | Date: {APP_BUILD_DATE}."
         )
         self.s_support_catalog_summary.setText(catalog_summary)
         if hasattr(self, "settings_tools_summary"):
@@ -4622,7 +4662,7 @@ class MainWindow(QMainWindow):
             share_safe = "Share-safe on" if self.settings_state.share_safe_default else "Share-safe off"
             self.settings_tools_summary.setText(
                 f"{mode} mode | {self.settings_state.density.title()} density | UI scale {int(getattr(self.settings_state, 'ui_scale_pct', 100))}% | "
-                f"{safety} | {share_safe} | Diagnostics, support, and export remain local-first."
+                f"{safety} | {share_safe} | {APP_VERSION_LABEL} | Diagnostics, support, and export remain local-first."
             )
 
     def _refresh_runbooks(self) -> None:

@@ -1,0 +1,24 @@
+Credential targets:
+MicrosoftAccount:target=SSO_POP_Device
+LegacyGeneric:target=git:https://github.com
+LegacyGeneric:target=GitHub for Visual Studio - https://brogan101@github.com/
+WindowsLive:target=virtualapp/didlogical
+LegacyGeneric:target=git:https://brogan101@github.com
+
+dsreg status:
+AzureAdJoined : NO
+DomainJoined : YES
+WorkplaceJoined : NO
+
+time status:
+Leap Indicator: 0(no warning)
+Stratum: 4 (secondary reference - syncd by (S)NTP)
+Precision: -23 (119.209ns per tick)
+Root Delay: 0.0548684s
+Root Dispersion: 0.1392169s
+ReferenceId: 0x0A011FC7 (source IP:  10.1.31.199)
+Last Successful Sync Time: 3/9/2026 1:17:09 PM
+Source: SAF-DC2.saf.sc.gov
+Poll Interval: 10 (1024s)
+
+hello_path_exists=False

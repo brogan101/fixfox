@@ -1,0 +1,20 @@
+[
+  {
+    "domain": "microsoft.com",
+    "ok": true,
+    "ms": 104.84,
+    "error": ""
+  },
+  {
+    "domain": "openai.com",
+    "ok": true,
+    "ms": 103.73,
+    "error": ""
+  },
+  {
+    "domain": "cloudflare.com",
+    "ok": true,
+    "ms": 103.8,
+    "error": ""
+  }
+]

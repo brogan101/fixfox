@@ -1,0 +1,13 @@
+{
+  "task_id": "task_get_windows_update_log",
+  "title": "Windows Update Log",
+  "command": [
+    "powershell",
+    "-NoProfile",
+    "-Command",
+    "$p='C:\\Users\\btheobald\\Desktop\\IT Core\\docs\\support_audit_runs\\20260309_131902\\windows_update_repair\\diagnostic\\windows_update_log.txt'; Get-WindowsUpdateLog -LogPath $p -ErrorAction Continue; if (Test-Path $p) { Get-Content $p -TotalCount 400 }"
+  ],
+  "code": 124,
+  "stdout": "\nGetting the list of all ETL files...\n\nPlease wait for all of conversions to complete...\n",
+  "stderr": "Timed out."
+}

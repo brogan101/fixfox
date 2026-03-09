@@ -1,0 +1,14 @@
+{
+  "task_id": "task_evtx_windows_update",
+  "title": "Export WindowsUpdateClient Operational",
+  "command": [
+    "wevtutil",
+    "epl",
+    "Microsoft-Windows-WindowsUpdateClient/Operational",
+    "C:\\Users\\btheobald\\Desktop\\IT Core\\docs\\support_audit_runs\\20260309_131902\\windows_update_repair\\validation\\windows_update_operational.evtx",
+    "/ow:true"
+  ],
+  "code": 0,
+  "stdout": "",
+  "stderr": ""
+}

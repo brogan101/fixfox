@@ -404,6 +404,183 @@ DEEP_SUPPORT_PLAYBOOKS: tuple[DeepSupportPlaybook, ...] = (
         escalation_rules=("Escalate if provisioning, policy, join, or device state is still incomplete after validation.",),
         success_criteria=("Core apps, network, devices, and updates are ready for handoff.",),
     ),
+    DeepSupportPlaybook(
+        playbook_id="sso_web_auth_repair",
+        family="browser",
+        audience="service desk",
+        aliases=("sso auth loop", "web auth loop", "popup blocked", "certificate warning"),
+        diagnostics=(
+            _binding("task_browser_rescue", "diagnostic", "Collect browser, proxy, extension, DNS, and site-scope posture.", "Confirm whether the failure is browser-profile, trust, or site-specific."),
+            _binding("task_identity_signin_helper", "diagnostic", "Collect device registration and time-sync posture for auth-loop scenarios.", "Rule out identity or clock drift before deeper browser cleanup."),
+        ),
+        remediations=(),
+        validations=(
+            _binding("task_browser_rescue", "validation", "Re-check browser posture after guided cleanup.", "Confirm the target site signs in without looping or trust prompts."),
+        ),
+        guided_steps=(
+            _guided("sso_private_window", "Retest in a clean profile or private window", "Use a clean profile or private window first to isolate extensions, cached cookies, and blocked pop-ups without wiping the primary profile.", "The auth flow completes once in the clean context.", "The loop persists across clean contexts or multiple browsers."),
+            _guided("sso_targeted_reset", "Reset only the affected site or browser profile state", "Clear the affected site's cookies/session state, then remove suspect extensions or reset only the affected browser profile if the issue is still isolated there.", "The target site signs in once and no certificate/popup loop remains.", "The same failure is cross-browser, cross-app, or tied to tenant trust/cert configuration."),
+        ),
+        evidence_plan_ids=("network_bundle", "support_bundle"),
+        escalation_rules=("Escalate if the auth loop persists across clean profiles/browsers or if tenant trust, federation, or certificate posture remains the blocker.",),
+        success_criteria=("The target site signs in without a repeated loop.", "Pop-ups, trust prompts, and browser auth state match the intended workflow."),
+    ),
+    DeepSupportPlaybook(
+        playbook_id="onedrive_sharepoint_sync_repair",
+        family="sync",
+        audience="service desk",
+        aliases=("onedrive not syncing", "sharepoint won't sync", "cloud only files", "coauthoring conflict"),
+        diagnostics=(
+            _binding("task_onedrive_sync_helper", "diagnostic", "Collect OneDrive process, sign-in, sync root, and storage posture.", "Determine whether the issue is client-state, storage pressure, or library sync drift."),
+            _binding("task_network_evidence_pack", "diagnostic", "Collect DNS/proxy and reachability support evidence for sync failures.", "Confirm sync is not failing because of a broader network path problem."),
+            _binding("task_storage_ranked_view", "diagnostic", "Collect storage/path pressure before relinking or rehydrating data.", "Check whether disk pressure or pathing is contributing to the sync issue."),
+        ),
+        remediations=(),
+        validations=(
+            _binding("task_onedrive_sync_helper", "validation", "Re-check sign-in, sync backlog, and path posture after guided repair.", "Confirm affected files/libraries resume syncing."),
+        ),
+        guided_steps=(
+            _guided("sync_signin_reset", "Reset only the affected sync relationship", "Pause sync, sign out of OneDrive if needed, then re-link only the affected account or library after documenting the original sync root.", "The sync client signs in once and the affected library resumes normal activity.", "The same tenant/library still fails to authenticate or enumerate."),
+            _guided("sync_storage_hygiene", "Resolve cloud-only or storage-pressure blockers before relinking", "If disk pressure or path complexity is the blocker, free space or shorten the path first, then retry sync.", "Files hydrate or sync without repeated conflicts or path errors.", "Tenant policy or library ownership still blocks the relationship."),
+        ),
+        evidence_plan_ids=("office_bundle", "support_bundle"),
+        escalation_rules=("Escalate if tenant policy, library ownership, or service-side sync state remains broken after client reset and storage/path validation.",),
+        success_criteria=("OneDrive signs in and the affected sync root is healthy.", "The originally affected files or libraries resume syncing without repeated conflicts."),
+    ),
+    DeepSupportPlaybook(
+        playbook_id="disk_cleanup_storage_recovery",
+        family="storage",
+        audience="service desk",
+        aliases=("full disk", "cannot save file", "path too long", "storage recovery"),
+        diagnostics=(
+            _binding("task_storage_radar", "diagnostic", "Collect top folders, cleanup candidates, and storage-pressure guidance.", "Identify what is actually consuming space before deleting anything."),
+            _binding("task_storage_ranked_view", "diagnostic", "Collect a fast ranked storage view for escalation-ready evidence.", "Confirm which locations or profiles dominate local storage usage."),
+            _binding("task_fast_file_search", "diagnostic", "Collect quick indexed file evidence for path and file-location troubleshooting.", "Use search evidence when a user cannot find, delete, or relocate a file."),
+        ),
+        remediations=(),
+        validations=(
+            _binding("task_storage_radar", "validation", "Re-check storage pressure after guided cleanup or relocation.", "Confirm free space or save-path posture improved."),
+        ),
+        guided_steps=(
+            _guided("storage_cleanup_preview", "Use the cleanup preview instead of deleting blindly", "Review downloads, temp, and AppData hotspots from the generated evidence before removing anything user-facing.", "Free space increases and the original save/update issue improves.", "The required space cannot be recovered safely with local cleanup."),
+            _guided("storage_path_repair", "Treat path and permission failures separately from free-space issues", "If the symptom is path-too-long or permission-denied, shorten the working path or redirect the save target before considering broader cleanup.", "The file saves or opens from the intended location without a new error.", "The location is enterprise-controlled, shared, or permissions remain broken."),
+        ),
+        evidence_plan_ids=("backup_snapshot", "support_bundle"),
+        escalation_rules=("Escalate if the required free-space recovery or path ownership change exceeds safe local cleanup, or if user data risk is high.",),
+        success_criteria=("The original save/update/sync action can complete.", "Storage pressure or path/access blockers are clearly reduced and documented."),
+    ),
+    DeepSupportPlaybook(
+        playbook_id="audio_video_device_triage",
+        family="media",
+        audience="service desk",
+        aliases=("no sound", "mic not detected", "camera black", "bluetooth headset no audio"),
+        diagnostics=(
+            _binding("task_audio_mic_helper", "diagnostic", "Collect default endpoints, mute state, and audio routing posture.", "Determine whether the issue is endpoint selection, mute state, or device enumeration."),
+            _binding("task_camera_privacy_check", "diagnostic", "Collect camera/mic privacy posture and safe settings links.", "Confirm whether Windows privacy settings are blocking the device."),
+            _binding("task_driver_device_inventory_pack", "diagnostic", "Collect device inventory and problem-device posture for escalation.", "Determine whether the issue is at the driver/device layer."),
+        ),
+        remediations=(),
+        validations=(
+            _binding("task_audio_mic_helper", "validation", "Re-check endpoint selection and device posture after guided cleanup.", "Confirm the intended app sees and uses the correct device."),
+        ),
+        guided_steps=(
+            _guided("media_endpoint_reset", "Re-select the intended default endpoints", "Set the intended playback/recording device at the Windows level first, then reselect it in the affected app if needed.", "The affected app uses the expected mic, speaker, or headset.", "The device never enumerates or immediately drops again."),
+            _guided("media_privacy_review", "Review camera and microphone privacy only when the device exists", "If the device enumerates but the app still cannot use it, review privacy toggles and per-app access next.", "The camera/mic works without a black frame or silent input.", "Privacy is correct but the device still stays unavailable."),
+        ),
+        evidence_plan_ids=("device_bundle", "support_bundle"),
+        escalation_rules=("Escalate if the device fails to enumerate, repeatedly disconnects, or remains blocked after endpoint/privacy validation.",),
+        success_criteria=("The affected app sees and uses the intended device.", "Audio, mic, or camera symptoms are resolved or cleanly escalated with evidence."),
+    ),
+    DeepSupportPlaybook(
+        playbook_id="display_dock_triage",
+        family="display",
+        audience="service desk",
+        aliases=("monitor not detected", "dock not working", "usb not recognized", "touchpad not working"),
+        diagnostics=(
+            _binding("task_driver_device_inventory_pack", "diagnostic", "Collect monitor, dock, USB, and problem-device posture.", "Determine whether the failure is enumeration, driver, or dock-related."),
+            _binding("task_usb_bt_disconnect_helper", "diagnostic", "Collect USB/Bluetooth disconnect patterns and power hints.", "Check whether instability is tied to selective suspend or repeated reconnects."),
+            _binding("task_powercfg_a", "diagnostic", "Collect available power states for dock/sleep/display posture.", "Confirm whether power-state transitions are contributing to the issue."),
+        ),
+        remediations=(),
+        validations=(
+            _binding("task_driver_device_inventory_pack", "validation", "Re-check display/device posture after guided re-seat or reconnect.", "Confirm the monitor or dock path remains stable."),
+        ),
+        guided_steps=(
+            _guided("display_reseat", "Re-seat dock/display connections in a known-good order", "Disconnect the dock or display chain, reconnect power/host/display in a known-good order, then retest before deeper driver changes.", "The monitor, dock, or USB device enumerates and remains stable.", "The issue immediately returns after a clean reconnect."),
+            _guided("display_layout_confirm", "Rebuild the layout only after enumeration is healthy", "If the monitor is detected but wrong, fix monitor order, scaling, and default display layout after the hardware path is stable.", "The expected monitor order and resolution persist.", "The device never holds the layout or drops from the system again."),
+        ),
+        evidence_plan_ids=("device_bundle", "support_bundle"),
+        escalation_rules=("Escalate if dock firmware, monitor hardware, or repeated USB/device disconnect behavior remains after guided reconnect validation.",),
+        success_criteria=("The expected monitor, dock, or device enumerates and remains stable.", "Layout, resolution, and input devices match the intended workstation setup."),
+    ),
+    DeepSupportPlaybook(
+        playbook_id="enterprise_posture_check",
+        family="enterprise",
+        audience="it",
+        aliases=("intune not checking in", "gpo not applying", "domain trust issue", "certificate auto enrollment"),
+        diagnostics=(
+            _binding("task_system_profile_belarc_lite", "diagnostic", "Collect join, policy, and profile posture for escalation-ready review.", "Confirm the device identity and management baseline."),
+            _binding("task_service_health_snapshot", "diagnostic", "Collect service posture relevant to policy, management, and trust issues.", "Identify local service failures before assuming tenant-side faults."),
+            _binding("task_firewall_profile_summary", "diagnostic", "Collect firewall profile posture for managed-device communication checks.", "Confirm firewall state is not the obvious local blocker."),
+            _binding("task_identity_signin_helper", "diagnostic", "Collect device registration and sign-in posture for trust/compliance issues.", "Determine whether join or auth posture is already broken locally."),
+        ),
+        remediations=(),
+        validations=(
+            _binding("task_system_profile_belarc_lite", "validation", "Re-check baseline posture after guided gpupdate or sync attempts.", "Confirm whether the management posture changed."),
+        ),
+        guided_steps=(
+            _guided("enterprise_sync_attempt", "Force a safe management refresh before escalation", "Use the documented Intune/company portal sync or gpupdate path once after collecting evidence, then re-check posture.", "A fresh sync/check-in occurs and the target policy or trust issue clears.", "The device still fails to check in or apply policy."),
+            _guided("enterprise_cert_review", "Treat certificate and trust issues as escalation-sensitive", "If auto-enrollment, root/intermediate trust, or smart-card posture looks wrong, stop before manual certificate surgery unless the escalation path explicitly requires it.", "The device posture is documented and safe to escalate.", "Local manual trust changes would be needed to proceed."),
+        ),
+        evidence_plan_ids=("system_snapshot", "support_bundle"),
+        escalation_rules=("Escalate to directory, Intune, PKI, or policy owners if posture remains broken after one safe sync/check cycle and evidence capture.",),
+        success_criteria=("The device shows the expected management posture or has a clean escalation package.",),
+    ),
+    DeepSupportPlaybook(
+        playbook_id="meta_cant_sign_in",
+        family="identity",
+        audience="service desk",
+        aliases=("i can't sign in", "cant sign in", "signin issue"),
+        diagnostics=(
+            _binding("task_identity_signin_helper", "diagnostic", "Collect Windows sign-in, credential, and device-registration posture.", "Establish whether the issue is Windows, app auth, or tenant-side."),
+            _binding("task_browser_rescue", "diagnostic", "Collect browser auth-loop and trust context for web-based sign-in failures.", "Check whether the symptom is primarily browser/SSO scoped."),
+            _binding("task_office_outlook_helper", "diagnostic", "Collect Office sign-in posture when app prompts are part of the issue.", "Decide whether Office apps are using stale auth state."),
+        ),
+        remediations=(),
+        validations=(
+            _binding("task_identity_signin_helper", "validation", "Re-check identity posture after the chosen guided path.", "Confirm the sign-in symptom is either fixed or narrowed cleanly."),
+        ),
+        guided_steps=(
+            _guided("meta_signin_scope", "Separate Windows sign-in from app/web sign-in first", "Decide whether the user cannot sign into Windows, one app, or a web flow before you clear any cached state.", "The issue scope is clearly narrowed to Windows, app, or browser.", "The symptom affects every surface and device registration or tenant state looks wrong."),
+            _guided("meta_signin_route", "Route into the right deep workflow", "If the failure is browser/SSO, follow SSO/Web Auth Repair. If it is cached Office/app auth, follow Credential Repair or Outlook/Teams guidance.", "The next workflow is obvious and evidence is already captured.", "No single workflow fits because the whole identity posture is degraded."),
+        ),
+        evidence_plan_ids=("system_snapshot", "office_bundle", "support_bundle"),
+        escalation_rules=("Escalate if Windows, browser, and app sign-in all fail after scoped guided handling, or if tenant/device registration posture is unhealthy.",),
+        success_criteria=("The sign-in issue is fixed or narrowed to the correct specialist escalation path.",),
+    ),
+    DeepSupportPlaybook(
+        playbook_id="meta_unknown_issue",
+        family="bundles",
+        audience="service desk",
+        aliases=("i don't know what's wrong", "unknown issue", "general triage"),
+        diagnostics=(
+            _binding("task_system_profile_belarc_lite", "diagnostic", "Collect a baseline system profile before routing deeper.", "Build a broad machine posture quickly."),
+            _binding("task_network_evidence_pack", "diagnostic", "Collect basic connectivity posture because many escalations depend on it.", "Rule out broad network/path issues early."),
+            _binding("task_service_health_snapshot", "diagnostic", "Collect service baseline for common shell/update/app failures.", "Surface obvious local service faults before deeper family routing."),
+            _binding("task_update_repair_evidence_pack", "diagnostic", "Collect update/reboot posture because it often blocks other fixes.", "Check whether pending servicing is distorting the symptom set."),
+        ),
+        remediations=(),
+        validations=(
+            _binding("task_system_profile_belarc_lite", "validation", "Keep the baseline package as the final handoff summary if escalation is still needed.", "Confirm the case has a reusable triage baseline."),
+        ),
+        guided_steps=(
+            _guided("meta_unknown_pattern", "Match the symptom to a family after the baseline is collected", "Use the baseline findings to route into identity, network, performance, printer, collaboration, or shell playbooks instead of guessing.", "The issue maps cleanly to a family-specific workflow.", "The baseline still does not reveal a probable family."),
+            _guided("meta_unknown_export", "Escalate with a support bundle when routing is still unclear", "If the symptom remains broad after baseline collection, move to Reports and generate a support bundle before escalating.", "The next responder gets a complete baseline instead of a vague symptom report.", "Critical symptoms remain unexplained and require immediate specialist review."),
+        ),
+        evidence_plan_ids=("system_snapshot", "network_bundle", "support_bundle"),
+        escalation_rules=("Escalate when the baseline still does not isolate a family or when multiple subsystems appear degraded at once.",),
+        success_criteria=("The issue is either routed into a concrete family workflow or escalated with a useful baseline bundle.",),
+    ),
 )
 
 

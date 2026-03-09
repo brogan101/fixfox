@@ -1,0 +1,18 @@
+Update Evidence Pack Summary
+
+What we checked:
+- Ran 4 evidence tasks.
+
+What we found:
+- Failures: 1
+- Artifacts: 6
+
+What we changed:
+- No remediation changes were performed by this pack.
+
+Next steps:
+- Review captured files.
+- Export Ticket Pack for escalation.
+
+Technical appendix:
+- task_ids=task_update_services_status,task_pending_reboot_sources,task_get_windows_update_log,task_evtx_windows_update

@@ -51,6 +51,40 @@ _DYNAMIC_BUILD_COUNT = 0
 _DYNAMIC_REFRESH_INFLIGHT = False
 _DYNAMIC_TTL_S = 45.0
 
+_KIND_BASE_BOOST = {
+    "support_playbook": 22.0,
+    "issue": 18.0,
+    "fix": 10.0,
+    "runbook": 6.0,
+    "task": 4.0,
+}
+
+_LOW_SIGNAL_TOKENS = {
+    "a",
+    "an",
+    "and",
+    "app",
+    "broken",
+    "error",
+    "fails",
+    "failure",
+    "i",
+    "is",
+    "issue",
+    "my",
+    "not",
+    "problem",
+    "the",
+    "to",
+    "wont",
+    "won't",
+    "working",
+}
+
+
+def _query_tokens(value: str) -> list[str]:
+    return [token for token in str(value or "").lower().replace("/", " ").replace("-", " ").split() if token]
+
 
 def _to_indexed(item: SearchItem) -> _IndexedRow:
     title_l = str(item.title or "").lower()
@@ -258,6 +292,23 @@ def _score_row(q: str, row: _IndexedRow) -> float:
         score += 14.0
     if q == row.title_l or q == row.key_l:
         score += 30.0
+    query_tokens = _query_tokens(q)
+    signal_tokens = [token for token in query_tokens if token not in _LOW_SIGNAL_TOKENS] or query_tokens
+    if query_tokens:
+        title_hits = sum(1 for token in signal_tokens if token in row.title_l)
+        haystack_hits = sum(1 for token in signal_tokens if token in row.haystack_l)
+        if title_hits:
+            score += 12.0 * title_hits
+        if haystack_hits:
+            score += 4.0 * haystack_hits
+        if haystack_hits == len(signal_tokens):
+            score += 20.0
+            kind = str(row.item.kind or "").lower()
+            if kind == "support_playbook":
+                score += 22.0
+            elif kind == "issue":
+                score += 12.0
+    score += _KIND_BASE_BOOST.get(str(row.item.kind or "").lower(), 0.0)
     return score
 
 

@@ -1,0 +1,11 @@
+rasdial:
+No connections
+Command completed successfully.
+
+rasphone_exists=False (C:\Users\btheobald\AppData\Roaming\Microsoft\Network\Connections\Pbk\rasphone.pbk)
+
+vpn_profiles:
+[]
+
+vpn_adapters:
+[]
