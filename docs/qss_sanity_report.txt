@@ -1,2 +1,10 @@
-PASS
-stylesheet_length=17535
+FixFox QSS Sanity Check
+result=OK
+
+Failures:
+- none
+
+Qt Warnings:
+- none
+
+OK

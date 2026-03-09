@@ -86,3 +86,32 @@
   - `python scripts/ui_walkthrough.py`
   - `pytest`
   - packaged build smoke via `python scripts/build_release.py`
+
+## 2026-03-09 16:08 ET
+- Starting commit: `6d172e8858adade2c563b2371842faa96e256e52`
+- Branch: `main`
+- Exact scope of this run:
+  - full visible-surface validation of the desktop shell across Home, Playbooks, Diagnose, Fixes, Reports, History, and Settings
+  - nav rail, top bar, global search, settings section nav, dialogs, drawers, row actions, and screenshot/report artifacts
+  - regression proof for rendering, visible text, clipping, persistence, interaction states, keyboard focus, and responsive sizing
+- Test methodology:
+  - inspect required UI/page/style/runtime files before execution so claimed coverage matches the real widget tree
+  - run startup/env proof commands and append them here before validation
+  - execute the existing walkthrough and diagnostics checks to establish the baseline artifact set
+  - extend the harness if baseline coverage is insufficient for control/state/responsive verification
+  - rerun validation and write a page-by-page readiness report with explicit failures and artifact paths
+- Pages and controls to be covered:
+  - Home, Playbooks, Diagnose, Fixes, Reports, History, Settings
+  - nav rail buttons, top-bar quick check/search/panel/overflow controls, settings section list, page headers, cards, rows, feed actions, searches, combo boxes, checkboxes, sliders, tabs, drawers, dialog buttons, and export/help/support actions
+- Known risk areas:
+  - global search popup anchoring and keyboard handling in `src/ui/main_window_impl.py`
+  - list/feed row hover/selection/focus state styling in `src/ui/components/rows.py`
+  - responsive collapse behavior for top search and side sheet in `src/ui/components/app_bar.py` and `src/ui/components/side_sheet.py`
+  - settings search/nav filtering and live theme/scale application in `src/ui/pages/settings_page.py` and `src/ui/main_window_impl.py`
+  - proof gap risk: existing `scripts/ui_walkthrough.py` covers persistence/screenshots but not exhaustive control-state accounting
+- Startup proof:
+  - `git fetch --all`
+  - `git rev-parse HEAD` -> `6d172e8858adade2c563b2371842faa96e256e52`
+  - `git status --short --branch` -> `## main...origin/main`
+  - `python --version` -> `Python 3.14.3`
+  - `pip --version` failed on PATH; fallback `python -m pip --version` -> `pip 26.0.1 from C:\Users\btheobald\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\pip (python 3.14)`
