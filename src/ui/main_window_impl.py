@@ -537,6 +537,7 @@ class MainWindow(QMainWindow):
         self._persist_concierge_events = True
         self._auto_concierge_collapse = False
         self._startup_warmup_active = True
+        self._startup_deferred_page_refreshes: set[str] = set()
         self._history_dirty = True
         self._history_refresh_key: tuple[Any, ...] | None = None
         self._toolbox_dirty = True
@@ -754,8 +755,37 @@ class MainWindow(QMainWindow):
     def _startup_warmup_stage_three(self) -> None:
         self._mark_startup_phase("mainwindow:warmup_stage_three")
         self._startup_warmup_active = False
+        self._drain_startup_deferred_page_refreshes()
         self._hide_startup_banner()
         self._mark_startup_phase("mainwindow:warmup_complete")
+
+    def _schedule_page_refresh(self, page_name: str, callback: Callable[[], None]) -> None:
+        page_key = str(page_name or "").strip()
+        if self._startup_warmup_active:
+            self._startup_deferred_page_refreshes.add(page_key)
+            return
+        QTimer.singleShot(0, callback)
+
+    def _drain_startup_deferred_page_refreshes(self) -> None:
+        queued = set(self._startup_deferred_page_refreshes)
+        self._startup_deferred_page_refreshes.clear()
+        page_name = self.NAV_ITEMS[self.nav.currentRow()] if self.nav.currentRow() >= 0 else "Home"
+        queued.add(page_name)
+        for row in queued:
+            if row == "Home":
+                QTimer.singleShot(0, self._refresh_home_history)
+                QTimer.singleShot(0, self._refresh_home_favorites)
+            elif row == "History":
+                QTimer.singleShot(0, self._refresh_history)
+            elif row == "Reports":
+                QTimer.singleShot(0, self._refresh_run_center)
+                QTimer.singleShot(0, self._refresh_evidence_items)
+            elif row == "Fixes":
+                QTimer.singleShot(0, self._refresh_fixes)
+            elif row == "Playbooks":
+                QTimer.singleShot(0, self._refresh_toolbox)
+                QTimer.singleShot(0, self._refresh_runbooks)
+                QTimer.singleShot(0, self._refresh_home_favorites)
 
     def _show_startup_banner(self) -> None:
         self.startup_banner.show()
@@ -1886,19 +1916,19 @@ class MainWindow(QMainWindow):
         if page_name in {"History", "Reports"}:
             refresh_dynamic_index_async(force=True)
         if page_name == "Home":
-            QTimer.singleShot(0, self._refresh_home_history)
-            QTimer.singleShot(0, self._refresh_home_favorites)
+            self._schedule_page_refresh("Home", self._refresh_home_history)
+            self._schedule_page_refresh("Home", self._refresh_home_favorites)
         elif page_name == "History":
-            QTimer.singleShot(0, self._refresh_history)
+            self._schedule_page_refresh("History", self._refresh_history)
         elif page_name == "Reports":
-            QTimer.singleShot(0, self._refresh_run_center)
-            QTimer.singleShot(0, self._refresh_evidence_items)
+            self._schedule_page_refresh("Reports", self._refresh_run_center)
+            self._schedule_page_refresh("Reports", self._refresh_evidence_items)
         elif page_name == "Fixes":
-            QTimer.singleShot(0, self._refresh_fixes)
+            self._schedule_page_refresh("Fixes", self._refresh_fixes)
         elif page_name == "Playbooks":
-            QTimer.singleShot(0, self._refresh_toolbox)
-            QTimer.singleShot(0, self._refresh_runbooks)
-            QTimer.singleShot(0, self._refresh_home_favorites)
+            self._schedule_page_refresh("Playbooks", self._refresh_toolbox)
+            self._schedule_page_refresh("Playbooks", self._refresh_runbooks)
+            self._schedule_page_refresh("Playbooks", self._refresh_home_favorites)
         self._sync_context_bar_visibility()
         self._sync_shell_status_bar()
         self._update_concierge()
@@ -1954,7 +1984,7 @@ class MainWindow(QMainWindow):
                     self.settings_nav.setCurrentRow(idx)
                     break
 
-    def _persist_layout_state(self) -> None:
+    def _persist_layout_state(self, *, sync_db: bool = True) -> None:
         geo = self.geometry()
         self.settings_state.window_x = int(geo.x())
         self.settings_state.window_y = int(geo.y())
@@ -1971,7 +2001,7 @@ class MainWindow(QMainWindow):
             if 0 <= settings_idx < self.settings_nav.count():
                 item = self.settings_nav.item(settings_idx)
                 self.settings_state.last_settings_section = str(item.data(Qt.UserRole) or item.text() or "Safety")
-        save_settings(self.settings_state)
+        save_settings(self.settings_state, sync_db=sync_db)
 
     def _toggle_concierge(self) -> None:
         self._set_concierge_collapsed(not self.concierge.collapsed, persist=True)
@@ -2539,7 +2569,7 @@ class MainWindow(QMainWindow):
         self._resize_debounce_timer.stop()
         if self._settings_save_timer.isActive():
             self._settings_save_timer.stop()
-            self._flush_settings_changes()
+            self._flush_settings_changes(sync_db=False)
         self._unsubscribe_run_status_events()
         if self._run_status_subscription_id > 0:
             self.run_event_bus.unsubscribe(self._run_status_subscription_id)
@@ -2547,7 +2577,7 @@ class MainWindow(QMainWindow):
         app = QApplication.instance()
         if app is not None:
             app.removeEventFilter(self)
-        self._persist_layout_state()
+        self._persist_layout_state(sync_db=False)
         self._cancel_active_search_worker()
         self._search_popup.hide_popup()
         if self.tool_runner is not None:
@@ -5899,7 +5929,7 @@ class MainWindow(QMainWindow):
         self.s_adv.setChecked(pending.show_advanced_tools)
         self.s_adv.blockSignals(False)
 
-    def _apply_settings_debounced(self) -> None:
+    def _apply_settings_debounced(self, *, sync_db: bool = True) -> None:
         flags = set(self._pending_settings_refresh_flags)
         self._pending_settings_refresh_flags.clear()
         pending = self._pending_settings_state
@@ -5909,7 +5939,7 @@ class MainWindow(QMainWindow):
         for key, value in asdict(pending).items():
             setattr(self.settings_state, key, value)
         self.layout_policy_state = layout_policy(self.settings_state)
-        save_settings(self.settings_state)
+        save_settings(self.settings_state, sync_db=sync_db)
         self.safety_policy = policy_from_settings(self.settings_state)
         if hasattr(self, "side_sheet"):
             self.side_sheet.set_pinned(bool(getattr(self.settings_state, "details_drawer_pinned", True)))
@@ -5936,8 +5966,8 @@ class MainWindow(QMainWindow):
         self._runbooks_dirty = True
         self.toasts.show_toast("Settings saved.")
 
-    def _flush_settings_changes(self) -> None:
-        self._apply_settings_debounced()
+    def _flush_settings_changes(self, *, sync_db: bool = True) -> None:
+        self._apply_settings_debounced(sync_db=sync_db)
 
 
 

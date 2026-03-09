@@ -141,22 +141,23 @@ def export_settings_snapshot(settings: AppSettings) -> dict[str, Any]:
     return payload
 
 
-def save_settings(settings: AppSettings) -> Path:
+def save_settings(settings: AppSettings, *, sync_db: bool = True) -> Path:
     path = settings_path()
     normalized = settings.normalized()
     path.parent.mkdir(parents=True, exist_ok=True)
     temp_path = path.with_suffix(".tmp")
     temp_path.write_text(json.dumps(asdict(normalized), indent=2), encoding="utf-8")
     temp_path.replace(path)
-    try:
-        from .db import replace_all_favorites, set_file_index_roots
+    if sync_db:
+        try:
+            from .db import replace_all_favorites, set_file_index_roots
 
-        replace_all_favorites(
-            fixes=normalized.favorites_fixes or [],
-            tools=normalized.favorites_tools or [],
-            runbooks=normalized.favorites_runbooks or [],
-        )
-        set_file_index_roots(normalized.file_index_roots or [])
-    except Exception:
-        pass
+            replace_all_favorites(
+                fixes=normalized.favorites_fixes or [],
+                tools=normalized.favorites_tools or [],
+                runbooks=normalized.favorites_runbooks or [],
+            )
+            set_file_index_roots(normalized.file_index_roots or [])
+        except Exception:
+            pass
     return path

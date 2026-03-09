@@ -38,3 +38,32 @@
   - catalog / mapping / search audit script
   - unittest coverage for registry and search expectations
   - headless UI walkthrough screenshots
+
+## 2026-03-09 13:45 ET
+- Starting commit: `085ec5c46ebf8ca21fca904874b511b2c388965e`
+- Branch: `main`
+- Goals for this run:
+  - clear the remaining packaged EXE watchdog hit during warmup
+  - verify the packaged launch path is release-clean rather than only source-clean
+- Architecture plan:
+  - remove blocking work from startup and shutdown paths instead of masking the watchdog
+  - keep settings file persistence and database mirroring separable so `closeEvent` stays cheap
+  - defer heavy page refresh work until startup warmup completes
+- Playbook family plan:
+  - no catalog expansion in this pass
+  - focus only on packaged-path stability
+- UI integration plan:
+  - keep page content behavior unchanged while moving refresh timing off the warmup critical path
+- Release/readiness plan:
+  - rebuild the packaged EXE
+  - rerun packaged auto-exit smoke
+  - update release verification with the new perf/watchdog proof
+- High-risk files/modules:
+  - `src/core/settings.py`
+  - `src/ui/main_window_impl.py`
+  - packaged warmup / history refresh path
+- Verification plan:
+  - python compile checks
+  - packaged rebuild
+  - packaged EXE smoke run with `FIXFOX_AUTO_EXIT_MS=4000`
+  - inspect `logs/fixfox.log`, `logs/perf_*.json`, and `logs/launch_watchdog_*.txt`
