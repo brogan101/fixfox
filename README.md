@@ -23,6 +23,20 @@ py -m venv .venv
 - `scripts\ui_walkthrough.py` generates screenshots into `docs\screenshots\<timestamp>\`
 - `python -m unittest src.tests.test_support_catalog_integrity src.tests.test_search_support_discovery`
 
+## Build EXE
+
+```powershell
+.venv\Scripts\python.exe scripts\build_release.py
+```
+
+Output:
+
+- `dist\FixFox\FixFox.exe`
+
+Release checklist:
+
+- `docs\RELEASE_CHECKLIST.md`
+
 ## Release Notes
 
 - Current app train: `0.9.0-rc2 (RC)`
