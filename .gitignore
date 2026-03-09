@@ -11,7 +11,4 @@ build/
 .smoke_tmp/
 .unit_tmp/
 *.log
-docs/screenshots/*/
-!docs/screenshots/.keep
 logs/
-docs/_tracked_files.txt
