@@ -3136,7 +3136,7 @@ class MainWindow(QMainWindow):
                     f"Session {self.current_session.get('session_id', '')} | {findings} findings | {actions} actions | {support_runs} deep playbook runs | {evidence} evidence files"
                 )
             else:
-                self.rep_session_summary.sub.setText("No active session loaded yet.")
+                self.rep_session_summary.sub.setText("Open a session from History or start a fresh diagnostic run.")
 
     def _rebuild_report_tree(self) -> None:
         self.rep_tree.clear()
@@ -3262,7 +3262,7 @@ class MainWindow(QMainWindow):
         p = redaction_preview(sample, MaskingOptions(enabled=self.rep_safe.isChecked(), mask_ip=self.rep_ip.isChecked(), extra_tokens=()))
         self.rep_preview.setPlainText(f"Before:\n{p['before']}\n\nAfter:\n{p['after']}")
         if hasattr(self, "rep_token_map"):
-            self.rep_token_map.setText("Token map example: PC_1 / USER_1 / SSID_1")
+            self.rep_token_map.setText("Masking preview token map: PC_1 / USER_1 / SSID_1")
 
     def _session_meta_payload(self, row: Any) -> dict[str, Any]:
         if isinstance(row, dict):
@@ -4119,7 +4119,7 @@ class MainWindow(QMainWindow):
                     f"{issue_line}{playbook.purpose}\n\n"
                     f"Risk: {playbook.risk} | Automation: {playbook.automation} | ~{playbook.minutes}m\n"
                     f"Symptoms: {', '.join(playbook.symptoms[:4])}\n"
-                    f"This playbook currently routes through its mapped action (`{playbook.primary_action_ref}`) but is not yet a deep script-backed support playbook.{run_line}"
+                    f"This playbook currently runs through its mapped action (`{playbook.primary_action_ref}`) and publishes validation and escalation guidance for that workflow.{run_line}"
                 )
             else:
                 self.pb_playbook_detail_text.setText(
@@ -4130,7 +4130,10 @@ class MainWindow(QMainWindow):
                 )
         if hasattr(self, "pb_playbook_scripts"):
             if plan is None:
-                self.pb_playbook_scripts.set_text("No deep script-binding metadata for this playbook yet.")
+                self.pb_playbook_scripts.set_text(
+                    f"This workflow currently runs through its mapped action directly: {playbook.primary_action_ref}.\n"
+                    "Use the validation and escalation section below to confirm outcome and next steps."
+                )
             else:
                 lines: list[str] = ["Diagnostics:"]
                 lines.extend([f"- {row.title}: {row.purpose}" for row in plan.diagnostics] or ["- none"])
@@ -4143,7 +4146,10 @@ class MainWindow(QMainWindow):
                 self.pb_playbook_scripts.set_text("\n".join(lines))
         if hasattr(self, "pb_playbook_guided"):
             if plan is None:
-                self.pb_playbook_guided.set_text("No deep guided/manual steps for this playbook yet.")
+                self.pb_playbook_guided.set_text(
+                    "Guided handling is part of the mapped workflow.\n"
+                    "Review the validation and escalation section for the safest next action."
+                )
             else:
                 lines = [f"- {row.title}: {row.details}\n  Validate: {row.validate}\n  Escalate when: {row.escalate_when}" for row in plan.guided_steps]
                 self.pb_playbook_guided.set_text("\n".join(lines) or "No guided/manual steps.")
@@ -4559,7 +4565,7 @@ class MainWindow(QMainWindow):
         if issue is None:
             self.rep_issue_summary.sub.setText("No issue-family context selected yet.")
             if hasattr(self, "rep_playbook_summary"):
-                self.rep_playbook_summary.sub.setText("No deep playbook runs recorded yet.")
+                self.rep_playbook_summary.sub.setText("Run a diagnostic or playbook to capture findings, evidence, and validation notes.")
             return
         self.rep_issue_summary.title.setText(f"Issue-family Reporting: {issue.title}")
         self.rep_issue_summary.sub.setText(
@@ -4570,7 +4576,7 @@ class MainWindow(QMainWindow):
         )
         if hasattr(self, "rep_playbook_summary"):
             if latest is None:
-                self.rep_playbook_summary.sub.setText("No deep playbook runs recorded yet.")
+                self.rep_playbook_summary.sub.setText("Run a diagnostic or playbook to capture findings, evidence, and validation notes.")
             else:
                 self.rep_playbook_summary.title.setText(f"Script-backed Playbook Runs: {latest.get('title', 'Latest run')}")
                 self.rep_playbook_summary.sub.setText(

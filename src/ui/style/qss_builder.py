@@ -135,8 +135,8 @@ QWidget#NavRail {{
   background: {_alpha(tokens.panel, 0.96)};
   border: 1px solid {_alpha(tokens.border, 0.72)};
   border-radius: {d.corner_radius + 8}px;
-  min-width: 88px;
-  max-width: 88px;
+  min-width: 104px;
+  max-width: 104px;
 }}
 QFrame#NavRailDivider {{
   background: {_alpha(tokens.border, 0.55)};
@@ -149,8 +149,8 @@ QToolButton#NavRailAuxButton {{
   background: transparent;
   border: 1px solid transparent;
   border-radius: {d.corner_radius + 10}px;
-  padding: 12px;
-  margin: 0 3px;
+  padding: 10px;
+  margin: 0;
   icon-size: {max(18, d.icon_size)}px;
 }}
 QToolButton#NavRailButton:checked {{

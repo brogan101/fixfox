@@ -103,7 +103,8 @@ class ToolRunnerWindow(QDialog):
         self.lbl_highlights = QLabel("Highlights: safe | findings 0 | artifacts 0")
         header.body_layout().addWidget(self.lbl_highlights)
         self.progress = QProgressBar()
-        self.progress.setRange(0, 0)
+        self.progress.setRange(0, 100)
+        self.progress.setValue(0)
         header.body_layout().addWidget(self.progress)
         root.addWidget(header)
 
@@ -119,7 +120,7 @@ class ToolRunnerWindow(QDialog):
 
         self.txt_activity = QTextEdit()
         self.txt_activity.setReadOnly(True)
-        self.txt_activity.setPlainText("Activity timeline will populate as the run progresses.")
+        self.txt_activity.setPlainText("Live status, findings, and captured artifacts appear here during the run.")
 
         self.txt_output = QPlainTextEdit()
         self.txt_output.setReadOnly(True)
@@ -133,7 +134,7 @@ class ToolRunnerWindow(QDialog):
 
         self.txt_details = self.txt_issues
         self.txt_next = self.txt_activity
-        self.txt_next.setPlainText("Waiting for run completion to compute next steps.")
+        self.txt_next.setPlainText("Next actions are calculated from the final run result, evidence, and validation state.")
         self.next_actions = QWidget()
         next_actions_layout = QHBoxLayout(self.next_actions)
         next_actions_layout.setContentsMargins(0, 0, 0, 0)
@@ -205,6 +206,11 @@ class ToolRunnerWindow(QDialog):
         self._tick_timer = QTimer(self)
         self._tick_timer.timeout.connect(self._tick_elapsed)
         self._tick_timer.start(1000)
+        self._progress_timer = QTimer(self)
+        self._progress_timer.setInterval(90)
+        self._progress_timer.timeout.connect(self._advance_progress_pulse)
+        self._progress_value = 0
+        self._progress_timer.start()
         self._flush_timer = QTimer(self)
         self._flush_timer.setInterval(40)
         self._flush_timer.timeout.connect(self._flush_output_lines)
@@ -283,6 +289,7 @@ class ToolRunnerWindow(QDialog):
             return
         if kind == RunEventType.PROGRESS:
             pct = int(event.progress if event.progress is not None else 0)
+            self._progress_timer.stop()
             self.progress.setRange(0, 100)
             self.progress.setValue(max(0, min(100, pct)))
             self.lbl_status.setText(f"Running ({pct}%)")
@@ -402,6 +409,7 @@ class ToolRunnerWindow(QDialog):
 
     def on_progress(self, pct: int, text: str) -> None:
         self.lbl_status.setText(f"Running ({pct}%)")
+        self._progress_timer.stop()
         self.progress.setRange(0, 100)
         self.progress.setValue(max(0, min(100, pct)))
         if text:
@@ -411,6 +419,7 @@ class ToolRunnerWindow(QDialog):
         self._queue_output_line(line, "stdout")
 
     def on_partial(self, payload: Any) -> None:
+        self._progress_timer.stop()
         self._set_status_chip("Partial")
         if isinstance(payload, dict):
             self._queue_output_line("[partial] " + json.dumps(payload, ensure_ascii=False)[:1400], "status")
@@ -426,6 +435,7 @@ class ToolRunnerWindow(QDialog):
 
     def on_result(self, payload: dict[str, Any]) -> None:
         self._drain_event_bus()
+        self._progress_timer.stop()
         self._result_payload = payload or {}
         evidence_items = coerce_evidence_items(self._result_payload if isinstance(self._result_payload, dict) else {})
         if isinstance(self._result_payload, dict):
@@ -496,6 +506,7 @@ class ToolRunnerWindow(QDialog):
 
     def on_error(self, message: str) -> None:
         self._drain_event_bus()
+        self._progress_timer.stop()
         self._last_status = "Failed"
         self._set_status_chip("Failed")
         self.btn_cancel.setEnabled(False)
@@ -531,6 +542,7 @@ class ToolRunnerWindow(QDialog):
 
     def on_cancelled(self) -> None:
         self._drain_event_bus()
+        self._progress_timer.stop()
         self._last_status = "Cancelled"
         self._set_status_chip("Cancelled")
         self.btn_cancel.setEnabled(False)
@@ -706,7 +718,7 @@ class ToolRunnerWindow(QDialog):
             [
                 f"What we checked:\n- {checked}",
                 "What we found:\n- Task is currently running.",
-                "What changed:\n- No confirmed changes yet.",
+                "What changed:\n- No system changes have been confirmed so far.",
                 "What to do next:",
                 "- Watch Activity for progress updates.",
                 "- Check Issues for risk context.",
@@ -714,6 +726,10 @@ class ToolRunnerWindow(QDialog):
                 "- Cancel if this is not the intended action.",
             ]
         )
+
+    def _advance_progress_pulse(self) -> None:
+        self._progress_value = (self._progress_value + 6) % 101
+        self.progress.setValue(self._progress_value)
 
     def _build_overview(self, findings_count: int, artifacts: int, next_steps: list[str]) -> str:
         summary = ""
@@ -794,6 +810,8 @@ class ToolRunnerWindow(QDialog):
 
     def closeEvent(self, event: Any) -> None:  # type: ignore[override]
         self._unsubscribe_event_bus()
+        if hasattr(self, "_progress_timer"):
+            self._progress_timer.stop()
         if hasattr(self, "_flush_timer"):
             self._flush_timer.stop()
         super().closeEvent(event)

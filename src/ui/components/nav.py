@@ -10,6 +10,9 @@ from ..icons import get_icon
 from ..style import spacing
 
 
+NAV_RAIL_WIDTH = 104
+
+
 @dataclass
 class _NavItemProxy:
     label: str
@@ -32,8 +35,8 @@ class NavRail(QWidget):
         super().__init__()
         self.setObjectName("NavRail")
         self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
-        self.setMinimumWidth(88)
-        self.setMaximumWidth(88)
+        self.setMinimumWidth(NAV_RAIL_WIDTH)
+        self.setMaximumWidth(NAV_RAIL_WIDTH)
         self._row_height = 58
         self._current_row = -1
         self._items: list[str] = []
@@ -41,7 +44,7 @@ class NavRail(QWidget):
         self._buttons: dict[str, QToolButton] = {}
 
         shell = QVBoxLayout(self)
-        shell.setContentsMargins(spacing("md"), spacing("md"), spacing("md"), spacing("md"))
+        shell.setContentsMargins(spacing("sm"), spacing("md"), spacing("sm"), spacing("md"))
         shell.setSpacing(spacing("md"))
 
         self.top_group_box = QWidget()
@@ -124,8 +127,8 @@ class NavRail(QWidget):
         btn.setCursor(Qt.PointingHandCursor)
         btn.setProperty("nav_label", label)
         btn.setProperty("icon_name", icon_name)
-        btn.setFixedSize(64, self._row_height)
-        icon_size = max(18, min(20, self._row_height - 26))
+        btn.setFixedSize(72, self._row_height)
+        icon_size = max(18, min(20, self._row_height - 24))
         btn.setIconSize(QSize(icon_size, icon_size))
         btn.setIcon(get_icon(icon_name, btn, size=icon_size))
         btn.setAccessibleName(f"Navigate to {label}")
@@ -141,8 +144,8 @@ class NavRail(QWidget):
         btn.setFocusPolicy(Qt.TabFocus)
         btn.setCursor(Qt.PointingHandCursor)
         btn.setProperty("icon_name", icon_name)
-        btn.setFixedSize(64, self._row_height)
-        icon_size = max(18, min(20, self._row_height - 26))
+        btn.setFixedSize(72, self._row_height)
+        icon_size = max(18, min(20, self._row_height - 24))
         btn.setIconSize(QSize(icon_size, icon_size))
         btn.setIcon(get_icon(icon_name, btn, size=icon_size))
         return btn
@@ -173,7 +176,7 @@ class NavRail(QWidget):
         return self._proxies[index]
 
     def width(self) -> int:  # type: ignore[override]
-        return 88
+        return NAV_RAIL_WIDTH
 
     @staticmethod
     def _clear_layout(layout: QVBoxLayout) -> None:

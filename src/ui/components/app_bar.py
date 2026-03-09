@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QEasingCurve, QPropertyAnimation, Qt, Signal
+from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QTimer, Qt, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QLineEdit, QProgressBar, QSizePolicy, QStackedWidget, QToolButton, QVBoxLayout, QWidget
 
@@ -145,8 +145,13 @@ class AppToolbar(QFrame):
         self.task_progress.setObjectName("AppBarProgress")
         self.task_progress.setTextVisible(False)
         self.task_progress.setFixedHeight(3)
-        self.task_progress.setRange(0, 0)
+        self.task_progress.setRange(0, 100)
+        self.task_progress.setValue(0)
         self.task_progress.hide()
+        self._task_progress_value = 0
+        self._task_progress_timer = QTimer(self)
+        self._task_progress_timer.setInterval(90)
+        self._task_progress_timer.timeout.connect(self._advance_task_progress_pulse)
         root.addWidget(self.task_progress, 0)
 
         self.set_details_open(False)
@@ -208,12 +213,23 @@ class AppToolbar(QFrame):
 
     def set_task_running(self, running: bool, *, progress: int | None = None) -> None:
         if not running:
+            self._task_progress_timer.stop()
             self.task_progress.hide()
-            self.task_progress.setRange(0, 0)
+            self.task_progress.setRange(0, 100)
+            self.task_progress.setValue(0)
             return
         self.task_progress.show()
         if progress is None or progress < 0:
-            self.task_progress.setRange(0, 0)
+            self.task_progress.setRange(0, 100)
+            if not self._task_progress_timer.isActive():
+                self._task_progress_value = 0
+                self.task_progress.setValue(0)
+                self._task_progress_timer.start()
         else:
+            self._task_progress_timer.stop()
             self.task_progress.setRange(0, 100)
             self.task_progress.setValue(max(0, min(100, int(progress))))
+
+    def _advance_task_progress_pulse(self) -> None:
+        self._task_progress_value = (self._task_progress_value + 7) % 101
+        self.task_progress.setValue(self._task_progress_value)

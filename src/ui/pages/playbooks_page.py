@@ -92,8 +92,8 @@ class PlaybooksPage(PageScroll):
         issue_right_layout.setContentsMargins(0, 0, 0, 0)
         issue_right_layout.setSpacing(spacing("md"))
 
-        w.pb_issue_detail = Card("Issue Detail", "Select an issue to inspect diagnostics, playbooks, and recommended fixes.")
-        w.pb_issue_detail_text = QLabel("Select an issue to inspect diagnostics, playbooks, and recommended fixes.")
+        w.pb_issue_detail = Card("Issue Detail", "Choose an issue to review mapped diagnostics, playbooks, and recommended fixes.")
+        w.pb_issue_detail_text = QLabel("Choose an issue to review mapped diagnostics, playbooks, and recommended fixes.")
         w.pb_issue_detail_text.setWordWrap(True)
         w.pb_issue_playbooks = DrawerCard("Playbooks")
         w.pb_issue_diagnostics = DrawerCard("Diagnostics")
@@ -118,8 +118,8 @@ class PlaybooksPage(PageScroll):
         w.pb_issue_detail.body_layout().addLayout(issue_actions)
         issue_right_layout.addWidget(w.pb_issue_detail)
 
-        w.pb_playbook_detail = Card("Deep Playbook Detail", "Select an issue or mapped playbook to inspect the actual script-backed workflow.")
-        w.pb_playbook_detail_text = QLabel("Select an issue or mapped playbook to inspect the actual script-backed workflow.")
+        w.pb_playbook_detail = Card("Deep Playbook Detail", "Choose an issue or mapped playbook to inspect the actual script-backed workflow.")
+        w.pb_playbook_detail_text = QLabel("Choose an issue or mapped playbook to inspect the actual script-backed workflow.")
         w.pb_playbook_detail_text.setWordWrap(True)
         w.pb_playbook_scripts = DrawerCard("Scripts and Checks")
         w.pb_playbook_guided = DrawerCard("Guided / Manual Steps")
@@ -304,6 +304,7 @@ class PlaybooksPage(PageScroll):
                 "WMI",
             ]
         )
+        w.tb_filter.hide()
         w.tb_filter.currentTextChanged.connect(w._refresh_toolbox)
         def _sync_category_list(text: str) -> None:
             if not hasattr(w, "pb_category_list"):
@@ -320,7 +321,6 @@ class PlaybooksPage(PageScroll):
         w.tb_top.item_selected.connect(lambda tid: w._set_selected_tool(str(tid)))
         w.tb_top.context_requested.connect(w._tool_menu)
         pinned = Card("Recommended", "Fast actions and pinned tools.")
-        pinned.body_layout().addWidget(w.tb_filter)
         pinned.body_layout().addWidget(QLabel("Top tools"))
         pinned.body_layout().addWidget(w.tb_top, 1)
 
@@ -344,8 +344,8 @@ class PlaybooksPage(PageScroll):
         right_layout = QVBoxLayout(right)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(spacing("md"))
-        w.pb_tool_detail = Card("Tool Detail", "Select a tool to see details and run it.")
-        w.pb_tool_detail_text = QLabel("Select a tool to see details and run it.")
+        w.pb_tool_detail = Card("Tool Detail", "Choose a tool to review what it runs and when to use it.")
+        w.pb_tool_detail_text = QLabel("Choose a tool to review what it runs and when to use it.")
         w.pb_tool_detail_text.setWordWrap(True)
         w.pb_tool_detail.body_layout().addWidget(w.pb_tool_detail_text)
         w.pb_detail_steps = DrawerCard("What it runs")

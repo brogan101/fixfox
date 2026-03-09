@@ -62,7 +62,7 @@ class DiagnosePage(PageScroll):
         w.diag_playbook_summary_text.setWordWrap(True)
         run_diag_btn = SoftButton("Run Selected Diagnostics")
         run_diag_btn.clicked.connect(w._run_selected_support_playbook_diagnostics)
-        w.diag_playbook_findings = Card("Latest Script-backed Findings", "No deep playbook run yet.", right_widget=run_diag_btn, elevation=2)
+        w.diag_playbook_findings = Card("Latest Script-backed Findings", "Run selected diagnostics to capture normalized findings and validation guidance.", right_widget=run_diag_btn, elevation=2)
         w.diag_playbook_findings_text = QLabel("Run a deep playbook to populate normalized findings, validation, and escalation guidance.")
         w.diag_playbook_findings_text.setWordWrap(True)
         w.diag_playbook_summary.body_layout().addWidget(w.diag_playbook_summary_text)

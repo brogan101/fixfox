@@ -146,7 +146,7 @@ class TextButton(QPushButton):
 
 class DrawerCard(Card):
     def __init__(self, title: str = "Details"):
-        self.toggle_btn = SoftButton("Show details")
+        self.toggle_btn = SoftButton("Expand")
         super().__init__(title, "", right_widget=self.toggle_btn, object_name="Drawer")
         self.text = QTextEdit()
         self.text.setReadOnly(True)
@@ -170,14 +170,14 @@ class DrawerCard(Card):
             self._anim.setEndValue(0)
             self._anim.finished.connect(self._hide_drawer_once)
             self._anim.start()
-            self.toggle_btn.setText("Show details")
+            self.toggle_btn.setText("Expand")
             return
         self.text.setVisible(True)
         self._anim.stop()
         self._anim.setStartValue(0)
         self._anim.setEndValue(180)
         self._anim.start()
-        self.toggle_btn.setText("Hide details")
+        self.toggle_btn.setText("Collapse")
 
     def _hide_drawer_once(self) -> None:
         if self.text.maximumHeight() <= 0:
