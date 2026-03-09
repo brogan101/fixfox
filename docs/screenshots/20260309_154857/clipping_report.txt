@@ -1,0 +1,20 @@
+Page: Home
+- none
+
+Page: Playbooks
+- none
+
+Page: Diagnose
+- none
+
+Page: Fixes
+- none
+
+Page: Reports
+- none
+
+Page: History
+- none
+
+Page: Settings
+- none

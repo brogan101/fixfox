@@ -1,0 +1,76 @@
+Page: Home
+Result: PASS
+- baseline: nav=0 stack=0 text=96 blank_containers=0 page=home
+  sample: FixFox | SYSTEM STATUS | Ready for the next step
+- +0.2s: nav=0 stack=0 text=96 blank_containers=0 page=home
+  sample: FixFox | SYSTEM STATUS | Ready for the next step
+- +1.0s: nav=0 stack=0 text=96 blank_containers=0 page=home
+  sample: FixFox | SYSTEM STATUS | Ready for the next step
+- +2.0s: nav=0 stack=0 text=96 blank_containers=0 page=home
+  sample: FixFox | SYSTEM STATUS | Ready for the next step
+
+Page: Playbooks
+Result: PASS
+- baseline: nav=1 stack=1 text=340 blank_containers=0 page=playbooks
+  sample: FixFox | SYSTEM STATUS | Ready for the next step
+- +0.2s: nav=1 stack=1 text=340 blank_containers=0 page=playbooks
+  sample: FixFox | SYSTEM STATUS | Ready for the next step
+- +1.0s: nav=1 stack=1 text=340 blank_containers=0 page=playbooks
+  sample: FixFox | SYSTEM STATUS | Ready for the next step
+- +2.0s: nav=1 stack=1 text=340 blank_containers=0 page=playbooks
+  sample: FixFox | SYSTEM STATUS | Ready for the next step
+
+Page: Diagnose
+Result: PASS
+- baseline: nav=2 stack=2 text=52 blank_containers=0 page=diagnose
+  sample: FixFox | SYSTEM STATUS | Ready for the next step
+- +0.2s: nav=2 stack=2 text=52 blank_containers=0 page=diagnose
+  sample: FixFox | SYSTEM STATUS | Ready for the next step
+- +1.0s: nav=2 stack=2 text=52 blank_containers=0 page=diagnose
+  sample: FixFox | SYSTEM STATUS | Ready for the next step
+- +2.0s: nav=2 stack=2 text=52 blank_containers=0 page=diagnose
+  sample: FixFox | SYSTEM STATUS | Ready for the next step
+
+Page: Fixes
+Result: PASS
+- baseline: nav=3 stack=3 text=63 blank_containers=0 page=fixes
+  sample: FixFox | SYSTEM STATUS | Ready for the next step
+- +0.2s: nav=3 stack=3 text=63 blank_containers=0 page=fixes
+  sample: FixFox | SYSTEM STATUS | Ready for the next step
+- +1.0s: nav=3 stack=3 text=63 blank_containers=0 page=fixes
+  sample: FixFox | SYSTEM STATUS | Ready for the next step
+- +2.0s: nav=3 stack=3 text=63 blank_containers=0 page=fixes
+  sample: FixFox | SYSTEM STATUS | Ready for the next step
+
+Page: Reports
+Result: PASS
+- baseline: nav=4 stack=4 text=51 blank_containers=0 page=reports
+  sample: FixFox | SYSTEM STATUS | Ready for the next step
+- +0.2s: nav=4 stack=4 text=51 blank_containers=0 page=reports
+  sample: FixFox | SYSTEM STATUS | Ready for the next step
+- +1.0s: nav=4 stack=4 text=51 blank_containers=0 page=reports
+  sample: FixFox | SYSTEM STATUS | Ready for the next step
+- +2.0s: nav=4 stack=4 text=51 blank_containers=0 page=reports
+  sample: FixFox | SYSTEM STATUS | Ready for the next step
+
+Page: History
+Result: PASS
+- baseline: nav=5 stack=5 text=566 blank_containers=0 page=history
+  sample: FixFox | SYSTEM STATUS | Ready for the next step
+- +0.2s: nav=5 stack=5 text=566 blank_containers=0 page=history
+  sample: FixFox | SYSTEM STATUS | Ready for the next step
+- +1.0s: nav=5 stack=5 text=566 blank_containers=0 page=history
+  sample: FixFox | SYSTEM STATUS | Ready for the next step
+- +2.0s: nav=5 stack=5 text=566 blank_containers=0 page=history
+  sample: FixFox | SYSTEM STATUS | Ready for the next step
+
+Page: Settings
+Result: PASS
+- baseline: nav=6 stack=6 text=40 blank_containers=0 page=settings
+  sample: FixFox | SYSTEM STATUS | Ready for the next step
+- +0.2s: nav=6 stack=6 text=40 blank_containers=0 page=settings
+  sample: FixFox | SYSTEM STATUS | Ready for the next step
+- +1.0s: nav=6 stack=6 text=40 blank_containers=0 page=settings
+  sample: FixFox | SYSTEM STATUS | Ready for the next step
+- +2.0s: nav=6 stack=6 text=40 blank_containers=0 page=settings
+  sample: FixFox | SYSTEM STATUS | Ready for the next step

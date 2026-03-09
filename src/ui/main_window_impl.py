@@ -78,6 +78,7 @@ from ..core.perf import PERF_RECORDER
 from ..core.paths import ensure_dirs
 from ..core.registry import CAPABILITIES
 from ..core.registry import get_visible_capabilities
+from ..core.playbooks import support_playbook_safety
 from ..core.runbooks import RUNBOOKS, execute_runbook, runbook_map
 from ..core.run_events import RunEventBus, RunEventType, get_run_event_bus
 from ..core.safety import policy_from_settings
@@ -94,6 +95,7 @@ from ..core.sessions import (
 )
 from ..core.settings import AppSettings, load_settings, save_settings
 from ..core.script_tasks import list_script_tasks, run_script_task, script_task_map
+from ..core.support_bundle import audit_support_bundle
 from ..core.support_catalog import (
     catalog_stats as support_catalog_stats,
     diagnostics_for_issue,
@@ -485,6 +487,7 @@ class MainWindow(QMainWindow):
         self.active_run_id = ""
         self.active_run_name = ""
         self.active_run_started = 0.0
+        self.active_run_started_utc = ""
         self._run_status_subscription_id = 0
         self._status_spinner_frames = ("|", "/", "-", "\\")
         self._status_spinner_index = 0
@@ -2366,6 +2369,7 @@ class MainWindow(QMainWindow):
         self.active_run_name = name
         self._last_run_name = name
         self.active_run_started = time.monotonic()
+        self.active_run_started_utc = datetime.utcnow().isoformat()
         self._clear_page_callouts()
         self._run_status_active = True
         self._run_status_attention = False
@@ -2409,9 +2413,9 @@ class MainWindow(QMainWindow):
         worker.signals.progress.connect(lambda p, t: self._on_run_progress(resolved_run_id, name, p, t))
         worker.signals.partial.connect(lambda payload: self._on_run_partial(resolved_run_id, payload))
         worker.signals.log_line.connect(lambda line: self._on_run_log_line(resolved_run_id, line))
-        worker.signals.result.connect(on_result)
-        worker.signals.result.connect(lambda payload: self._on_run_result_event(resolved_run_id, payload))
-        worker.signals.result.connect(self.tool_runner.on_result)
+        worker.signals.result.connect(
+            lambda payload: self._dispatch_task_result(resolved_run_id, name, risk, on_result, payload)
+        )
         worker.signals.error.connect(lambda msg: self._on_task_error(name, str(msg), run_id=resolved_run_id))
         worker.signals.cancelled.connect(lambda: self._on_run_cancelled(resolved_run_id, name))
         worker.signals.cancelled.connect(self.tool_runner.on_cancelled)
@@ -2557,12 +2561,27 @@ class MainWindow(QMainWindow):
         self.active_run_id = ""
         self.active_run_name = ""
         self.active_run_started = 0.0
+        self.active_run_started_utc = ""
         self._last_run_progress = None
         self.btn_cancel_task.setEnabled(False)
         self.app_shell.toolbar.set_task_running(False)
         self._set_quick_check_busy(False)
         self._unsubscribe_run_status_events()
         self._refresh_run_status_ui()
+
+    def _dispatch_task_result(
+        self,
+        run_id: str,
+        name: str,
+        risk: str,
+        on_result: Any,
+        payload: dict[str, Any],
+    ) -> None:
+        enriched = self._enrich_task_payload(name, risk, payload)
+        on_result(enriched)
+        self._on_run_result_event(run_id, enriched)
+        if self.tool_runner is not None:
+            self.tool_runner.on_result(enriched)
 
     def closeEvent(self, event: Any) -> None:  # type: ignore[override]
         self._status_animation_timer.stop()
@@ -3041,7 +3060,17 @@ class MainWindow(QMainWindow):
         )
 
     def _on_fix(self, payload: dict[str, Any]) -> None:
-        self._append_action({"key": payload.get("key", ""), "title": payload.get("title", ""), "risk": payload.get("risk", "Safe"), "code": payload.get("code", 1), "result": str(payload.get("output", ""))[:8000]})
+        self._append_action(
+            {
+                **self._action_execution_fields(payload, fallback_title=str(payload.get("title", "Fix"))),
+                "key": payload.get("key", ""),
+                "title": payload.get("title", ""),
+                "risk": payload.get("risk", "Safe"),
+                "code": payload.get("code", 1),
+                "result": str(payload.get("output", ""))[:8000],
+                "type": "fix",
+            }
+        )
         self._refresh_rollback_list()
         self.toasts.show_toast(f"{payload.get('title', 'Fix')} {'completed' if payload.get('code') == 0 else 'failed'}.")
 
@@ -3052,6 +3081,118 @@ class MainWindow(QMainWindow):
         save_session(self.current_session)
         self._history_dirty = True
         self._refresh_run_center()
+
+    def _payload_warning_rows(self, payload: dict[str, Any]) -> list[str]:
+        warnings = payload.get("warnings", [])
+        if isinstance(warnings, list):
+            rows = [str(row).strip() for row in warnings if str(row).strip()]
+            if rows:
+                return rows
+        findings = payload.get("findings", [])
+        if isinstance(findings, list):
+            rows = []
+            for row in findings:
+                if not isinstance(row, dict):
+                    continue
+                status = str(row.get("status", "")).upper()
+                summary = str(row.get("summary", row.get("title", ""))).strip()
+                if status in {"WARN", "WARNING"} and summary:
+                    rows.append(summary)
+            if rows:
+                return rows
+        warn_text = str(payload.get("warn", "")).strip()
+        return [warn_text] if warn_text else []
+
+    def _payload_error_rows(self, payload: dict[str, Any]) -> list[str]:
+        errors = payload.get("errors", [])
+        if isinstance(errors, list):
+            rows = [str(row).strip() for row in errors if str(row).strip()]
+            if rows:
+                return rows
+        findings = payload.get("findings", [])
+        if isinstance(findings, list):
+            rows = []
+            for row in findings:
+                if not isinstance(row, dict):
+                    continue
+                status = str(row.get("status", "")).upper()
+                summary = str(row.get("summary", row.get("title", ""))).strip()
+                if status in {"FAIL", "FAILED", "ERROR", "CRIT", "CRITICAL"} and summary:
+                    rows.append(summary)
+            if rows:
+                return rows
+        for key in ("stderr", "error", "result", "summary_text"):
+            value = str(payload.get(key, "")).strip()
+            if value:
+                return [value[:500]]
+        return []
+
+    def _collect_actions_performed(self, payload: dict[str, Any], fallback_title: str = "") -> list[str]:
+        actions = payload.get("actions_performed", [])
+        if isinstance(actions, list):
+            rows = [str(row).strip() for row in actions if str(row).strip()]
+            if rows:
+                return rows
+        steps = payload.get("steps", [])
+        if isinstance(steps, list):
+            rows = []
+            for step in steps:
+                if not isinstance(step, dict):
+                    continue
+                title = str(step.get("title") or step.get("task_id") or "").strip()
+                phase = str(step.get("phase", "")).strip()
+                if title:
+                    rows.append(f"{phase}: {title}" if phase else title)
+            if rows:
+                return rows
+        performed = []
+        for key in ("task_id", "fix_id", "support_playbook_id", "playbook_id", "runbook_id", "key"):
+            value = str(payload.get(key, "")).strip()
+            if value:
+                performed.append(value)
+                break
+        if fallback_title:
+            performed.append(fallback_title)
+        return [row for row in performed if row]
+
+    def _enrich_task_payload(self, name: str, risk: str, payload: dict[str, Any]) -> dict[str, Any]:
+        enriched = dict(payload or {})
+        code = int(enriched.get("code", 0 if enriched.get("ok") else 1))
+        warnings = self._payload_warning_rows(enriched)
+        errors = self._payload_error_rows(enriched)
+        if code == 0 and not warnings and not errors:
+            final_status = "SUCCESS"
+        elif code == 0:
+            final_status = "COMPLETED_WITH_ISSUES"
+        else:
+            final_status = "FAILED"
+        end_time = datetime.utcnow().isoformat()
+        duration_ms = int(max(0.0, (time.monotonic() - float(self.active_run_started or 0.0)) * 1000.0))
+        enriched.setdefault("title", name)
+        enriched.setdefault("risk", risk)
+        enriched["code"] = code
+        enriched["start_time"] = str(enriched.get("start_time") or self.active_run_started_utc or "")
+        enriched["end_time"] = str(enriched.get("end_time") or end_time)
+        enriched["duration_ms"] = int(enriched.get("duration_ms", duration_ms))
+        enriched["actions_performed"] = self._collect_actions_performed(enriched, fallback_title=name)
+        enriched["warnings"] = warnings
+        enriched["errors"] = errors
+        enriched["final_status"] = str(enriched.get("final_status") or final_status).upper()
+        return enriched
+
+    def _action_execution_fields(self, payload: dict[str, Any], *, fallback_title: str = "") -> dict[str, Any]:
+        return {
+            "title": str(payload.get("title", fallback_title)),
+            "risk": str(payload.get("risk", "Safe")),
+            "code": int(payload.get("code", 1)),
+            "final_status": str(payload.get("final_status", "")).upper(),
+            "start_time": str(payload.get("start_time", "")),
+            "end_time": str(payload.get("end_time", "")),
+            "duration_ms": int(payload.get("duration_ms", 0) or 0),
+            "actions_performed": payload.get("actions_performed", []),
+            "warnings": payload.get("warnings", []),
+            "errors": payload.get("errors", []),
+        }
 
     def export_current_session(self) -> None:
         self._start_export_task(allow_validator_override=False)
@@ -3350,11 +3491,16 @@ class MainWindow(QMainWindow):
     def _refresh_history(self) -> None:
         q = self.hist_search.text().strip().lower() if hasattr(self, "hist_search") else ""
         scope = self.hist_scope.currentText().strip().lower() if hasattr(self, "hist_scope") else "all sessions"
-        refresh_key = (q, scope)
+        status_filter = self.hist_status.currentText().strip().lower() if hasattr(self, "hist_status") else "all statuses"
+        playbook_filter = self.hist_playbook.currentText().strip() if hasattr(self, "hist_playbook") else "All Playbooks"
+        family_filter = self.hist_family.currentText().strip() if hasattr(self, "hist_family") else "All Families"
+        refresh_key = (q, scope, status_filter, playbook_filter, family_filter)
         if (not self._history_dirty) and self._history_refresh_key == refresh_key:
             return
         adapters: list[FeedItemAdapter] = []
         rows: list[Any] = []
+        playbook_options: set[str] = {"All Playbooks"}
+        family_options: set[str] = {"All Families"}
         try:
             rows = list_sessions_db(limit=300, query=q)
         except Exception:
@@ -3363,26 +3509,77 @@ class MainWindow(QMainWindow):
             rows = load_index()
         for r in rows:
             payload = self._session_meta_payload(r)
+            session_payload: dict[str, Any] = {}
+            try:
+                session_payload = load_session(str(payload.get("session_id", "")))
+            except Exception:
+                session_payload = {}
+            support_runs = session_payload.get("support_playbook_runs", []) if isinstance(session_payload.get("support_playbook_runs", []), list) else []
+            support_context = session_payload.get("support_context", {}) if isinstance(session_payload.get("support_context", {}), dict) else {}
+            actions = session_payload.get("actions", []) if isinstance(session_payload.get("actions", []), list) else []
+            latest_run = support_runs[-1] if support_runs else {}
+            latest_action = actions[-1] if actions else {}
+            latest_title = str(latest_run.get("title") or latest_action.get("title") or "").strip()
+            latest_family = str(support_context.get("family_label", "")).strip()
+            latest_status = str(latest_run.get("final_status") or latest_run.get("status") or latest_action.get("final_status") or "").strip()
+            if latest_title:
+                playbook_options.add(latest_title)
+            if latest_family:
+                family_options.add(latest_family)
             blob = f"{payload.get('session_id', '')} {payload.get('symptom', '')} {payload.get('summary', '')}".lower()
+            if latest_title:
+                blob += f" {latest_title.lower()}"
+            if latest_family:
+                blob += f" {latest_family.lower()}"
             if q and q not in blob:
                 continue
             exported = bool(payload.get("last_export_path"))
             if scope == "with exports" and not exported:
                 continue
             if scope == "failures":
-                summary_blob = str(payload.get("summary", "")).lower()
+                summary_blob = f"{str(payload.get('summary', '')).lower()} {latest_status.lower()}"
                 if not any(token in summary_blob for token in ("fail", "error", "warn", "crit")):
                     continue
+            if status_filter == "success" and latest_status.upper() != "SUCCESS":
+                continue
+            if status_filter == "completed with issues" and latest_status.upper() != "COMPLETED_WITH_ISSUES":
+                continue
+            if status_filter == "failed" and latest_status.upper() not in {"FAILED", "ERROR"}:
+                continue
+            if playbook_filter != "All Playbooks" and latest_title != playbook_filter:
+                continue
+            if family_filter != "All Families" and latest_family != family_filter:
+                continue
+            subtitle = str(payload.get("summary", ""))
+            extra = [row for row in (latest_family, latest_title, latest_status) if row]
+            if extra:
+                subtitle = f"{subtitle}\n" + " | ".join(extra)
             adapters.append(
                 FeedItemAdapter(
                     key=str(payload.get("session_id", "")),
                     title=str(payload.get("symptom", "")),
-                    subtitle=str(payload.get("summary", "")),
+                    subtitle=subtitle,
                     payload=payload,
                     timestamp=str(payload.get("created_utc", "")),
                     export_status="Exported" if exported else "New",
                 )
             )
+        if hasattr(self, "hist_playbook"):
+            current = self.hist_playbook.currentText()
+            self.hist_playbook.blockSignals(True)
+            self.hist_playbook.clear()
+            self.hist_playbook.addItems(sorted(playbook_options))
+            if current and current in playbook_options:
+                self.hist_playbook.setCurrentText(current)
+            self.hist_playbook.blockSignals(False)
+        if hasattr(self, "hist_family"):
+            current = self.hist_family.currentText()
+            self.hist_family.blockSignals(True)
+            self.hist_family.clear()
+            self.hist_family.addItems(sorted(family_options))
+            if current and current in family_options:
+                self.hist_family.setCurrentText(current)
+            self.hist_family.blockSignals(False)
         self.hist_list.set_items(adapters)
         self._history_refresh_key = refresh_key
         self._history_dirty = False
@@ -3400,6 +3597,8 @@ class MainWindow(QMainWindow):
             self.hist_detail.sub.setText("Select a session.")
             if hasattr(self, "hist_compare"):
                 self.hist_compare.set_text("")
+            if hasattr(self, "hist_run_detail"):
+                self.hist_run_detail.set_text("")
             return
         try:
             s = load_session(sid)
@@ -3412,6 +3611,8 @@ class MainWindow(QMainWindow):
         evidence = s.get("evidence", {}).get("files", []) if isinstance(s.get("evidence", {}), dict) else []
         support_context = s.get("support_context", {}) if isinstance(s.get("support_context", {}), dict) else {}
         support_runs = s.get("support_playbook_runs", []) if isinstance(s.get("support_playbook_runs", []), list) else []
+        latest_run = support_runs[-1] if support_runs else {}
+        latest_action = actions[-1] if isinstance(actions, list) and actions else {}
         top_rows = [str(row.get("title", "")).strip() for row in findings[:3] if str(row.get("title", "")).strip()]
         exports = "yes" if any(meta.session_id == sid and meta.last_export_path for meta in load_index()) else "no"
         lines = [
@@ -3426,7 +3627,6 @@ class MainWindow(QMainWindow):
         if support_context:
             lines.insert(2, f"Issue family: {support_context.get('family_label', 'n/a')} | {support_context.get('title', 'n/a')}")
         if support_runs:
-            latest_run = support_runs[-1]
             lines.insert(4, f"Latest deep run: {latest_run.get('title', 'n/a')} | {latest_run.get('status', 'n/a')} | mode={latest_run.get('mode', 'n/a')}")
         if top_rows:
             lines.extend([f"- {row}" for row in top_rows])
@@ -3445,6 +3645,45 @@ class MainWindow(QMainWindow):
             )
         if hasattr(self, "hist_compare"):
             self.hist_compare.set_text("\n".join(lines))
+        if hasattr(self, "hist_run_detail"):
+            detail_lines = [
+                f"Playbook: {latest_run.get('title', latest_action.get('title', 'n/a'))}",
+                f"Issue family: {support_context.get('family_label', 'n/a')}",
+                f"Timestamp: {latest_run.get('timestamp_local', latest_action.get('end_time', 'n/a'))}",
+                f"Execution status: {latest_run.get('final_status', latest_action.get('final_status', latest_run.get('status', 'n/a')))}",
+                f"Warnings: {len(latest_run.get('warnings', latest_action.get('warnings', [])) if isinstance(latest_run.get('warnings', latest_action.get('warnings', [])), list) else [])}",
+                f"Errors: {len(latest_run.get('errors', latest_action.get('errors', [])) if isinstance(latest_run.get('errors', latest_action.get('errors', [])), list) else [])}",
+                "",
+                "Actions performed:",
+            ]
+            action_rows = latest_run.get("actions_performed", latest_action.get("actions_performed", []))
+            if isinstance(action_rows, list) and action_rows:
+                detail_lines.extend([f"- {str(row)}" for row in action_rows[:8]])
+            else:
+                detail_lines.append("- none recorded")
+            detail_lines.extend(["", "Rollback notes:"])
+            rollback_note = str(
+                latest_run.get("rollback_notes")
+                or latest_action.get("rollback_notes")
+                or support_context.get("rollback_notes")
+                or "See selected fix/playbook for recovery guidance."
+            ).strip()
+            detail_lines.append(f"- {rollback_note}")
+            detail_lines.extend(["", "Evidence artifacts:"])
+            evidence_rows = latest_run.get("evidence_files", latest_action.get("evidence_artifacts", []))
+            if isinstance(evidence_rows, list) and evidence_rows:
+                detail_lines.extend([f"- {str(row)}" for row in evidence_rows[:8]])
+            else:
+                detail_lines.append("- none attached")
+            warn_rows = latest_run.get("warnings", latest_action.get("warnings", []))
+            if isinstance(warn_rows, list) and warn_rows:
+                detail_lines.extend(["", "Warnings:"])
+                detail_lines.extend([f"- {str(row)}" for row in warn_rows[:6]])
+            error_rows = latest_run.get("errors", latest_action.get("errors", []))
+            if isinstance(error_rows, list) and error_rows:
+                detail_lines.extend(["", "Errors:"])
+                detail_lines.extend([f"- {str(row)}" for row in error_rows[:6]])
+            self.hist_run_detail.set_text("\n".join(detail_lines))
         self._update_concierge()
 
     def reopen_selected_session(self) -> None:
@@ -4156,6 +4395,7 @@ class MainWindow(QMainWindow):
         plan = deep_support_playbook_map().get(playbook.id) if playbook is not None else None
         issue_counts = playbook_issue_counts()
         latest = self._latest_support_playbook_run(playbook.id if playbook is not None else "")
+        safety = support_playbook_safety(playbook.id) if playbook is not None else None
         if hasattr(self, "pb_playbook_detail") and playbook is None:
             self.pb_playbook_detail.title.setText("Deep Playbook Detail")
             self.pb_playbook_detail.sub.setText("Select a mapped playbook to inspect script-backed workflow coverage.")
@@ -4181,6 +4421,11 @@ class MainWindow(QMainWindow):
                     f"{issue_line}{playbook.purpose}\n\n"
                     f"Risk: {playbook.risk} | Automation: {playbook.automation} | ~{playbook.minutes}m | Audience: {plan.audience}\n"
                     f"Covers: {issue_counts.get(playbook.id, 0)} issue classes\n"
+                    f"Safety: {safety.risk_level if safety is not None else playbook.risk} | "
+                    f"Admin required: {'yes' if safety and safety.admin_required else 'no'} | "
+                    f"Reboot required: {'yes' if safety and safety.reboot_required else 'no'} | "
+                    f"Rollback supported: {'yes' if safety and safety.rollback_supported else 'no'}\n"
+                    f"Evidence capture: {', '.join(safety.evidence_capture[:4]) if safety is not None and safety.evidence_capture else 'mapped evidence plans'}\n"
                     f"Aliases: {', '.join(plan.aliases[:4])}\n"
                     f"Support bundle integrated: {'yes' if plan.support_bundle_integrated else 'no'}{run_line}"
                 )
@@ -4218,6 +4463,13 @@ class MainWindow(QMainWindow):
                 lines = [
                     "Evidence plans:",
                     *[f"- {row}" for row in plan.evidence_plan_ids],
+                    "",
+                    "Safety metadata:",
+                    f"- Risk level: {safety.risk_level if safety is not None else playbook.risk}",
+                    f"- Admin required: {'yes' if safety and safety.admin_required else 'no'}",
+                    f"- Reboot required: {'yes' if safety and safety.reboot_required else 'no'}",
+                    f"- Rollback supported: {'yes' if safety and safety.rollback_supported else 'no'}",
+                    f"- Evidence capture: {', '.join(safety.evidence_capture[:5]) if safety is not None and safety.evidence_capture else 'mapped evidence plans'}",
                     "",
                     "Success criteria:",
                     *[f"- {row}" for row in plan.success_criteria],
@@ -4443,7 +4695,7 @@ class MainWindow(QMainWindow):
     def _on_support_playbook(self, playbook_id: str, payload: dict[str, Any]) -> None:
         if not self.current_session:
             return
-        run_status = "Failed" if int(payload.get("code", 0)) != 0 else "Completed"
+        run_status = str(payload.get("final_status", "FAILED" if int(payload.get("code", 0)) != 0 else "SUCCESS")).upper()
         rows = self.current_session.setdefault("support_playbook_runs", [])
         if not isinstance(rows, list):
             rows = []
@@ -4455,13 +4707,21 @@ class MainWindow(QMainWindow):
                 "title": str(payload.get("title", playbook_id)),
                 "mode": str(payload.get("mode", "diagnose")),
                 "status": run_status,
+                "final_status": run_status,
                 "timestamp_local": _now_local(),
+                "start_time": str(payload.get("start_time", "")),
+                "end_time": str(payload.get("end_time", "")),
+                "duration_ms": int(payload.get("duration_ms", 0) or 0),
                 "finding_count": len(payload.get("findings", [])) if isinstance(payload.get("findings", []), list) else 0,
                 "summary": str(payload.get("summary_text", ""))[:4000],
                 "findings": payload.get("findings", []),
+                "actions_performed": payload.get("actions_performed", []),
+                "warnings": payload.get("warnings", []),
+                "errors": payload.get("errors", []),
                 "guided_steps": payload.get("guided_steps", []),
                 "evidence_plan_ids": payload.get("evidence_plan_ids", []),
                 "evidence_files": payload.get("evidence_files", []),
+                "rollback_notes": str(payload.get("rollback_notes", "")),
                 "support_bundle_integrated": bool(payload.get("support_bundle_integrated", False)),
             }
         )
@@ -4479,12 +4739,15 @@ class MainWindow(QMainWindow):
             )
         self._append_action(
             {
+                **self._action_execution_fields(payload, fallback_title=str(payload.get("title", playbook_id))),
                 "key": playbook_id,
                 "title": str(payload.get("title", playbook_id)),
                 "risk": "Admin" if payload.get("requires_admin") else "Safe",
                 "code": int(payload.get("code", 0)),
                 "result": str(payload.get("summary_text", ""))[:8000],
                 "type": "support_playbook",
+                "rollback_notes": str(payload.get("rollback_notes", "")),
+                "evidence_artifacts": payload.get("evidence_files", []),
             }
         )
         save_session(self.current_session)
@@ -4631,6 +4894,7 @@ class MainWindow(QMainWindow):
         issue_id = str(context.get("issue_id", getattr(self, "selected_support_issue_id", ""))).strip()
         issue = support_issue_map().get(issue_id)
         latest = self._latest_support_playbook_run()
+        bundle_audit = audit_support_bundle(self.current_session or {})
         if issue is None:
             self.rep_issue_summary.sub.setText("No issue-family context selected yet.")
             if hasattr(self, "rep_playbook_summary"):
@@ -4649,8 +4913,11 @@ class MainWindow(QMainWindow):
             else:
                 self.rep_playbook_summary.title.setText(f"Script-backed Playbook Runs: {latest.get('title', 'Latest run')}")
                 self.rep_playbook_summary.sub.setText(
-                    f"Mode: {latest.get('mode', 'n/a')} | Status: {latest.get('status', 'n/a')} | Findings: {latest.get('finding_count', 0)}\n"
-                    f"Evidence plans: {', '.join([str(x) for x in latest.get('evidence_plan_ids', [])][:4])}\n"
+                    f"Mode: {latest.get('mode', 'n/a')} | Status: {latest.get('final_status', latest.get('status', 'n/a'))} | Findings: {latest.get('finding_count', 0)}\n"
+                    f"Warnings: {len(latest.get('warnings', []) if isinstance(latest.get('warnings', []), list) else [])} | "
+                    f"Errors: {len(latest.get('errors', []) if isinstance(latest.get('errors', []), list) else [])} | "
+                    f"Evidence files: {len(latest.get('evidence_files', []) if isinstance(latest.get('evidence_files', []), list) else [])}\n"
+                    f"Bundle audit: {' | '.join(bundle_audit.summary_lines()[:3])}\n"
                     f"{str(latest.get('summary', ''))[:700]}"
                 )
 
@@ -4852,11 +5119,14 @@ class MainWindow(QMainWindow):
         code = int(payload.get("code", 1))
         self._append_action(
             {
+                **self._action_execution_fields(payload, fallback_title=str(payload.get("title", "Tool"))),
                 "key": str(payload.get("key", "")),
                 "title": str(payload.get("title", "Tool")),
                 "risk": str(payload.get("risk", "Safe")),
                 "code": code,
                 "result": str(payload.get("result", ""))[:8000],
+                "type": "tool",
+                "evidence_artifacts": payload.get("output_files", []),
             }
         )
         self._merge_files_into_session_evidence(
@@ -4961,11 +5231,14 @@ class MainWindow(QMainWindow):
         status = "completed" if code == 0 else "failed"
         self._append_action(
             {
+                **self._action_execution_fields(payload, fallback_title=task_meta.title),
                 "key": str(payload.get("task_id", task_meta.id)),
                 "title": task_meta.title,
                 "risk": task_meta.risk,
                 "code": code,
                 "result": str(payload.get("stderr", "") or payload.get("stdout", ""))[:8000],
+                "type": "script_task",
+                "evidence_artifacts": payload.get("output_files", []),
             }
         )
         self._merge_files_into_session_evidence(payload.get("output_files", []), task_meta.category, str(payload.get("task_id", task_meta.id)))
@@ -5049,11 +5322,14 @@ class MainWindow(QMainWindow):
             self._merge_files_into_session_evidence([str(row.get("path", ""))], str(row.get("category", "evidence")), str(row.get("task_id", "")))
         self._append_action(
             {
+                **self._action_execution_fields(payload, fallback_title="Evidence Collection"),
                 "key": "evidence_collection",
                 "title": "Evidence Collection",
                 "risk": "Safe",
                 "code": 130 if payload.get("cancelled") else 0,
                 "result": str(payload.get("summary", ""))[:8000],
+                "type": "evidence",
+                "evidence_artifacts": payload.get("evidence_files", []),
             }
         )
         self._refresh_evidence_items()

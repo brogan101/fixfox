@@ -67,3 +67,22 @@
   - packaged rebuild
   - packaged EXE smoke run with `FIXFOX_AUTO_EXIT_MS=4000`
   - inspect `logs/fixfox.log`, `logs/perf_*.json`, and `logs/launch_watchdog_*.txt`
+
+## 2026-03-09 15:30 ET
+- Starting commit: `cc161c7fe314f038fa66e4665845e92863df1e77`
+- Branch: `main`
+- Goals for this run:
+  - harden runtime-state regression detection so page replacement / fallback render bugs are caught automatically
+  - upgrade tool execution records from binary pass/fail to operator-grade execution summaries
+  - upgrade History into a real execution browser with filters and expandable details
+  - surface playbook safety metadata in the UI and verify support-bundle completeness
+- Architecture targets:
+  - reusable runtime persistence snapshot/reporting in `src/ui/runtime_bootstrap.py`
+  - normalized execution payload enrichment in `src/ui/main_window_impl.py`
+  - safety metadata adapter layer in `src/core/playbooks.py`
+  - support-bundle audit layer in `src/core/support_bundle.py`
+- Verification plan:
+  - python compile checks
+  - `python scripts/ui_walkthrough.py`
+  - `pytest`
+  - packaged build smoke via `python scripts/build_release.py`

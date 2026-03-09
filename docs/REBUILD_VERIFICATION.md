@@ -32,3 +32,26 @@ The failed runs were real environment-dependent diagnostic outcomes, not registr
 - screenshots: `docs/screenshots/20260309_132419`
 - font sanity: `docs/font_sanity_report.txt`
 - qss sanity: `docs/qss_sanity_report.txt`
+
+## 2026-03-09 QA Hardening
+
+- `python -m py_compile ...`: PASS
+- `python -m pytest`: PASS (`10 passed`)
+- `python scripts/ui_walkthrough.py`: PASS
+- `python scripts/build_release.py`: PASS
+
+### Runtime persistence / regression proof
+
+- visible text sanity: `docs/screenshots/20260309_154857/visible_text_sanity_report.txt`
+- clipping report: `docs/screenshots/20260309_154857/clipping_report.txt`
+- Qt warnings: `docs/screenshots/20260309_154857/qt_warnings.txt`
+- manifest: `docs/screenshots/20260309_154857/MANIFEST.json`
+
+### Results
+
+- runtime split detected: `no`
+- clipping detected: `no`
+- qt warnings detected: `no`
+- history filters/details upgraded: `yes`
+- tool execution states normalized: `yes`
+- playbook safety metadata visible: `yes`

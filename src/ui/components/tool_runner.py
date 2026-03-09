@@ -81,6 +81,10 @@ class ToolRunnerWindow(QDialog):
         self._running_hint = "Running... waiting for live output."
         self._pending_output_lines: list[str] = []
         self._technical_visible = False
+        self._warning_messages: list[str] = []
+        self._error_messages: list[str] = []
+        self._actions_performed: list[str] = []
+        self._end_utc: datetime | None = None
 
         root = QVBoxLayout(self)
         root.setContentsMargins(spacing("sm"), spacing("sm"), spacing("sm"), spacing("sm"))
@@ -231,18 +235,18 @@ class ToolRunnerWindow(QDialog):
         if key.startswith("run"):
             kind = "info"
             label = "Running"
-        elif key.startswith("complete"):
+        elif key == "success":
             kind = "ok"
-            label = "Completed"
-        elif key.startswith("partial"):
+            label = "SUCCESS"
+        elif key in {"completed_with_issues", "partial"}:
             kind = "warn"
-            label = "Partial"
+            label = "COMPLETED_WITH_ISSUES"
         elif key.startswith("cancel"):
             kind = "warn"
             label = "Cancelled"
         elif key.startswith("fail"):
             kind = "crit"
-            label = "Failed"
+            label = "FAILED"
         else:
             kind = "info"
             label = text
@@ -312,10 +316,14 @@ class ToolRunnerWindow(QDialog):
             return
         if kind == RunEventType.WARNING:
             if message:
+                if message not in self._warning_messages:
+                    self._warning_messages.append(message)
                 self._queue_output_line(f"[warn] {message}", "warn")
             return
         if kind == RunEventType.ERROR:
             if message:
+                if message not in self._error_messages:
+                    self._error_messages.append(message)
                 self._queue_output_line(f"[error] {message}", "error")
             return
         if kind == RunEventType.END:
@@ -323,9 +331,11 @@ class ToolRunnerWindow(QDialog):
                 data = event.data or {}
                 code = int(data.get("code", 0)) if isinstance(data, dict) else 0
                 if code == 130:
-                    self._last_status = "Cancelled"
+                    self._last_status = "Failed"
+                elif code == 0 and not self._warning_messages:
+                    self._last_status = "Success"
                 elif code == 0:
-                    self._last_status = "Completed"
+                    self._last_status = "Completed_With_Issues"
                 else:
                     self._last_status = "Failed"
                 self._set_status_chip(self._last_status)
@@ -437,6 +447,7 @@ class ToolRunnerWindow(QDialog):
         self._drain_event_bus()
         self._progress_timer.stop()
         self._result_payload = payload or {}
+        self._end_utc = datetime.utcnow()
         evidence_items = coerce_evidence_items(self._result_payload if isinstance(self._result_payload, dict) else {})
         if isinstance(self._result_payload, dict):
             self._result_payload["evidence_items"] = [item.to_dict() for item in evidence_items]
@@ -455,14 +466,20 @@ class ToolRunnerWindow(QDialog):
                     continue
                 if int(result.get("code", 0)) != 0:
                     failures += 1
+        warnings = self._collect_warning_rows()
+        errors = self._collect_error_rows()
+        self._actions_performed = self._collect_actions_performed()
         if cancelled or code == 130:
-            self._last_status = "Cancelled"
-        elif failures > 0:
-            self._last_status = "Partial"
+            self._last_status = "Failed"
+            errors = errors or ["Cancelled by user."]
+        elif failures > 0 or code != 0:
+            self._last_status = "Failed"
+        elif warnings:
+            self._last_status = "Completed_With_Issues"
         elif code != 0:
             self._last_status = "Failed"
         else:
-            self._last_status = "Completed"
+            self._last_status = "Success"
         self._set_status_chip(self._last_status)
         self.progress.setRange(0, 100)
         self.progress.setValue(100)
@@ -481,8 +498,16 @@ class ToolRunnerWindow(QDialog):
         risk = str(self.lbl_risk.text().replace("Risk:", "").strip() or "Safe").lower()
         reboot_chip = "reboot likely" if reboot else "no reboot"
         self.lbl_highlights.setText(
-            f"Highlights: {risk} | {reboot_chip} | findings {findings_count} | artifacts {artifacts}"
+            f"Highlights: {risk} | {reboot_chip} | findings {findings_count} | artifacts {artifacts} | warnings {len(warnings)} | errors {len(errors)}"
         )
+        if isinstance(self._result_payload, dict):
+            self._result_payload["start_time"] = self._result_payload.get("start_time") or self._start_utc.isoformat()
+            self._result_payload["end_time"] = self._result_payload.get("end_time") or self._end_utc.isoformat()
+            self._result_payload["duration_ms"] = self._result_payload.get("duration_ms") or int((self._end_utc - self._start_utc).total_seconds() * 1000)
+            self._result_payload["actions_performed"] = list(self._actions_performed)
+            self._result_payload["warnings"] = warnings
+            self._result_payload["errors"] = errors
+            self._result_payload["final_status"] = str(self._last_status).upper()
         next_steps = self._extract_next_steps()
         self.txt_overview.setPlainText(self._build_overview(findings_count, artifacts, next_steps))
         self.txt_next.setPlainText("\n".join([f"- {row}" for row in next_steps]))
@@ -507,10 +532,13 @@ class ToolRunnerWindow(QDialog):
     def on_error(self, message: str) -> None:
         self._drain_event_bus()
         self._progress_timer.stop()
+        self._end_utc = datetime.utcnow()
         self._last_status = "Failed"
         self._set_status_chip("Failed")
         self.btn_cancel.setEnabled(False)
         reason = self._parse_reason(message)
+        if reason not in self._error_messages:
+            self._error_messages.append(reason)
         self._queue_output_line("[error] " + reason, "error")
         steps = self._failure_next_steps(message)
         self.txt_overview.setPlainText(
@@ -543,11 +571,58 @@ class ToolRunnerWindow(QDialog):
     def on_cancelled(self) -> None:
         self._drain_event_bus()
         self._progress_timer.stop()
-        self._last_status = "Cancelled"
-        self._set_status_chip("Cancelled")
+        self._end_utc = datetime.utcnow()
+        self._last_status = "Failed"
+        self._set_status_chip("Failed")
         self.btn_cancel.setEnabled(False)
+        if "Cancelled by user." not in self._error_messages:
+            self._error_messages.append("Cancelled by user.")
         self._queue_output_line("[cancelled] Cancellation requested.", "status")
         self._drain_event_bus()
+
+    def _collect_warning_rows(self) -> list[str]:
+        rows: list[str] = list(self._warning_messages)
+        if isinstance(self._result_payload, dict):
+            for key in ("warnings", "validation_warnings"):
+                values = self._result_payload.get(key, [])
+                if isinstance(values, list):
+                    for row in values:
+                        text = str(row).strip()
+                        if text and text not in rows:
+                            rows.append(text)
+        return rows
+
+    def _collect_error_rows(self) -> list[str]:
+        rows: list[str] = list(self._error_messages)
+        if isinstance(self._result_payload, dict):
+            if int(self._result_payload.get("code", 0) or 0) != 0:
+                for key in ("user_message", "technical_message", "stderr"):
+                    text = str(self._result_payload.get(key, "")).strip()
+                    if text and text not in rows:
+                        rows.append(text)
+        return rows
+
+    def _collect_actions_performed(self) -> list[str]:
+        rows: list[str] = []
+        if isinstance(self._result_payload, dict) and isinstance(self._result_payload.get("steps"), list):
+            for step in self._result_payload.get("steps", []):
+                if not isinstance(step, dict):
+                    continue
+                title = str(step.get("title", "")).strip()
+                phase = str(step.get("phase", "")).strip()
+                if title:
+                    rows.append(f"{phase}: {title}" if phase else title)
+        if not rows:
+            rows.append(self._tool_name)
+        deduped: list[str] = []
+        seen: set[str] = set()
+        for row in rows:
+            key = row.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(row)
+        return deduped
 
     def copy_summary(self) -> None:
         summary = self._plain_summary or f"{self._tool_name}: {self._last_status}"

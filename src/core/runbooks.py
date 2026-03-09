@@ -26,6 +26,11 @@ class Runbook:
     audience: str
     desc: str
     steps: tuple[RunbookStep, ...]
+    risk_level: str = "Safe"
+    admin_required: bool = False
+    reboot_required: bool = False
+    rollback_supported: bool = True
+    evidence_capture: tuple[str, ...] = ()
 
 
 RUNBOOKS: tuple[Runbook, ...] = (
@@ -406,6 +411,11 @@ def execute_runbook(
         "cancelled": False,
         "requires_admin": requires_admin,
         "reboot_likely": reboot_likely,
+        "risk_level": runbook.risk_level,
+        "admin_required": requires_admin,
+        "reboot_required": reboot_likely,
+        "rollback_supported": runbook.rollback_supported,
+        "evidence_capture": list(runbook.evidence_capture) if runbook.evidence_capture else _flatten_files(rows),
         "steps": rows,
         "evidence_root": str(work_root),
         "evidence_files": _flatten_files(rows),
