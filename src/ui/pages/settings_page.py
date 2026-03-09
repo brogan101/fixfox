@@ -54,7 +54,7 @@ class SettingsPage(PageScroll):
             )
         )
 
-        toolbar = Card("Settings Tools", "Search preferences, restore defaults, or jump straight to support workflows.")
+        toolbar = Card("Settings Tools", "Search preferences, restore defaults, or jump straight to support workflows.", elevation=2)
         tools_row = QWidget()
         tools_row_l = QVBoxLayout(tools_row)
         tools_row_l.setContentsMargins(0, 0, 0, 0)

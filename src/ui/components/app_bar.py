@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import QEasingCurve, QPropertyAnimation, Qt, Signal
 from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QLineEdit, QProgressBar, QStackedWidget, QToolButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QLineEdit, QProgressBar, QSizePolicy, QStackedWidget, QToolButton, QVBoxLayout, QWidget
 
 from ...core.brand import APP_DISPLAY_NAME
 from ...core.utils import resource_path
@@ -37,14 +37,14 @@ class AppToolbar(QFrame):
 
         self.run_status_panel = RunStatusPanel()
         self.run_status_panel.setObjectName("BrandStatus")
-        self.run_status_panel.setMinimumWidth(300)
+        self.run_status_panel.setMinimumWidth(340)
         status_l = QHBoxLayout(self.run_status_panel)
-        status_l.setContentsMargins(spacing("md"), spacing("sm"), spacing("md"), spacing("sm"))
-        status_l.setSpacing(spacing("sm"))
+        status_l.setContentsMargins(spacing("md"), spacing("md"), spacing("md"), spacing("md"))
+        status_l.setSpacing(spacing("md"))
 
         self.brand_mark = QLabel()
         self.brand_mark.setObjectName("BrandMark")
-        self.brand_mark.setFixedSize(48, 48)
+        self.brand_mark.setFixedSize(52, 52)
         self._refresh_brand_mark()
 
         text_col = QVBoxLayout()
@@ -97,6 +97,9 @@ class AppToolbar(QFrame):
         self.compact_search_btn.setToolTip("Search")
         self.search_stack = QStackedWidget()
         self.search_stack.setObjectName("HeaderSearchStack")
+        self.search_stack.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.search_stack.setMaximumWidth(860)
+        self.search_stack.setMinimumWidth(360)
         self.search_stack.addWidget(self.top_search)
         self.search_stack.addWidget(self.compact_search_btn)
         ensure_opacity_effect(self.top_search)
@@ -150,7 +153,7 @@ class AppToolbar(QFrame):
 
     def _refresh_brand_mark(self) -> None:
         pixmap = QPixmap(resource_path("assets/brand/fixfox_mark.png")).scaled(
-            44, 44, Qt.KeepAspectRatio, Qt.SmoothTransformation
+            48, 48, Qt.KeepAspectRatio, Qt.SmoothTransformation
         )
         if not pixmap.isNull():
             self.brand_mark.setPixmap(pixmap)

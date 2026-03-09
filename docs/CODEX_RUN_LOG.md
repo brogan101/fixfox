@@ -1009,3 +1009,13 @@ src/ui/style/qss_builder.py         |  45 +++---
   - Reports still reads too empty in the no-session path even though the flow is implemented
   - Settings top tools area lacks stronger summary hierarchy and quick section jumping
   - persistence proof is currently delay-based but should also validate nav/search round-trips so disappearing content cannot slip through
+
+## 2026-03-09 11:46:22 -04:00 - Surgical Leftover Patch Pass
+- Starting commit: `650c9403d91047c0e0d960893b1f097f50c798ef`
+- Branch: `main`
+- Exact leftover issues being targeted:
+  - nav rail feels too empty with icons that read too small and selected/focus states that lack weight
+  - top bar search field dominates the header while the status module still feels undersized and utility-like
+  - helper text, card contrast, and secondary buttons are too flat across Diagnose, Reports, Settings, and Fixes
+  - Diagnose left rail and Fixes right column still read as stacked placeholders instead of intentional product surfaces
+  - Reports no-session state and Settings tools strip still need a final hierarchy/weight pass

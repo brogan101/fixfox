@@ -53,6 +53,7 @@ class ReportsPage(PageScroll):
         workspace = Card(
             "Report Workspace",
             "Prepare masking defaults, reopen a case, or run diagnostics before generating the final support bundle.",
+            elevation=2,
         )
         workspace.body_layout().addWidget(QLabel("Reports stays useful before a session exists: stage bundle policy now, then validate evidence and export once a case is loaded."))
         workspace.body_layout().addWidget(workspace_actions)
@@ -90,6 +91,7 @@ class ReportsPage(PageScroll):
         export_flow = Card(
             "Support Bundle Flow",
             "1) Choose session  2) Choose bundle type  3) Configure masking  4) Create and validate",
+            elevation=2,
         )
         export_flow.body_layout().addWidget(QLabel("Reports stays useful even before a session exists: configure defaults, review the checklist, then generate once a case is loaded."))
         export_quick_actions = QWidget()

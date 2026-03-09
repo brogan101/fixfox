@@ -39,7 +39,7 @@ class FixesPage(PageScroll):
         )
         w.fix_callout = InlineCallout("Fixes", "", level="warn", density=w.settings_state.density)
         left_layout.addWidget(w.fix_callout)
-        w.support_fix_summary = Card("Issue Resolution Planner", "Select an issue-family entry to see safe fixes, guided steps, evidence capture, and escalation rules.")
+        w.support_fix_summary = Card("Issue Resolution Planner", "Select an issue-family entry to see safe fixes, guided steps, evidence capture, and escalation rules.", elevation=2)
         w.support_fix_search = QLineEdit()
         w.support_fix_search.setObjectName("SearchInput")
         w.support_fix_search.setPlaceholderText("Search issue fixes: printer offline, VPN, slow PC, BitLocker...")
@@ -65,7 +65,7 @@ class FixesPage(PageScroll):
         w.fix_chip_adv.setChecked(w.settings_state.show_advanced_tools)
         for chip in (w.fix_chip_safe, w.fix_chip_admin, w.fix_chip_adv):
             chip.stateChanged.connect(w._refresh_fixes)
-        policy_card = Card("Policy Summary", "Safe-only mode and visible risk levels.", right_widget=w.fix_scope)
+        policy_card = Card("Policy Summary", "Safe-only mode and visible risk levels.", right_widget=w.fix_scope, elevation=2)
         w.fix_policy_text = QLabel("Safe-only mode ON")
         chip_row = QWidget()
         chip_layout = QHBoxLayout(chip_row)
@@ -92,7 +92,7 @@ class FixesPage(PageScroll):
         right_layout = QVBoxLayout(right)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(spacing("md"))
-        w.fix_detail = Card("Fix Detail", "Select a fix.")
+        w.fix_detail = Card("Fix Detail", "Select a fix.", elevation=2)
         w.fix_detail_text = QLabel("Select a fix to see plain language, risk, and rollback guidance.")
         w.fix_detail_text.setWordWrap(True)
         w.fix_commands = DrawerCard("Commands")
@@ -112,8 +112,9 @@ class FixesPage(PageScroll):
         w.fix_detail.body_layout().addWidget(detail_actions)
         right_layout.addWidget(w.fix_detail)
 
-        w.support_fix_detail = Card("Issue-specific Fix Flow", "Select an issue from Playbooks or search above to see issue-specific fix guidance.")
+        w.support_fix_detail = Card("Issue-specific Fix Flow", "Select an issue from Playbooks or search above to see issue-specific fix guidance.", elevation=2)
         w.support_fix_detail_text = QLabel("Select an issue from Playbooks or search above to see issue-specific fix guidance.")
+        w.support_fix_detail_text.setObjectName("SubTitle")
         w.support_fix_detail_text.setWordWrap(True)
         w.support_fix_list = FeedRenderer(w._make_support_fix_row, density=w.settings_state.density, empty_icon="wrench", empty_message="No support fixes mapped to the selected issue.")
         w.support_fix_list.item_selected.connect(lambda fix_id: w._set_support_fix_selection(str(fix_id) if fix_id else ""))
@@ -146,7 +147,7 @@ class FixesPage(PageScroll):
         w.fix_rollback.body_layout().addWidget(w.rollback_feed)
         right_layout.addWidget(w.fix_rollback, 1)
 
-        w.fix_info = Card("Safety and Rollback", "All fixes require confirmation.")
+        w.fix_info = Card("Safety and Rollback", "All fixes require confirmation.", elevation=2)
         right_layout.addWidget(w.fix_info)
 
         layout.addWidget(left, 2)

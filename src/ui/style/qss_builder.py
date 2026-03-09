@@ -96,17 +96,17 @@ QLabel#StartupWarmupText {{
 
 QFrame#BrandStatus {{
   background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-    stop:0 {_alpha(tokens.panel2, 0.98)},
-    stop:1 {_alpha(tokens.panel, 0.98)});
-  border: 1px solid {_alpha(tokens.border, 0.88)};
+    stop:0 {_alpha(tokens.panel2, 0.99)},
+    stop:1 {_alpha(tokens.panel, 0.99)});
+  border: 1px solid {_alpha(tokens.border, 0.94)};
   border-radius: {d.corner_radius + 10}px;
 }}
 QLabel#Wordmark {{
-  font-size: {d.font_size + 2}pt;
+  font-size: {d.font_size + 3}pt;
   font-weight: 75;
 }}
 QLabel#TopStatusEyebrow {{
-  color: {tokens.text_muted};
+  color: {text_soft};
   font-size: {max(7, d.font_size - 2)}pt;
   letter-spacing: 0.08em;
   font-weight: 63;
@@ -120,11 +120,11 @@ QLabel#BrandMark {{
 }}
 QLabel#TopStatusText {{
   color: {tokens.text};
-  font-size: {d.font_size + 1}pt;
-  font-weight: 63;
+  font-size: {d.font_size + 2}pt;
+  font-weight: 75;
 }}
 QLabel#TopStatusSubtle {{
-  color: {tokens.text_muted};
+  color: {text_soft};
   font-size: {max(8, d.font_size - 1)}pt;
 }}
 QWidget#TopStatusMeta {{
@@ -132,11 +132,11 @@ QWidget#TopStatusMeta {{
 }}
 
 QWidget#NavRail {{
-  background: {_alpha(tokens.panel, 0.92)};
-  border: 0;
+  background: {_alpha(tokens.panel, 0.96)};
+  border: 1px solid {_alpha(tokens.border, 0.72)};
   border-radius: {d.corner_radius + 8}px;
-  min-width: 80px;
-  max-width: 80px;
+  min-width: 88px;
+  max-width: 88px;
 }}
 QFrame#NavRailDivider {{
   background: {_alpha(tokens.border, 0.55)};
@@ -149,28 +149,29 @@ QToolButton#NavRailAuxButton {{
   background: transparent;
   border: 1px solid transparent;
   border-radius: {d.corner_radius + 10}px;
-  padding: 10px;
-  margin: 0 2px;
-  icon-size: {max(16, d.icon_size - 1)}px;
+  padding: 12px;
+  margin: 0 3px;
+  icon-size: {max(18, d.icon_size)}px;
 }}
 QToolButton#NavRailButton:checked {{
-  background: {_alpha(tokens.accent, 0.18)};
-  border-color: {_alpha(tokens.accent, 0.38)};
+  background: {_alpha(tokens.accent, 0.22)};
+  border-color: {_alpha(tokens.accent, 0.52)};
 }}
 QToolButton#NavRailButton:hover,
 QToolButton#NavRailAuxButton:hover {{
-  background: {surface_alt};
-  border-color: {border_soft};
+  background: {_alpha(tokens.panel2, 0.88)};
+  border-color: {_alpha(tokens.border, 0.84)};
 }}
 QToolButton#NavRailButton:focus,
 QToolButton#NavRailAuxButton:focus {{
-  border-color: {focus_ring};
+  background: {_alpha(tokens.accent, 0.10)};
+  border-color: {_alpha(tokens.accent, 0.58)};
 }}
 QLabel#RunnerStatusChip {{
-  background: {tokens.panel2};
-  border: 1px solid {border_soft};
+  background: {_alpha(tokens.panel2, 0.98)};
+  border: 1px solid {_alpha(tokens.border, 0.86)};
   border-radius: 999px;
-  padding: 4px 10px;
+  padding: 5px 12px;
   font-weight: 63;
 }}
 QLabel#RunnerStatusChip[kind="ok"] {{
@@ -262,7 +263,7 @@ QLabel#Title {{
   min-height: {max(26, d.font_size + 14)}px;
 }}
 QLabel#SubTitle {{
-  color: {tokens.text_muted};
+  color: {text_soft};
   font-size: {d.font_size - 1}pt;
   min-height: {max(16, d.font_size + 6)}px;
 }}
@@ -275,7 +276,7 @@ QLabel#CardTitle {{
   font-weight: 63;
 }}
 QLabel#CardSubtitle {{
-  color: {tokens.text_muted};
+  color: {text_soft};
 }}
 
 QFrame#Card,
@@ -283,9 +284,14 @@ QFrame#Drawer,
 QFrame#EmptyState,
 QFrame#InlineCallout,
 QFrame#AccordionSection {{
-  background: {tokens.panel};
-  border: 1px solid {border_soft};
+  background: {surface_raised};
+  border: 1px solid {_alpha(tokens.border, 0.84)};
   border-radius: {d.corner_radius + 2}px;
+}}
+QFrame#Card[hovered="true"],
+QFrame#Drawer[hovered="true"],
+QFrame#EmptyState[hovered="true"] {{
+  border-color: {_alpha(tokens.accent, 0.28)};
 }}
 QFrame#Card[elevation="1"],
 QFrame#Drawer[elevation="1"],
@@ -360,12 +366,13 @@ QPushButton#SecondaryButton,
 QToolButton#IconButton,
 QToolButton#KebabMenuButton,
 QToolButton#MoreButton {{
-  background: {tokens.panel2};
+  background: {surface_raised};
   color: {tokens.text};
   border: 1px solid {border_soft};
   border-radius: {d.corner_radius}px;
   padding: 0 10px;
   min-height: {d.button_height}px;
+  font-weight: 57;
 }}
 QPushButton#SoftButton:hover,
 QPushButton#SecondaryButton:hover,
