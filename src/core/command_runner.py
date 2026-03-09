@@ -61,7 +61,12 @@ def _pump_stream(
         if stream is None:
             return
         while True:
-            line = stream.readline()
+            try:
+                line = stream.readline()
+            except ValueError:
+                # The parent can close the pipe during shutdown if the worker is
+                # still winding down. Treat that as normal end-of-stream.
+                break
             if line == "":
                 break
             line = line.rstrip("\r\n")

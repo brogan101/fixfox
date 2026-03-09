@@ -702,21 +702,21 @@ class MainWindow(QMainWindow):
         self.ctx_hint = QLabel("No active session - start a goal from Home.")
         self.ctx_hint.setObjectName("SubTitle")
         self.ctx_full = QWidget()
-        full_l = QHBoxLayout(self.ctx_full); full_l.setContentsMargins(0, 0, 0, 0); full_l.setSpacing(8)
-        self.ctx_session = QLabel("Session: none")
-        self.ctx_symptom = QLabel("Symptom: n/a")
-        self.ctx_share = QLabel("Share-safe: on")
-        self.ctx_preset = QLabel("Preset: home_share")
-        self.ctx_last = QLabel("Last run: n/a")
+        full_l = QVBoxLayout(self.ctx_full); full_l.setContentsMargins(0, 0, 0, 0); full_l.setSpacing(6)
+        self.ctx_summary = QLabel("Session none | Symptom n/a | Share-safe on | Preset home_share | Last run n/a")
+        self.ctx_summary.setObjectName("SubTitle")
+        self.ctx_summary.setWordWrap(True)
+        actions = QWidget()
+        actions_l = QHBoxLayout(actions); actions_l.setContentsMargins(0, 0, 0, 0); actions_l.setSpacing(8)
         b_export = SoftButton("Support Bundle"); b_export.clicked.connect(lambda: self.nav.setCurrentRow(self.NAV_ITEMS.index("Reports")))
         b_copy = SoftButton("Copy Summary"); b_copy.clicked.connect(self.copy_session_summary)
         b_end = SoftButton("End Session"); b_end.clicked.connect(self.end_session)
         min_btn = min_button_size(self.settings_state.density)
         for btn in (b_export, b_copy, b_end):
             btn.setMinimumSize(min_btn)
-        for w in (self.ctx_session, self.ctx_symptom, self.ctx_share, self.ctx_preset, self.ctx_last):
-            full_l.addWidget(w)
-        full_l.addStretch(1); full_l.addWidget(b_export); full_l.addWidget(b_copy); full_l.addWidget(b_end)
+        actions_l.addStretch(1); actions_l.addWidget(b_export); actions_l.addWidget(b_copy); actions_l.addWidget(b_end)
+        full_l.addWidget(self.ctx_summary)
+        full_l.addWidget(actions)
         l.addWidget(self.ctx_hint)
         l.addWidget(self.ctx_full)
         return f
@@ -4520,7 +4520,9 @@ class MainWindow(QMainWindow):
             self.support_fix_detail_text.setText(
                 f"{selected_issue.family_label} | {selected_issue.subfamily}\n"
                 f"Mapped playbooks: {', '.join(selected_issue.playbook_ids)}\n"
-                f"Evidence plans: {', '.join(selected_issue.evidence_plan_ids)}"
+                f"Evidence plans: {', '.join(selected_issue.evidence_plan_ids)}\n"
+                f"Symptoms: {', '.join(selected_issue.symptom_labels[:3])}\n"
+                f"Escalate when: {selected_issue.rollback_notes}"
             )
         if adapters:
             self._set_support_fix_selection(adapters[0].key)
@@ -5528,19 +5530,44 @@ class MainWindow(QMainWindow):
     def _refresh_home_favorites(self) -> None:
         visible = self._visible_capability_ids()
         entries: list[FeedItemAdapter] = []
+        user_pinned = False
         for key in self.settings_state.favorites_fixes or []:
             fx = next((f for f in FIX_CATALOG if f.key == key), None)
             if fx is not None and f"fix_action.{fx.key}" in visible:
                 entries.append(FeedItemAdapter(key=f"fix:{fx.key}", title=fx.title, subtitle=fx.plain, payload={"kind": "fixes", "key": fx.key}, category="Fix"))
+                user_pinned = True
         for key in self.settings_state.favorites_tools or []:
             tool = next((t for t in TOOL_DIRECTORY if t.id == key), None)
             if tool is not None and f"tool.{tool.id}" in visible:
                 entries.append(FeedItemAdapter(key=f"tool:{tool.id}", title=tool.title, subtitle=tool.desc, payload={"kind": "tools", "key": tool.id}, category="Tool"))
+                user_pinned = True
         for key in self.settings_state.favorites_runbooks or []:
             rb = next((r for r in RUNBOOKS if r.id == key), None)
             if rb is not None and f"runbook.{rb.id}" in visible:
                 entries.append(FeedItemAdapter(key=f"runbook:{rb.id}", title=rb.title, subtitle=rb.desc, payload={"kind": "runbooks", "key": rb.id}, category="Runbook"))
+                user_pinned = True
+        if not entries:
+            for rb in RUNBOOKS:
+                if rb.audience != "home" or f"runbook.{rb.id}" not in visible:
+                    continue
+                entries.append(
+                    FeedItemAdapter(
+                        key=f"runbook:{rb.id}",
+                        title=rb.title.replace("Home: ", ""),
+                        subtitle=rb.desc,
+                        payload={"kind": "runbooks", "key": rb.id},
+                        category="Suggested",
+                    )
+                )
+                if len(entries) >= 4:
+                    break
         self.home_favorites.set_items(entries[:6] if len(entries) > 6 else entries)
+        if hasattr(self, "home_favorites_hint"):
+            self.home_favorites_hint.setText(
+                "Pinned actions are shown here."
+                if user_pinned
+                else "Showing suggested home runbooks until you pin your own quick actions."
+            )
         if not entries:
             self.home_favorites.show_empty("quick_check", "No quick actions in this mode. Switch to Pro to see more.")
 
@@ -5590,15 +5617,19 @@ class MainWindow(QMainWindow):
             self.weekly_card.sub.setText(f"Weekly check is up to date. Last completed check: {last_raw}.")
 
     def _update_context_labels(self) -> None:
-        self.ctx_session.setText(f"Session: {self.current_session.get('session_id', 'none')}")
-        self.ctx_symptom.setText(f"Symptom: {self.current_session.get('symptom', 'n/a')}")
-        self.ctx_share.setText(f"Share-safe: {'on' if self.rep_safe.isChecked() else 'off'}" if hasattr(self, "rep_safe") else "Share-safe: on")
-        self.ctx_preset.setText(f"Preset: {self.rep_preset.currentText()}" if hasattr(self, "rep_preset") else "Preset: home_share")
-        self.ctx_last.setText(f"Last run: {self.current_session.get('created_local', 'n/a')}")
+        session_id = str(self.current_session.get("session_id", "none"))
+        symptom = str(self.current_session.get("symptom", "n/a"))
+        share_state = "on" if hasattr(self, "rep_safe") and self.rep_safe.isChecked() else "off" if hasattr(self, "rep_safe") else "on"
+        preset = self.rep_preset.currentText() if hasattr(self, "rep_preset") else "home_share"
+        last_run = str(self.current_session.get("created_local", "n/a"))
+        if hasattr(self, "ctx_summary"):
+            self.ctx_summary.setText(
+                f"Session {session_id}  |  Symptom {symptom}  |  Share-safe {share_state}  |  Preset {preset}  |  Last run {last_run}"
+            )
         if hasattr(self, "run_status_session_chip"):
-            session_id = str(self.current_session.get("session_id", "") or "none").strip()
-            self.run_status_session_chip.setText(f"Session {session_id}")
-            self.run_status_session_chip.setProperty("kind", "muted" if session_id == "none" else "info")
+            chip_session_id = str(self.current_session.get("session_id", "") or "none").strip()
+            self.run_status_session_chip.setText(f"Session {chip_session_id}")
+            self.run_status_session_chip.setProperty("kind", "muted" if chip_session_id == "none" else "info")
             self.run_status_session_chip.style().unpolish(self.run_status_session_chip)
             self.run_status_session_chip.style().polish(self.run_status_session_chip)
         self._sync_context_bar_visibility()

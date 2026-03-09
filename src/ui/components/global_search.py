@@ -9,6 +9,26 @@ from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QListWidget, QListWid
 from ..style import spacing
 
 
+def _display_kind_label(kind: str) -> str:
+    token = str(kind or "").strip().lower()
+    return {
+        "capability": "Goal",
+        "support_playbook": "Playbook",
+        "runbook": "Runbook",
+        "task": "Script",
+        "fix": "Fix",
+        "tool": "Tool",
+        "session": "Session",
+        "run": "Run",
+        "finding": "Finding",
+        "artifact": "Artifact",
+        "file": "File",
+        "kb": "KB",
+        "export": "Export",
+        "route": "Route",
+    }.get(token, token.replace("_", " ").title() or "Item")
+
+
 class _SearchResultRow(QFrame):
     def __init__(self, payload: dict[str, str]) -> None:
         super().__init__()
@@ -32,9 +52,15 @@ class _SearchResultRow(QFrame):
         text_col.addWidget(self.title)
         text_col.addWidget(self.subtitle)
 
-        self.kind = QLabel(str(payload.get("kind", "")).strip().upper())
+        kind_text = _display_kind_label(str(payload.get("kind", "")).strip())
+        self.kind = QLabel(kind_text)
         self.kind.setObjectName("GlobalSearchTag")
         self.kind.setAlignment(Qt.AlignCenter)
+        self.kind.setToolTip(str(payload.get("kind", "")).strip())
+        tag_metrics = QFontMetrics(self.kind.font())
+        desired_width = max(70, min(116, tag_metrics.horizontalAdvance(kind_text) + 22))
+        self.kind.setMinimumWidth(desired_width)
+        self.kind.setMaximumWidth(desired_width)
 
         shell.addLayout(text_col, 1)
         shell.addWidget(self.kind, 0, Qt.AlignTop)

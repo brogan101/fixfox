@@ -168,6 +168,9 @@ class HomePage(PageScroll):
         manage_btn.clicked.connect(lambda: w.nav.setCurrentRow(w.NAV_ITEMS.index("Settings")))
         manage_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         favorites_card.body_layout().addWidget(manage_btn)
+        w.home_favorites_hint = QLabel("If you have not pinned anything yet, FixFox will surface suggested home runbooks here.")
+        w.home_favorites_hint.setWordWrap(True)
+        favorites_card.body_layout().addWidget(w.home_favorites_hint)
         favorites_card.body_layout().addWidget(w.home_favorites)
         layout.addWidget(favorites_card)
 

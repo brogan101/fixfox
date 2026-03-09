@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from PySide6.QtWidgets import QCheckBox, QComboBox, QLabel, QTabWidget, QTextEdit, QTreeWidget, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QCheckBox, QComboBox, QHBoxLayout, QLabel, QTabWidget, QTextEdit, QTreeWidget, QVBoxLayout, QWidget
 
 from ...core.exporter import PRESETS
 from ..components.feed_renderer import FeedRenderer
@@ -44,11 +44,17 @@ class ReportsPage(PageScroll):
         overview_row_layout = QVBoxLayout(overview_row)
         overview_row_layout.setContentsMargins(0, 0, 0, 0)
         overview_row_layout.setSpacing(spacing("md"))
-        w.rep_session_summary = Card("Active Session", "No active session loaded yet.")
+        open_history_summary = SoftButton("Open History")
+        open_history_summary.clicked.connect(lambda: w.nav.setCurrentRow(w.NAV_ITEMS.index("History")))
+        open_playbooks_summary = SoftButton("Open Playbooks")
+        open_playbooks_summary.clicked.connect(lambda: w.nav.setCurrentRow(w.NAV_ITEMS.index("Playbooks")))
+        open_diagnose_summary = SoftButton("Open Diagnose")
+        open_diagnose_summary.clicked.connect(lambda: w.nav.setCurrentRow(w.NAV_ITEMS.index("Diagnose")))
+        w.rep_session_summary = Card("Active Session", "No active session loaded yet.", right_widget=open_history_summary)
         w.rep_session_summary.body_layout().addWidget(QLabel("Load or create a session to unlock live bundle validation."))
-        w.rep_issue_summary = Card("Issue-family Reporting", "No issue-family context selected yet.")
+        w.rep_issue_summary = Card("Issue-family Reporting", "No issue-family context selected yet.", right_widget=open_playbooks_summary)
         w.rep_issue_summary.body_layout().addWidget(QLabel("When you pick an issue in Playbooks or Fixes, Reports summarizes mapped playbooks, evidence plans, and escalation posture here."))
-        w.rep_playbook_summary = Card("Script-backed Playbook Runs", "No deep playbook runs recorded yet.")
+        w.rep_playbook_summary = Card("Script-backed Playbook Runs", "No deep playbook runs recorded yet.", right_widget=open_diagnose_summary)
         w.rep_playbook_summary.body_layout().addWidget(QLabel("Deep playbook executions contribute normalized findings, evidence files, and validation notes here."))
         w.rep_handoff_summary = Card("Handoff Checklist", "Masking preview, evidence review, validation, and summary copy all live here.")
         w.rep_handoff_summary.body_layout().addWidget(QLabel("Use Reports as the final review station before sharing anything externally."))
@@ -64,6 +70,21 @@ class ReportsPage(PageScroll):
             "1) Choose session  2) Choose bundle type  3) Configure masking  4) Create and validate",
         )
         export_flow.body_layout().addWidget(QLabel("Reports stays useful even before a session exists: configure defaults, review the checklist, then generate once a case is loaded."))
+        export_quick_actions = QWidget()
+        export_quick_actions_layout = QHBoxLayout(export_quick_actions)
+        export_quick_actions_layout.setContentsMargins(0, 0, 0, 0)
+        export_quick_actions_layout.setSpacing(spacing("sm"))
+        export_open_history = SoftButton("Reopen Session")
+        export_open_history.clicked.connect(lambda: w.nav.setCurrentRow(w.NAV_ITEMS.index("History")))
+        export_open_playbooks = SoftButton("Pick Issue Context")
+        export_open_playbooks.clicked.connect(lambda: w.nav.setCurrentRow(w.NAV_ITEMS.index("Playbooks")))
+        export_collect_now = SoftButton("Collect Diagnostics")
+        export_collect_now.clicked.connect(w._collect_core_evidence)
+        export_quick_actions_layout.addWidget(export_open_history)
+        export_quick_actions_layout.addWidget(export_open_playbooks)
+        export_quick_actions_layout.addWidget(export_collect_now)
+        export_quick_actions_layout.addStretch(1)
+        export_flow.body_layout().addWidget(export_quick_actions)
         layout.addWidget(export_flow)
 
         w.rep_empty_state = EmptyState(
