@@ -1,0 +1,402 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- ═══════════════════════ FIXFOX DARK PALETTE ═══════════════════════ -->
+  <!-- Background layers — deep navy -->
+  <SolidColorBrush x:Key="BgPrimaryBrush"   Color="#0D1117"/>
+  <SolidColorBrush x:Key="BgSurfaceBrush"   Color="#141A27"/>
+  <SolidColorBrush x:Key="BgCardBrush"      Color="#1A2235"/>
+  <SolidColorBrush x:Key="BgCard2Brush"     Color="#1F2940"/>
+  <SolidColorBrush x:Key="BorderBrush"      Color="#263047"/>
+
+  <!-- Text -->
+  <SolidColorBrush x:Key="TextPrimaryBrush" Color="#E8EDF5"/>
+  <SolidColorBrush x:Key="TextSecBrush"     Color="#7E8FAD"/>
+  <SolidColorBrush x:Key="TextMutedBrush"   Color="#3D4F6A"/>
+
+  <!-- FixFox brand — fox orange -->
+  <SolidColorBrush x:Key="FoxOrangeBrush"      Color="#E8720C"/>
+  <SolidColorBrush x:Key="FoxOrangeDimBrush"   Color="#B85A09"/>
+  <SolidColorBrush x:Key="FoxOrangeGlowBrush"  Color="#1AE8720C"/>
+
+  <!-- Accents -->
+  <SolidColorBrush x:Key="AccentBlueBrush"   Color="#3B82F6"/>
+  <SolidColorBrush x:Key="AccentBlue2Brush"  Color="#2563EB"/>
+  <SolidColorBrush x:Key="AccentGreenBrush"  Color="#22C55E"/>
+  <SolidColorBrush x:Key="AccentAmberBrush"  Color="#F59E0B"/>
+  <SolidColorBrush x:Key="AccentRedBrush"    Color="#EF4444"/>
+  <SolidColorBrush x:Key="AccentPurpleBrush" Color="#8B5CF6"/>
+
+  <!-- Button interactive states -->
+  <SolidColorBrush x:Key="ButtonHoverBrush"   Color="#28364F"/>
+  <SolidColorBrush x:Key="ButtonPressedBrush" Color="#1A2540"/>
+  <SolidColorBrush x:Key="SecBtnHoverBrush"   Color="#28364F"/>
+  <SolidColorBrush x:Key="TitleBarBrush"      Color="#141A27"/>
+  <SolidColorBrush x:Key="StatusBarBrush"     Color="#0F1520"/>
+  <SolidColorBrush x:Key="WindowBorderBrush"  Color="#1E2A3E"/>
+
+  <!-- Icon font (Segoe Fluent Icons, falling back to MDL2 Assets) -->
+  <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
+
+  <!-- ═══════════════════════ GLOBAL DEFAULTS ═══════════════════════ -->
+  <Style TargetType="TextBlock">
+    <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+    <Setter Property="FontFamily" Value="Segoe UI"/>
+  </Style>
+
+  <Style TargetType="TextBox">
+    <Setter Property="Background"      Value="{StaticResource BgCardBrush}"/>
+    <Setter Property="Foreground"      Value="{StaticResource TextPrimaryBrush}"/>
+    <Setter Property="CaretBrush"      Value="{StaticResource FoxOrangeBrush}"/>
+    <Setter Property="BorderBrush"     Value="{StaticResource BorderBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="Padding"         Value="10,7"/>
+    <Setter Property="FontFamily"      Value="Segoe UI"/>
+    <Setter Property="FontSize"        Value="13"/>
+    <Setter Property="SelectionBrush"  Value="{StaticResource FoxOrangeBrush}"/>
+    <Style.Triggers>
+      <Trigger Property="IsFocused" Value="True">
+        <Setter Property="BorderBrush" Value="{StaticResource FoxOrangeBrush}"/>
+      </Trigger>
+    </Style.Triggers>
+  </Style>
+
+  <Style TargetType="CheckBox">
+    <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+    <Setter Property="VerticalContentAlignment" Value="Center"/>
+  </Style>
+
+  <Style TargetType="Separator">
+    <Setter Property="Background" Value="{StaticResource BorderBrush}"/>
+    <Setter Property="Height"     Value="1"/>
+    <Setter Property="Margin"     Value="0"/>
+  </Style>
+
+  <!-- ═══════════════════════ SCROLLBAR ═══════════════════════ -->
+  <Style TargetType="ScrollBar">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="Width"      Value="5"/>
+    <Setter Property="Opacity"    Value="0"/>
+    <Style.Triggers>
+      <Trigger Property="IsMouseOver" Value="True">
+        <Setter Property="Opacity" Value="1"/>
+        <Setter Property="Width"   Value="6"/>
+      </Trigger>
+    </Style.Triggers>
+  </Style>
+
+  <Style TargetType="ScrollViewer">
+    <Setter Property="VerticalScrollBarVisibility"   Value="Auto"/>
+    <Setter Property="HorizontalScrollBarVisibility" Value="Disabled"/>
+  </Style>
+
+  <!-- ═══════════════════════ SIDEBAR NAV BUTTON ═══════════════════════ -->
+  <Style x:Key="NavButton" TargetType="Button">
+    <Setter Property="Background"                 Value="Transparent"/>
+    <Setter Property="Foreground"                 Value="{StaticResource TextSecBrush}"/>
+    <Setter Property="BorderThickness"            Value="0"/>
+    <Setter Property="HorizontalAlignment"        Value="Stretch"/>
+    <Setter Property="HorizontalContentAlignment" Value="Left"/>
+    <Setter Property="Padding"                    Value="14,11,14,11"/>
+    <Setter Property="Margin"                     Value="6,1"/>
+    <Setter Property="FontSize"                   Value="13"/>
+    <Setter Property="FontFamily"                 Value="Segoe UI"/>
+    <Setter Property="Cursor"                     Value="Hand"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="bg" Background="{TemplateBinding Background}"
+                  CornerRadius="7" Padding="{TemplateBinding Padding}">
+            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                              VerticalAlignment="Center"/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="bg" Property="Background" Value="{StaticResource FoxOrangeGlowBrush}"/>
+              <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+              <Setter TargetName="bg" Property="Background" Value="#25E8720C"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style x:Key="NavButtonActive" TargetType="Button" BasedOn="{StaticResource NavButton}">
+    <Setter Property="Background" Value="{StaticResource FoxOrangeGlowBrush}"/>
+    <Setter Property="Foreground" Value="{StaticResource FoxOrangeBrush}"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+  </Style>
+
+  <Style x:Key="CategoryButton" TargetType="Button" BasedOn="{StaticResource NavButton}">
+    <Setter Property="FontSize" Value="12"/>
+    <Setter Property="Padding"  Value="14,8,14,8"/>
+  </Style>
+
+  <!-- ═══════════════════════ PRIMARY BUTTON (Fox Orange) ═══════════════════════ -->
+  <Style x:Key="PrimaryButton" TargetType="Button">
+    <Setter Property="Background"      Value="{StaticResource FoxOrangeBrush}"/>
+    <Setter Property="Foreground"      Value="White"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="Padding"         Value="16,8"/>
+    <Setter Property="Height"          Value="36"/>
+    <Setter Property="FontSize"        Value="13"/>
+    <Setter Property="FontWeight"      Value="SemiBold"/>
+    <Setter Property="FontFamily"      Value="Segoe UI"/>
+    <Setter Property="Cursor"          Value="Hand"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="bg" Background="{TemplateBinding Background}"
+                  CornerRadius="8" Padding="{TemplateBinding Padding}"
+                  Height="{TemplateBinding Height}">
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="bg" Property="Background" Value="{StaticResource FoxOrangeDimBrush}"/>
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+              <Setter TargetName="bg" Property="Background" Value="#A05508"/>
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter TargetName="bg" Property="Background" Value="{StaticResource BorderBrush}"/>
+              <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style x:Key="FixButton"  TargetType="Button" BasedOn="{StaticResource PrimaryButton}"/>
+  <Style x:Key="ScanButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}"/>
+
+  <!-- ═══════════════════════ SECONDARY BUTTON ═══════════════════════ -->
+  <Style x:Key="SecondaryButton" TargetType="Button">
+    <Setter Property="Background"      Value="{StaticResource BgCard2Brush}"/>
+    <Setter Property="Foreground"      Value="{StaticResource TextPrimaryBrush}"/>
+    <Setter Property="BorderBrush"     Value="{StaticResource BorderBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="Padding"         Value="14,7"/>
+    <Setter Property="Height"          Value="36"/>
+    <Setter Property="FontSize"        Value="12"/>
+    <Setter Property="FontFamily"      Value="Segoe UI"/>
+    <Setter Property="Cursor"          Value="Hand"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="bg" Background="{TemplateBinding Background}"
+                  BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}"
+                  CornerRadius="8" Padding="{TemplateBinding Padding}"
+                  Height="{TemplateBinding Height}">
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="bg" Property="Background" Value="{StaticResource ButtonHoverBrush}"/>
+              <Setter TargetName="bg" Property="BorderBrush" Value="{StaticResource FoxOrangeBrush}"/>
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+              <Setter TargetName="bg" Property="Background" Value="{StaticResource ButtonPressedBrush}"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style x:Key="DangerButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+    <Setter Property="Foreground"  Value="{StaticResource AccentRedBrush}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource AccentRedBrush}"/>
+  </Style>
+
+  <!-- Icon-only button for title bar / toolbar -->
+  <Style x:Key="IconButton" TargetType="Button">
+    <Setter Property="Background"      Value="Transparent"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="Width"           Value="46"/>
+    <Setter Property="Height"          Value="44"/>
+    <Setter Property="FontFamily"      Value="{StaticResource IconFont}"/>
+    <Setter Property="FontSize"        Value="10"/>
+    <Setter Property="Foreground"      Value="{StaticResource TextSecBrush}"/>
+    <Setter Property="Cursor"          Value="Hand"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="bg" Background="{TemplateBinding Background}">
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="bg" Property="Background" Value="{StaticResource ButtonHoverBrush}"/>
+              <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+              <Setter TargetName="bg" Property="Background" Value="{StaticResource ButtonPressedBrush}"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style x:Key="CloseButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
+    <Style.Triggers>
+      <Trigger Property="IsMouseOver" Value="True">
+        <Setter Property="Background" Value="#C42B1C"/>
+        <Setter Property="Foreground" Value="White"/>
+      </Trigger>
+    </Style.Triggers>
+  </Style>
+
+  <!-- ═══════════════════════ FIX CARD ═══════════════════════ -->
+  <Style x:Key="FixCard" TargetType="Border">
+    <Setter Property="Background"      Value="{StaticResource BgCardBrush}"/>
+    <Setter Property="BorderBrush"     Value="{StaticResource BorderBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius"    Value="9"/>
+    <Setter Property="Padding"         Value="18,14"/>
+    <Setter Property="Margin"          Value="0,0,0,8"/>
+  </Style>
+
+  <!-- ═══════════════════════ INFO CARD ═══════════════════════ -->
+  <Style x:Key="InfoCard" TargetType="Border">
+    <Setter Property="Background"      Value="{StaticResource BgCardBrush}"/>
+    <Setter Property="BorderBrush"     Value="{StaticResource BorderBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius"    Value="9"/>
+    <Setter Property="Padding"         Value="18,16"/>
+    <Setter Property="Margin"          Value="0,0,12,12"/>
+  </Style>
+
+  <!-- ═══════════════════════ METRIC BAR ═══════════════════════ -->
+  <Style x:Key="MetricBar" TargetType="ProgressBar">
+    <Setter Property="Height"          Value="5"/>
+    <Setter Property="Margin"          Value="0,7,0,4"/>
+    <Setter Property="Background"      Value="{StaticResource BorderBrush}"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ProgressBar">
+          <Border CornerRadius="3" Background="{TemplateBinding Background}" Height="5">
+            <Border x:Name="PART_Track" CornerRadius="3">
+              <Border x:Name="PART_Indicator" CornerRadius="3"
+                      Background="{TemplateBinding Foreground}"
+                      HorizontalAlignment="Left"/>
+            </Border>
+          </Border>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style x:Key="BundleProgressBar" TargetType="ProgressBar" BasedOn="{StaticResource MetricBar}">
+    <Setter Property="Height"     Value="8"/>
+    <Setter Property="Margin"     Value="0,10,0,6"/>
+    <Setter Property="Foreground" Value="{StaticResource FoxOrangeBrush}"/>
+  </Style>
+
+  <Style x:Key="IndeterminateBar" TargetType="ProgressBar">
+    <Setter Property="Height"          Value="3"/>
+    <Setter Property="IsIndeterminate" Value="True"/>
+    <Setter Property="Background"      Value="Transparent"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="Foreground"      Value="{StaticResource FoxOrangeBrush}"/>
+  </Style>
+
+  <!-- ═══════════════════════ TEXT LABEL STYLES ═══════════════════════ -->
+  <Style x:Key="CardLabel" TargetType="TextBlock">
+    <Setter Property="FontSize"   Value="9"/>
+    <Setter Property="FontWeight" Value="Bold"/>
+    <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
+    <Setter Property="Margin"     Value="0,0,0,8"/>
+  </Style>
+
+  <Style x:Key="CardValue" TargetType="TextBlock">
+    <Setter Property="FontSize"     Value="14"/>
+    <Setter Property="FontWeight"   Value="SemiBold"/>
+    <Setter Property="Foreground"   Value="{StaticResource TextPrimaryBrush}"/>
+    <Setter Property="TextWrapping" Value="Wrap"/>
+  </Style>
+
+  <Style x:Key="CardSub" TargetType="TextBlock">
+    <Setter Property="FontSize"     Value="11"/>
+    <Setter Property="Foreground"   Value="{StaticResource TextSecBrush}"/>
+    <Setter Property="Margin"       Value="0,3,0,0"/>
+    <Setter Property="TextWrapping" Value="Wrap"/>
+  </Style>
+
+  <Style x:Key="PageTitle" TargetType="TextBlock">
+    <Setter Property="FontSize"   Value="20"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+  </Style>
+
+  <Style x:Key="PageSubtitle" TargetType="TextBlock">
+    <Setter Property="FontSize"   Value="12"/>
+    <Setter Property="Foreground" Value="{StaticResource TextSecBrush}"/>
+    <Setter Property="Margin"     Value="0,3,0,0"/>
+  </Style>
+
+  <Style x:Key="SectionLabel" TargetType="TextBlock">
+    <Setter Property="FontSize"   Value="9"/>
+    <Setter Property="FontWeight" Value="Bold"/>
+    <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
+    <Setter Property="Margin"     Value="20,10,0,2"/>
+  </Style>
+
+  <!-- ═══════════════════════ SEARCH BOX ═══════════════════════ -->
+  <Style x:Key="SearchBox" TargetType="Border">
+    <Setter Property="Background"      Value="{StaticResource BgCardBrush}"/>
+    <Setter Property="BorderBrush"     Value="{StaticResource BorderBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius"    Value="8"/>
+    <Setter Property="Padding"         Value="12,0"/>
+    <Setter Property="Height"          Value="36"/>
+  </Style>
+
+  <!-- ═══════════════════════ STAT PILL ═══════════════════════ -->
+  <Style x:Key="StatPill" TargetType="Border">
+    <Setter Property="CornerRadius"    Value="9"/>
+    <Setter Property="Padding"         Value="16,12"/>
+    <Setter Property="Margin"          Value="0,0,10,0"/>
+    <Setter Property="Background"      Value="{StaticResource BgCard2Brush}"/>
+    <Setter Property="BorderBrush"     Value="{StaticResource BorderBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+  </Style>
+
+  <!-- ═══════════════════════ WPF-UI COMPATIBILITY ALIASES ═══════════════════════ -->
+
+  <!-- NavButtonStyle — sidebar navigation button -->
+  <Style x:Key="NavButtonStyle" TargetType="Button" BasedOn="{StaticResource NavButton}"/>
+
+  <!-- SectionLabelStyle — sidebar section header label -->
+  <Style x:Key="SectionLabelStyle" TargetType="TextBlock" BasedOn="{StaticResource SectionLabel}"/>
+
+  <!-- AccentButtonStyle — primary call-to-action (fox orange) -->
+  <Style x:Key="AccentButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButton}"/>
+
+  <!-- TitleBarButtonStyle — min/max chrome buttons -->
+  <Style x:Key="TitleBarButtonStyle" TargetType="Button" BasedOn="{StaticResource IconButton}">
+    <Setter Property="Height"   Value="48"/>
+    <Setter Property="Width"    Value="46"/>
+    <Setter Property="FontSize" Value="10"/>
+  </Style>
+
+  <!-- TitleBarCloseButtonStyle — close chrome button (red on hover) -->
+  <Style x:Key="TitleBarCloseButtonStyle" TargetType="Button" BasedOn="{StaticResource CloseButton}">
+    <Setter Property="Height"   Value="48"/>
+    <Setter Property="Width"    Value="46"/>
+    <Setter Property="FontSize" Value="10"/>
+  </Style>
+
+  <!-- CardShadow — subtle drop shadow for floating panels -->
+  <DropShadowEffect x:Key="CardShadow"
+                    Color="#000000" Direction="270"
+                    ShadowDepth="4" BlurRadius="20" Opacity="0.45"/>
+
+</ResourceDictionary>

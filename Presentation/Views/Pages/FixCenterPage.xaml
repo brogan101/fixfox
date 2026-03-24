@@ -1,0 +1,165 @@
+<Page x:Class="HelpDesk.Presentation.Views.Pages.FixCenterPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      xmlns:h="clr-namespace:HelpDesk.Presentation.Helpers"
+      xmlns:m="clr-namespace:HelpDesk.Domain.Models"
+      Background="{DynamicResource BgPrimaryBrush}">
+
+  <Page.Resources>
+    <h:BoolToVisConverter       x:Key="BoolVis"/>
+    <h:InverseBoolToVisConverter x:Key="InvBoolVis"/>
+    <h:NullToCollapsedConverter  x:Key="NullCollapsed"/>
+    <h:StatusIconConverter       x:Key="StatusIcon"/>
+    <h:StatusBgConverter         x:Key="StatusBg"/>
+    <h:StatusFgConverter         x:Key="StatusFg"/>
+    <h:RunningVisConverter       x:Key="RunningVis"/>
+    <h:AdminShieldVisConverter   x:Key="AdminVis"/>
+    <h:PinIconConverter          x:Key="PinIcon"/>
+  </Page.Resources>
+
+  <Grid Margin="28,24">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+    </Grid.RowDefinitions>
+
+    <!-- Header + search bar -->
+    <DockPanel Grid.Row="0" Margin="0,0,0,16">
+      <StackPanel DockPanel.Dock="Left">
+        <TextBlock Text="Fix Center" Style="{DynamicResource PageTitle}"/>
+        <TextBlock Text="{Binding SelectedCategory.Title, StringFormat='Category: {0}', FallbackValue='All Categories'}"
+                   Style="{DynamicResource PageSubtitle}"/>
+      </StackPanel>
+      <Border DockPanel.Dock="Right" Style="{DynamicResource SearchBox}" Width="280" HorizontalAlignment="Right">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+          </Grid.ColumnDefinitions>
+          <ui:SymbolIcon Grid.Column="0" Symbol="Search20" FontSize="14"
+                         Foreground="{DynamicResource TextSecBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+          <TextBox Grid.Column="1" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                   BorderThickness="0" Background="Transparent" VerticalContentAlignment="Center"/>
+          <Button Grid.Column="2" Content="&#xE711;" Click="ClearSearch_Click"
+                  FontFamily="{DynamicResource IconFont}" FontSize="10"
+                  Background="Transparent" BorderThickness="0" Cursor="Hand"
+                  Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"
+                  Visibility="{Binding SearchText, Converter={StaticResource NullCollapsed}}"/>
+        </Grid>
+      </Border>
+    </DockPanel>
+
+    <!-- Fix count label -->
+    <TextBlock Grid.Row="1" Margin="0,0,0,10"
+               Foreground="{DynamicResource TextSecBrush}" FontSize="12">
+      <Run Text="{Binding ActiveFixCount, Mode=OneWay}"/>
+      <Run Text=" fixes"/>
+    </TextBlock>
+
+    <!-- Pinned fixes (if any) -->
+    <DockPanel Grid.Row="2">
+      <ScrollViewer DockPanel.Dock="Top" VerticalScrollBarVisibility="Auto"
+                    Visibility="{Binding PinnedFixes.Count, Converter={StaticResource NullCollapsed}}">
+        <StackPanel Margin="0,0,0,12">
+          <TextBlock Text="PINNED" Style="{DynamicResource CardLabel}" Margin="0,0,0,6"/>
+          <ItemsControl ItemsSource="{Binding PinnedFixes}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate DataType="{x:Type m:FixItem}">
+                <Border Style="{DynamicResource FixCard}"
+                        Background="{Binding Status, Converter={StaticResource StatusBg}}">
+                  <DockPanel>
+                    <Button DockPanel.Dock="Right" Tag="{Binding}" Click="TogglePin_Click"
+                            Content="{Binding IsPinned, Converter={StaticResource PinIcon}}"
+                            FontFamily="{DynamicResource IconFont}" FontSize="14"
+                            Background="Transparent" BorderThickness="0" Cursor="Hand"
+                            Foreground="{DynamicResource TextSecBrush}" VerticalAlignment="Top"/>
+                    <Button DockPanel.Dock="Right" Content="Run" Tag="{Binding}"
+                            Click="FixButton_Click" Style="{DynamicResource PrimaryButton}"
+                            Margin="0,0,8,0" VerticalAlignment="Center"/>
+                    <StackPanel>
+                      <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13"/>
+                      <TextBlock Text="{Binding Description}" Style="{DynamicResource CardSub}"
+                                 TextWrapping="Wrap" MaxHeight="40"/>
+                      <ProgressBar IsIndeterminate="True" Height="2" Margin="0,6,0,0"
+                                   Foreground="{DynamicResource FoxOrangeBrush}"
+                                   Background="Transparent" BorderThickness="0"
+                                   Visibility="{Binding Status, Converter={StaticResource RunningVis}}"/>
+                    </StackPanel>
+                  </DockPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </ScrollViewer>
+
+      <!-- Main fix list -->
+      <ScrollViewer>
+        <ItemsControl ItemsSource="{Binding ActiveFixes}"
+                      VirtualizingStackPanel.IsVirtualizing="True"
+                      VirtualizingStackPanel.VirtualizationMode="Recycling">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate DataType="{x:Type m:FixItem}">
+              <Border Style="{DynamicResource FixCard}"
+                      Background="{Binding Status, Converter={StaticResource StatusBg}}">
+                <DockPanel>
+                  <!-- Side actions -->
+                  <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
+                    <TextBlock Text="&#xE7EF;" FontFamily="{DynamicResource IconFont}" FontSize="12"
+                               Foreground="{DynamicResource AccentAmberBrush}" VerticalAlignment="Center" Margin="0,0,6,0"
+                               ToolTip="Requires admin"
+                               Visibility="{Binding RequiresAdmin, Converter={StaticResource AdminVis}}"/>
+                    <Button Tag="{Binding}" Click="TogglePin_Click"
+                            Content="{Binding IsPinned, Converter={StaticResource PinIcon}}"
+                            FontFamily="{DynamicResource IconFont}" FontSize="14"
+                            Background="Transparent" BorderThickness="0" Cursor="Hand"
+                            Foreground="{DynamicResource TextSecBrush}" Margin="0,0,6,0"/>
+                    <Button Content="Guide" Tag="{Binding}" Click="GuidedButton_Click"
+                            Style="{DynamicResource SecondaryButton}"
+                            Visibility="{Binding HasSteps, Converter={StaticResource BoolVis}}"
+                            Margin="0,0,6,0"/>
+                    <Button Content="Run" Tag="{Binding}" Click="FixButton_Click"
+                            Style="{DynamicResource PrimaryButton}"
+                            Visibility="{Binding HasScript, Converter={StaticResource BoolVis}}"/>
+                  </StackPanel>
+
+                  <!-- Fix info -->
+                  <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,3">
+                      <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13"/>
+                      <Border Background="{DynamicResource BgCard2Brush}" CornerRadius="4"
+                              Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Type}" FontSize="10"
+                                   Foreground="{DynamicResource TextSecBrush}"/>
+                      </Border>
+                    </StackPanel>
+                    <TextBlock Text="{Binding Description}" Style="{DynamicResource CardSub}"
+                               TextWrapping="Wrap" MaxHeight="48"/>
+                    <!-- Output -->
+                    <Border Background="{DynamicResource BgCardBrush}" CornerRadius="5" Padding="10,6"
+                            Margin="0,8,0,0"
+                            Visibility="{Binding LastOutput, Converter={StaticResource NullCollapsed}}">
+                      <TextBlock Text="{Binding LastOutput}" FontFamily="Consolas" FontSize="11"
+                                 Foreground="{Binding Status, Converter={StaticResource StatusFg}}"
+                                 TextWrapping="Wrap" MaxHeight="60"/>
+                    </Border>
+                    <ProgressBar IsIndeterminate="True" Height="2" Margin="0,6,0,0"
+                                 Foreground="{DynamicResource FoxOrangeBrush}"
+                                 Background="Transparent" BorderThickness="0"
+                                 Visibility="{Binding Status, Converter={StaticResource RunningVis}}"/>
+                  </StackPanel>
+                </DockPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </DockPanel>
+  </Grid>
+</Page>

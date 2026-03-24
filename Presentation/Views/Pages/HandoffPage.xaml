@@ -1,0 +1,194 @@
+<Page x:Class="HelpDesk.Presentation.Views.Pages.HandoffPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:h="clr-namespace:HelpDesk.Presentation.Helpers"
+      xmlns:m="clr-namespace:HelpDesk.Domain.Models"
+      Background="{DynamicResource BgPrimaryBrush}">
+
+  <Page.Resources>
+    <h:NullToCollapsedConverter x:Key="NullCollapsed"/>
+    <h:RelativeDateConverter x:Key="RelDate"/>
+    <h:NotifLevelColorConverter x:Key="NotifColor"/>
+    <h:BoolToVisConverter x:Key="BoolVis"/>
+    <h:InverseBoolToVisConverter x:Key="InvBoolVis"/>
+  </Page.Resources>
+
+  <ScrollViewer>
+    <Grid Margin="28,24">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="*"/>
+      </Grid.RowDefinitions>
+
+      <DockPanel Grid.Row="0" Margin="0,0,0,20">
+        <StackPanel DockPanel.Dock="Left">
+          <TextBlock Text="Help Desk Handoff" Style="{DynamicResource PageTitle}"/>
+          <TextBlock Text="Export a support bundle, review KB links, and prep a clean escalation summary." Style="{DynamicResource PageSubtitle}"/>
+        </StackPanel>
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
+          <Button Content="Run Health Check" Click="RunHealthCheck_Click"
+                  Style="{DynamicResource SecondaryButton}" Margin="0,0,8,0"/>
+          <Button Content="Create Support Bundle" Click="CreateBundle_Click"
+                  Style="{DynamicResource AccentButtonStyle}"/>
+        </StackPanel>
+      </DockPanel>
+
+      <Grid Grid.Row="1" Margin="0,0,0,16">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="0" Style="{DynamicResource InfoCard}" Margin="0,0,8,0">
+          <StackPanel>
+            <TextBlock Text="Escalation Readiness" Style="{DynamicResource PageTitle}" FontSize="15"/>
+            <TextBlock Text="{Binding HealthCheckSummaryText}" Style="{DynamicResource CardSub}" Margin="0,6,0,12" TextWrapping="Wrap"/>
+            <TextBlock Text="{Binding NotificationSummaryText}" Style="{DynamicResource CardSub}" Margin="0,0,0,8"/>
+            <TextBlock Text="{Binding PrivilegeModeText}" Style="{DynamicResource CardSub}" TextWrapping="Wrap"/>
+          </StackPanel>
+        </Border>
+
+        <Border Grid.Column="1" Style="{DynamicResource InfoCard}" Margin="8,0,0,0">
+          <StackPanel>
+            <TextBlock Text="Edition And Branding" Style="{DynamicResource PageTitle}" FontSize="15"/>
+            <TextBlock Text="{Binding Branding.AppName}" FontWeight="Bold" FontSize="14" Margin="0,6,0,2"/>
+            <TextBlock Text="{Binding Branding.AppSubtitle}" Style="{DynamicResource CardSub}" Margin="0,0,0,8"/>
+            <TextBlock Style="{DynamicResource CardSub}">
+              <Run Text="Edition: "/>
+              <Run Text="{Binding EditionSnapshot.Edition}"/>
+            </TextBlock>
+            <TextBlock Style="{DynamicResource CardSub}">
+              <Run Text="Evidence bundles: "/>
+              <Run Text="{Binding EditionSnapshot.EvidenceBundles}"/>
+            </TextBlock>
+            <TextBlock Style="{DynamicResource CardSub}">
+              <Run Text="Runbooks: "/>
+              <Run Text="{Binding EditionSnapshot.Runbooks}"/>
+            </TextBlock>
+          </StackPanel>
+        </Border>
+      </Grid>
+
+      <Border Grid.Row="2" Style="{DynamicResource InfoCard}" Margin="0,0,0,16"
+              Visibility="{Binding HasInterruptedOperation, Converter={StaticResource BoolVis}}">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Left">
+            <TextBlock Text="Interrupted Repair" Style="{DynamicResource PageTitle}" FontSize="15"/>
+            <TextBlock Text="{Binding InterruptedOperation.DisplayTitle}" FontWeight="Bold" Margin="0,6,0,2"/>
+            <TextBlock Text="{Binding InterruptedOperation.Summary}" Style="{DynamicResource CardSub}" TextWrapping="Wrap"/>
+          </StackPanel>
+          <Button DockPanel.Dock="Right" Content="Dismiss" Click="ClearInterrupted_Click"
+                  Style="{DynamicResource SecondaryButton}" VerticalAlignment="Center"/>
+        </DockPanel>
+      </Border>
+
+      <Grid Grid.Row="3" Margin="0,0,0,16">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="0" Style="{DynamicResource InfoCard}" Margin="0,0,8,0">
+          <StackPanel>
+            <TextBlock Text="Knowledge Base" Style="{DynamicResource PageTitle}" FontSize="15"/>
+            <ItemsControl ItemsSource="{Binding KnowledgeBaseEntries}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="{x:Type m:KnowledgeBaseEntry}">
+                  <DockPanel Margin="0,8,0,0">
+                    <StackPanel DockPanel.Dock="Left">
+                      <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
+                      <TextBlock Text="{Binding Description}" Style="{DynamicResource CardSub}" TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <Button DockPanel.Dock="Right" Content="Open" Tag="{Binding}" Click="OpenKb_Click"
+                            Style="{DynamicResource SecondaryButton}" Margin="8,0,0,0"/>
+                  </DockPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+
+        <Border Grid.Column="1" Style="{DynamicResource InfoCard}" Margin="8,0,0,0">
+          <StackPanel>
+            <TextBlock Text="Latest Support Bundle" Style="{DynamicResource PageTitle}" FontSize="15"/>
+            <TextBlock Text="{Binding LastEvidenceBundle.Headline}" FontWeight="Bold"
+                       Visibility="{Binding LastEvidenceBundle, Converter={StaticResource NullCollapsed}}" Margin="0,6,0,2"/>
+            <TextBlock Text="{Binding LastEvidenceBundle.BundleFolder}" Style="{DynamicResource CardSub}" TextWrapping="Wrap"
+                       Visibility="{Binding LastEvidenceBundle, Converter={StaticResource NullCollapsed}}"/>
+            <TextBlock Text="No support bundle has been generated in this session yet."
+                       Style="{DynamicResource CardSub}"
+                       Visibility="{Binding HasEvidenceBundle, Converter={StaticResource InvBoolVis}}" Margin="0,6,0,0"/>
+            <WrapPanel Margin="0,12,0,0">
+              <Button Content="Open Bundle Folder" Click="OpenBundleFolder_Click"
+                      Style="{DynamicResource SecondaryButton}" Margin="0,0,8,0"
+                      Visibility="{Binding HasEvidenceBundle, Converter={StaticResource BoolVis}}"/>
+              <Button Content="Open Summary" Click="OpenBundleSummary_Click"
+                      Style="{DynamicResource SecondaryButton}"
+                      Visibility="{Binding HasEvidenceBundle, Converter={StaticResource BoolVis}}"/>
+            </WrapPanel>
+          </StackPanel>
+        </Border>
+      </Grid>
+
+      <Grid Grid.Row="4">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="0" Style="{DynamicResource InfoCard}" Margin="0,0,8,0">
+          <StackPanel>
+            <TextBlock Text="Notifications" Style="{DynamicResource PageTitle}" FontSize="15"/>
+            <TextBlock Text="{Binding NotificationSummaryText}" Style="{DynamicResource CardSub}" Margin="0,6,0,12"/>
+            <ScrollViewer MaxHeight="320" Visibility="{Binding HasNotifications, Converter={StaticResource BoolVis}}">
+              <ItemsControl ItemsSource="{Binding NotificationEntries}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate DataType="{x:Type m:AppNotification}">
+                    <Border Style="{DynamicResource FixCard}" Padding="12" Margin="0,0,0,8">
+                      <Grid>
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="4"/>
+                          <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Background="{Binding Level, Converter={StaticResource NotifColor}}" CornerRadius="2" Margin="0,0,10,0"/>
+                        <StackPanel Grid.Column="1">
+                          <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
+                          <TextBlock Text="{Binding Message}" Style="{DynamicResource CardSub}" TextWrapping="Wrap"/>
+                          <TextBlock Text="{Binding Timestamp, Converter={StaticResource RelDate}}" Style="{DynamicResource CardSub}" FontSize="10" Margin="0,4,0,0"/>
+                        </StackPanel>
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+            <TextBlock Text="All caught up." Style="{DynamicResource CardSub}"
+                       Visibility="{Binding HasNotifications, Converter={StaticResource InvBoolVis}}"/>
+          </StackPanel>
+        </Border>
+
+        <Border Grid.Column="1" Style="{DynamicResource InfoCard}" Margin="8,0,0,0">
+          <StackPanel>
+            <TextBlock Text="Recent Recommendations" Style="{DynamicResource PageTitle}" FontSize="15"/>
+            <TextBlock Text="{Binding HealthCheckSummaryText}" Style="{DynamicResource CardSub}" Margin="0,6,0,12" TextWrapping="Wrap"/>
+            <ItemsControl ItemsSource="{Binding ProactiveRecommendations}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="{x:Type m:ProactiveRecommendation}">
+                  <Border Style="{DynamicResource FixCard}" Padding="12" Margin="0,0,0,8">
+                    <StackPanel>
+                      <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
+                      <TextBlock Text="{Binding Summary}" Style="{DynamicResource CardSub}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+      </Grid>
+    </Grid>
+  </ScrollViewer>
+</Page>

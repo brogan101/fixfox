@@ -1,0 +1,160 @@
+<Page x:Class="HelpDesk.Presentation.Views.Pages.SettingsPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      xmlns:h="clr-namespace:HelpDesk.Presentation.Helpers"
+      Background="{DynamicResource BgPrimaryBrush}">
+
+  <Page.Resources>
+    <h:ThemeIsDarkConverter x:Key="ThemeIsDark"/>
+  </Page.Resources>
+
+  <ScrollViewer>
+    <Grid Margin="28,24" MaxWidth="600" HorizontalAlignment="Left">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="*"/>
+      </Grid.RowDefinitions>
+
+      <!-- Header -->
+      <DockPanel Grid.Row="0" Margin="0,0,0,24">
+        <StackPanel DockPanel.Dock="Left">
+          <TextBlock Text="Settings" Style="{DynamicResource PageTitle}"/>
+          <TextBlock Text="Preferences and behaviour" Style="{DynamicResource PageSubtitle}"/>
+        </StackPanel>
+        <Button DockPanel.Dock="Right" Content="Save Settings" Click="SaveSettings_Click"
+                Style="{DynamicResource AccentButtonStyle}" HorizontalAlignment="Right"/>
+      </DockPanel>
+
+      <StackPanel Grid.Row="1">
+
+        <!-- Appearance -->
+        <TextBlock Text="APPEARANCE" Style="{DynamicResource CardLabel}" Margin="0,0,0,8"/>
+        <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,16">
+          <StackPanel>
+            <Grid Margin="0,0,0,12">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+              </Grid.ColumnDefinitions>
+              <StackPanel Grid.Column="0">
+                <TextBlock Text="Dark Theme" FontSize="13" FontWeight="Medium"/>
+                <TextBlock Text="Use the dark navy colour scheme" Style="{DynamicResource CardSub}"/>
+              </StackPanel>
+              <ui:ToggleSwitch Grid.Column="1" IsChecked="{Binding Settings.Theme, Converter={StaticResource ThemeIsDark}}"
+                               Checked="ThemeToggle_Changed" Unchecked="ThemeToggle_Changed"
+                               VerticalAlignment="Center"/>
+            </Grid>
+          </StackPanel>
+        </Border>
+
+        <!-- Behaviour -->
+        <TextBlock Text="BEHAVIOUR" Style="{DynamicResource CardLabel}" Margin="0,0,0,8"/>
+        <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,16">
+          <StackPanel>
+            <Grid Margin="0,0,0,12">
+              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+              <StackPanel Grid.Column="0">
+                <TextBlock Text="Run Quick Scan on Launch" FontSize="13" FontWeight="Medium"/>
+                <TextBlock Text="Automatically scan when FixFox opens" Style="{DynamicResource CardSub}"/>
+              </StackPanel>
+              <ui:ToggleSwitch Grid.Column="1"
+                               IsChecked="{Binding Settings.RunQuickScanOnLaunch, Mode=TwoWay}"
+                               VerticalAlignment="Center"/>
+            </Grid>
+            <Separator Margin="0,4,0,12"/>
+            <Grid Margin="0,0,0,12">
+              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+              <StackPanel Grid.Column="0">
+                <TextBlock Text="Log Fix History" FontSize="13" FontWeight="Medium"/>
+                <TextBlock Text="Record each fix run to history" Style="{DynamicResource CardSub}"/>
+              </StackPanel>
+              <ui:ToggleSwitch Grid.Column="1"
+                               IsChecked="{Binding Settings.LogFixHistory, Mode=TwoWay}"
+                               VerticalAlignment="Center"/>
+            </Grid>
+            <Separator Margin="0,4,0,12"/>
+            <Grid Margin="0,0,0,4">
+              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+              <StackPanel Grid.Column="0">
+                <TextBlock Text="Show Notifications" FontSize="13" FontWeight="Medium"/>
+                <TextBlock Text="Alert you to scan results and issues" Style="{DynamicResource CardSub}"/>
+              </StackPanel>
+              <ui:ToggleSwitch Grid.Column="1"
+                               IsChecked="{Binding Settings.ShowNotifications, Mode=TwoWay}"
+                               VerticalAlignment="Center"/>
+            </Grid>
+          </StackPanel>
+        </Border>
+
+        <!-- System -->
+        <TextBlock Text="SYSTEM" Style="{DynamicResource CardLabel}" Margin="0,0,0,8"/>
+        <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,16">
+          <StackPanel>
+            <Grid Margin="0,0,0,12">
+              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+              <StackPanel Grid.Column="0">
+                <TextBlock Text="Run at Startup" FontSize="13" FontWeight="Medium"/>
+                <TextBlock Text="Launch FixFox automatically with Windows" Style="{DynamicResource CardSub}"/>
+              </StackPanel>
+              <ui:ToggleSwitch Grid.Column="1"
+                               IsChecked="{Binding Settings.RunAtStartup, Mode=TwoWay}"
+                               Checked="RunAtStartup_Changed" Unchecked="RunAtStartup_Changed"
+                               VerticalAlignment="Center"/>
+            </Grid>
+            <Separator Margin="0,4,0,12"/>
+            <Grid Margin="0,0,0,4">
+              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+              <StackPanel Grid.Column="0">
+                <TextBlock Text="Minimize to Tray" FontSize="13" FontWeight="Medium"/>
+                <TextBlock Text="Keep FixFox running in the system tray when closed" Style="{DynamicResource CardSub}"/>
+              </StackPanel>
+              <ui:ToggleSwitch Grid.Column="1"
+                               IsChecked="{Binding Settings.MinimizeToTray, Mode=TwoWay}"
+                               VerticalAlignment="Center"/>
+            </Grid>
+            <Separator Margin="0,4,0,12"/>
+            <Grid Margin="0,0,0,4">
+              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+              <StackPanel Grid.Column="0">
+                <TextBlock Text="Show Tray Balloon Tips" FontSize="13" FontWeight="Medium"/>
+                <TextBlock Text="Display a tray notice when FixFox is minimized to the tray" Style="{DynamicResource CardSub}"/>
+              </StackPanel>
+              <ui:ToggleSwitch Grid.Column="1"
+                               IsChecked="{Binding Settings.ShowTrayBalloons, Mode=TwoWay}"
+                               VerticalAlignment="Center"/>
+            </Grid>
+          </StackPanel>
+        </Border>
+
+        <!-- About -->
+        <TextBlock Text="ABOUT" Style="{DynamicResource CardLabel}" Margin="0,0,0,8"/>
+        <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,0">
+          <StackPanel>
+            <TextBlock Text="FixFox" FontSize="18" FontWeight="Bold"
+                       Foreground="{DynamicResource FoxOrangeBrush}" Margin="0,0,0,4"/>
+            <TextBlock Text="{Binding AppVersionSummaryText}" Style="{DynamicResource CardSub}"/>
+            <TextBlock Text="{Binding PrivilegeModeText}" Style="{DynamicResource CardSub}" Margin="0,6,0,0"/>
+            <TextBlock Margin="0,8,0,0" Style="{DynamicResource CardSub}" TextWrapping="Wrap">
+              FixFox is a self-service Windows PC repair tool. It runs fully offline, collects no data,
+              and has no ads, no upselling, and no registry cleaner.
+            </TextBlock>
+            <Separator Margin="0,12,0,12"/>
+            <TextBlock Text="Data Folder" FontSize="13" FontWeight="Medium"/>
+            <TextBlock Text="{Binding DataFolderPath}" Style="{DynamicResource CardSub}"
+                       TextWrapping="Wrap" Margin="0,4,0,10"/>
+            <WrapPanel>
+              <Button Content="Open Data Folder" Click="OpenDataFolder_Click"
+                      Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
+              <Button Content="Open App Log" Click="OpenAppLog_Click"
+                      Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
+              <Button Content="Open Verify Log" Click="OpenVerifyLog_Click"
+                      Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8"/>
+            </WrapPanel>
+          </StackPanel>
+        </Border>
+
+      </StackPanel>
+    </Grid>
+  </ScrollViewer>
+</Page>

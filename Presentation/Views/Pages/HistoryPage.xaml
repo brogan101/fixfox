@@ -1,0 +1,111 @@
+<Page x:Class="HelpDesk.Presentation.Views.Pages.HistoryPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      xmlns:h="clr-namespace:HelpDesk.Presentation.Helpers"
+      xmlns:m="clr-namespace:HelpDesk.Domain.Models"
+      Background="{DynamicResource BgPrimaryBrush}">
+
+  <Page.Resources>
+    <h:NullToCollapsedConverter x:Key="NullCollapsed"/>
+    <h:RelativeDateConverter    x:Key="RelDate"/>
+    <h:BoolToVisConverter       x:Key="BoolVis"/>
+    <h:InverseBoolToVisConverter x:Key="InvBoolVis"/>
+  </Page.Resources>
+
+  <Grid Margin="28,24">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+    </Grid.RowDefinitions>
+
+    <!-- Header -->
+    <DockPanel Grid.Row="0" Margin="0,0,0,20">
+      <StackPanel DockPanel.Dock="Left">
+        <TextBlock Text="Fix History" Style="{DynamicResource PageTitle}"/>
+        <TextBlock Text="{Binding HistorySummaryText}" Style="{DynamicResource PageSubtitle}"/>
+      </StackPanel>
+      <Button DockPanel.Dock="Right" Content="Clear History" Click="ClearHistory_Click"
+              Style="{DynamicResource DangerButton}" HorizontalAlignment="Right"/>
+    </DockPanel>
+
+    <Border Grid.Row="1" Style="{DynamicResource SearchBox}" Margin="0,0,0,16">
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto"/>
+          <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <ui:SymbolIcon Grid.Column="0" Symbol="Search20" FontSize="14"
+                       Foreground="{DynamicResource TextSecBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+        <TextBox Grid.Column="1" Text="{Binding HistorySearchText, UpdateSourceTrigger=PropertyChanged}"
+                 BorderThickness="0" Background="Transparent" VerticalContentAlignment="Center"/>
+      </Grid>
+    </Border>
+
+    <!-- History list -->
+    <Grid Grid.Row="2">
+      <Border Style="{DynamicResource InfoCard}"
+              Visibility="{Binding HasFilteredHistoryEntries, Converter={StaticResource InvBoolVis}}">
+        <StackPanel>
+          <TextBlock Text="No matching history entries" Style="{DynamicResource PageTitle}" FontSize="16"/>
+          <TextBlock Text="Run a fix or bundle, or clear your history search to see past runs here."
+                     Style="{DynamicResource CardSub}" Margin="0,6,0,0"/>
+        </StackPanel>
+      </Border>
+
+      <ScrollViewer Visibility="{Binding HasFilteredHistoryEntries, Converter={StaticResource BoolVis}}">
+      <ItemsControl ItemsSource="{Binding FilteredHistoryEntries}"
+                    VirtualizingStackPanel.IsVirtualizing="True"
+                    VirtualizingStackPanel.VirtualizationMode="Recycling">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate DataType="{x:Type m:FixLogEntry}">
+            <Border Style="{DynamicResource FixCard}" Padding="14,10">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto"/>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0"
+                           FontFamily="{DynamicResource IconFont}" FontSize="16">
+                  <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                      <Setter Property="Text"       Value="&#xE711;"/>
+                      <Setter Property="Foreground" Value="{DynamicResource AccentRedBrush}"/>
+                      <Style.Triggers>
+                        <DataTrigger Binding="{Binding Success}" Value="True">
+                          <Setter Property="Text"       Value="&#xE73E;"/>
+                          <Setter Property="Foreground" Value="{DynamicResource AccentGreenBrush}"/>
+                        </DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </TextBlock.Style>
+                </TextBlock>
+                <StackPanel Grid.Column="1">
+                  <TextBlock Text="{Binding FixTitle}" FontWeight="SemiBold" FontSize="13"/>
+                  <TextBlock Text="{Binding Category}" Style="{DynamicResource CardSub}" FontSize="11"/>
+                  <TextBlock Text="{Binding Output}" Style="{DynamicResource CardSub}" FontFamily="Consolas"
+                             TextWrapping="Wrap" Margin="0,4,0,0"
+                             Visibility="{Binding Output, Converter={StaticResource NullCollapsed}}"/>
+                </StackPanel>
+                <StackPanel Grid.Column="2" HorizontalAlignment="Right">
+                  <TextBlock Text="{Binding Timestamp, Converter={StaticResource RelDate}}"
+                             Style="{DynamicResource CardSub}" VerticalAlignment="Center" FontSize="11"
+                             HorizontalAlignment="Right"/>
+                  <Button Content="Run Again" Tag="{Binding}" Click="RerunFix_Click"
+                          Style="{DynamicResource SecondaryButton}" Margin="0,8,0,0"
+                          Visibility="{Binding FixId, Converter={StaticResource NullCollapsed}}"/>
+                </StackPanel>
+              </Grid>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      </ScrollViewer>
+    </Grid>
+  </Grid>
+</Page>
