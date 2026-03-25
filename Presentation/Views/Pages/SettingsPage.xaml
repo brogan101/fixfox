@@ -7,29 +7,27 @@
 
   <Page.Resources>
     <h:ThemeIsDarkConverter x:Key="ThemeIsDark"/>
+    <h:NullToCollapsedConverter x:Key="NullCollapsed"/>
+    <h:BoolToVisConverter x:Key="BoolVis"/>
   </Page.Resources>
 
   <ScrollViewer>
-    <Grid Margin="28,24" MaxWidth="600" HorizontalAlignment="Left">
+    <Grid Margin="28,24" MaxWidth="680" HorizontalAlignment="Left">
       <Grid.RowDefinitions>
         <RowDefinition Height="Auto"/>
         <RowDefinition Height="*"/>
       </Grid.RowDefinitions>
 
       <!-- Header -->
-      <DockPanel Grid.Row="0" Margin="0,0,0,24">
-        <StackPanel DockPanel.Dock="Left">
-          <TextBlock Text="Settings" Style="{DynamicResource PageTitle}"/>
-          <TextBlock Text="Preferences and behaviour" Style="{DynamicResource PageSubtitle}"/>
-        </StackPanel>
-        <Button DockPanel.Dock="Right" Content="Save Settings" Click="SaveSettings_Click"
-                Style="{DynamicResource AccentButtonStyle}" HorizontalAlignment="Right"/>
-      </DockPanel>
+      <StackPanel Grid.Row="0" Margin="0,0,0,24">
+        <TextBlock Text="Settings" Style="{DynamicResource PageTitle}"/>
+        <TextBlock Text="Profiles, automation, startup, notifications, updates, and local data handling. Changes save immediately." Style="{DynamicResource PageSubtitle}"/>
+      </StackPanel>
 
       <StackPanel Grid.Row="1">
 
         <!-- Appearance -->
-        <TextBlock Text="APPEARANCE" Style="{DynamicResource CardLabel}" Margin="0,0,0,8"/>
+        <TextBlock Text="Appearance" Style="{DynamicResource CardLabel}" Margin="0,0,0,8"/>
         <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,16">
           <StackPanel>
             <Grid Margin="0,0,0,12">
@@ -39,7 +37,7 @@
               </Grid.ColumnDefinitions>
               <StackPanel Grid.Column="0">
                 <TextBlock Text="Dark Theme" FontSize="13" FontWeight="Medium"/>
-                <TextBlock Text="Use the dark navy colour scheme" Style="{DynamicResource CardSub}"/>
+                <TextBlock Text="Use the dark navy color scheme." Style="{DynamicResource CardSub}"/>
               </StackPanel>
               <ui:ToggleSwitch Grid.Column="1" IsChecked="{Binding Settings.Theme, Converter={StaticResource ThemeIsDark}}"
                                Checked="ThemeToggle_Changed" Unchecked="ThemeToggle_Changed"
@@ -48,18 +46,98 @@
           </StackPanel>
         </Border>
 
-        <!-- Behaviour -->
-        <TextBlock Text="BEHAVIOUR" Style="{DynamicResource CardLabel}" Margin="0,0,0,8"/>
+        <TextBlock Text="Profiles" Style="{DynamicResource CardLabel}" Margin="0,0,0,8"/>
         <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,16">
           <StackPanel>
+            <TextBlock Text="Behavior Profile" FontSize="13" FontWeight="Medium"/>
+            <TextBlock Text="Profiles tune notifications, tray behavior, and safe defaults so this build fits the kind of device you are supporting."
+                       Style="{DynamicResource CardSub}" Margin="0,4,0,10" TextWrapping="Wrap"/>
+            <ComboBox ItemsSource="{Binding BehaviorProfileOptions}"
+                      SelectedItem="{Binding SelectedBehaviorProfile, Mode=TwoWay}"
+                      SelectionChanged="BehaviorProfile_Changed"
+                      IsEnabled="{Binding CanEditBehaviorProfile}"
+                      Width="220"/>
+            <TextBlock Text="Notification Mode" FontSize="13" FontWeight="Medium" Margin="0,14,0,0"/>
+            <TextBlock Text="Choose whether the app stays quiet, shows only important alerts, or surfaces the full steady-state view."
+                       Style="{DynamicResource CardSub}" Margin="0,4,0,10" TextWrapping="Wrap"/>
+            <ComboBox ItemsSource="{Binding NotificationModeOptions}"
+                      SelectedItem="{Binding SelectedNotificationMode, Mode=TwoWay}"
+                      SelectionChanged="SettingsCombo_Changed"
+                      IsEnabled="{Binding CanEditNotificationMode}"
+                      Width="220"/>
+            <TextBlock Text="Support Package Detail" FontSize="13" FontWeight="Medium" Margin="0,14,0,0"/>
+            <TextBlock Text="Basic packages redact more aggressively. Technician detail keeps richer receipt history for escalation."
+                       Style="{DynamicResource CardSub}" Margin="0,4,0,10" TextWrapping="Wrap"/>
+            <ComboBox ItemsSource="{Binding SupportBundleExportLevelOptions}"
+                      SelectedItem="{Binding SelectedSupportBundleExportLevel, Mode=TwoWay}"
+                      SelectionChanged="SettingsCombo_Changed"
+                      IsEnabled="{Binding CanEditSupportBundleDetail}"
+                      Width="220"/>
+            <TextBlock Text="{Binding SupportBundleDetailAvailabilityText}" Style="{DynamicResource MetaText}" Margin="0,6,0,0" TextWrapping="Wrap"/>
+            <TextBlock Text="Startup Landing Page" FontSize="13" FontWeight="Medium" Margin="0,14,0,0"/>
+            <TextBlock Text="Choose which workspace opens first so the app lands where this device needs it most."
+                       Style="{DynamicResource CardSub}" Margin="0,4,0,10" TextWrapping="Wrap"/>
+            <ComboBox ItemsSource="{Binding LandingPageOptions}"
+                      SelectedItem="{Binding SelectedLandingPage, Mode=TwoWay}"
+                      SelectionChanged="LandingPage_Changed"
+                      IsEnabled="{Binding CanEditLandingPage}"
+                      Width="220"/>
+            <CheckBox Content="Show advanced controls and deeper technical detail"
+                      IsChecked="{Binding AdvancedModeEnabled, Mode=TwoWay}"
+                      IsEnabled="{Binding CanToggleAdvancedMode}"
+                      Margin="0,12,0,0"/>
+            <TextBlock Text="{Binding AdvancedModeAvailabilityText}" Style="{DynamicResource MetaText}" Margin="0,6,0,0" TextWrapping="Wrap"/>
+            <Separator Margin="0,12,0,12"/>
+            <DockPanel>
+              <StackPanel DockPanel.Dock="Left">
+                <TextBlock Text="Ignored alerts and recommendations" FontSize="13" FontWeight="Medium"/>
+                <TextBlock Text="Reset snoozed alerts and ignored maintenance suggestions if you want the app to evaluate them again."
+                           Style="{DynamicResource CardSub}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+              </StackPanel>
+              <Button DockPanel.Dock="Right" Content="Reset Suppressed Items" Click="ResetSuppressed_Click"
+                      Style="{DynamicResource SecondaryButton}"
+                      Visibility="{Binding HasSuppressedItems, Converter={StaticResource NullCollapsed}}"/>
+            </DockPanel>
+          </StackPanel>
+        </Border>
+
+        <TextBlock Text="Product access" Style="{DynamicResource CardLabel}" Margin="0,0,0,8"/>
+        <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,16">
+          <StackPanel>
+            <TextBlock Text="Edition and deployment" FontSize="13" FontWeight="Medium"/>
+            <TextBlock Text="{Binding EditionSummaryText}" Style="{DynamicResource CardSub}" Margin="0,4,0,2"/>
+            <TextBlock Text="{Binding DeploymentSummaryText}" Style="{DynamicResource CardSub}" Margin="0,0,0,10"/>
+            <TextBlock Text="Support routing" FontSize="13" FontWeight="Medium"/>
+            <TextBlock Text="{Binding SupportRoutingSummaryText}" Style="{DynamicResource CardSub}" Margin="0,4,0,10" TextWrapping="Wrap"/>
+            <TextBlock Text="Managed restrictions" FontSize="13" FontWeight="Medium"
+                       Visibility="{Binding HasManagedRestrictions, Converter={StaticResource BoolVis}}"/>
+            <TextBlock Text="{Binding ManagedPolicySummaryText}" Style="{DynamicResource CardSub}" Margin="0,4,0,0" TextWrapping="Wrap"
+                       Visibility="{Binding HasManagedRestrictions, Converter={StaticResource BoolVis}}"/>
+          </StackPanel>
+        </Border>
+
+        <TextBlock Text="Automation &amp; behavior" Style="{DynamicResource CardLabel}" Margin="0,0,0,8"/>
+        <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,16">
+          <StackPanel>
+            <DockPanel Margin="0,0,0,12">
+              <StackPanel DockPanel.Dock="Left">
+                <TextBlock Text="Automation Center" FontSize="13" FontWeight="Medium"/>
+                <TextBlock Text="Review schedules, watchers, pause controls, and automation history in one place."
+                           Style="{DynamicResource CardSub}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+              </StackPanel>
+              <Button DockPanel.Dock="Right" Content="Open Automation Center" Click="OpenAutomationCenter_Click"
+                      Style="{DynamicResource SecondaryButton}" Margin="12,0,0,0"/>
+            </DockPanel>
+            <Separator Margin="0,4,0,12"/>
             <Grid Margin="0,0,0,12">
               <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
               <StackPanel Grid.Column="0">
                 <TextBlock Text="Run Quick Scan on Launch" FontSize="13" FontWeight="Medium"/>
-                <TextBlock Text="Automatically scan when FixFox opens" Style="{DynamicResource CardSub}"/>
+                <TextBlock Text="Run a lightweight health scan when the app opens." Style="{DynamicResource CardSub}"/>
               </StackPanel>
               <ui:ToggleSwitch Grid.Column="1"
                                IsChecked="{Binding Settings.RunQuickScanOnLaunch, Mode=TwoWay}"
+                               Checked="SettingsToggle_Changed" Unchecked="SettingsToggle_Changed"
                                VerticalAlignment="Center"/>
             </Grid>
             <Separator Margin="0,4,0,12"/>
@@ -67,10 +145,11 @@
               <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
               <StackPanel Grid.Column="0">
                 <TextBlock Text="Log Fix History" FontSize="13" FontWeight="Medium"/>
-                <TextBlock Text="Record each fix run to history" Style="{DynamicResource CardSub}"/>
+                <TextBlock Text="Keep repair, workflow, and automation receipts in Activity." Style="{DynamicResource CardSub}"/>
               </StackPanel>
               <ui:ToggleSwitch Grid.Column="1"
                                IsChecked="{Binding Settings.LogFixHistory, Mode=TwoWay}"
+                               Checked="SettingsToggle_Changed" Unchecked="SettingsToggle_Changed"
                                VerticalAlignment="Center"/>
             </Grid>
             <Separator Margin="0,4,0,12"/>
@@ -78,24 +157,72 @@
               <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
               <StackPanel Grid.Column="0">
                 <TextBlock Text="Show Notifications" FontSize="13" FontWeight="Medium"/>
-                <TextBlock Text="Alert you to scan results and issues" Style="{DynamicResource CardSub}"/>
+                <TextBlock Text="Show alerts when FixFox finds something that needs attention." Style="{DynamicResource CardSub}"/>
               </StackPanel>
               <ui:ToggleSwitch Grid.Column="1"
                                IsChecked="{Binding Settings.ShowNotifications, Mode=TwoWay}"
+                               Checked="SettingsToggle_Changed" Unchecked="SettingsToggle_Changed"
+                               VerticalAlignment="Center"/>
+            </Grid>
+            <Separator Margin="0,4,0,12"/>
+            <Grid Margin="0,0,0,4">
+              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+              <StackPanel Grid.Column="0">
+                <TextBlock Text="Check for Updates on Launch" FontSize="13" FontWeight="Medium"/>
+                <TextBlock Text="Review the configured update channel when the app starts." Style="{DynamicResource CardSub}"/>
+              </StackPanel>
+              <ui:ToggleSwitch Grid.Column="1"
+                               IsChecked="{Binding Settings.CheckForUpdatesOnLaunch, Mode=TwoWay}"
+                               Checked="SettingsToggle_Changed" Unchecked="SettingsToggle_Changed"
+                               VerticalAlignment="Center"/>
+            </Grid>
+            <Separator Margin="0,4,0,12"/>
+            <Grid Margin="0,0,0,4">
+              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+              <StackPanel Grid.Column="0">
+                <TextBlock Text="Prefer Safe Maintenance Defaults" FontSize="13" FontWeight="Medium"/>
+                <TextBlock Text="Use the conservative maintenance workflow first instead of broader cleanup or deeper repair packs." Style="{DynamicResource CardSub}"/>
+              </StackPanel>
+              <ui:ToggleSwitch Grid.Column="1"
+                               IsChecked="{Binding Settings.PreferSafeMaintenanceDefaults, Mode=TwoWay}"
+                               Checked="SettingsToggle_Changed" Unchecked="SettingsToggle_Changed"
+                               VerticalAlignment="Center"/>
+            </Grid>
+            <Separator Margin="0,4,0,12"/>
+            <Grid Margin="0,0,0,4">
+              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+              <StackPanel Grid.Column="0">
+                <TextBlock Text="Resume Interrupted Repairs" FontSize="13" FontWeight="Medium"/>
+                <TextBlock Text="Restore guided repair work after a restart when the recovery state is still fresh and safe to continue." Style="{DynamicResource CardSub}"/>
+              </StackPanel>
+              <ui:ToggleSwitch Grid.Column="1"
+                               IsChecked="{Binding Settings.RecoverInterruptedOperations, Mode=TwoWay}"
+                               Checked="SettingsToggle_Changed" Unchecked="SettingsToggle_Changed"
+                               VerticalAlignment="Center"/>
+            </Grid>
+            <Separator Margin="0,4,0,12"/>
+            <Grid Margin="0,0,0,4">
+              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+              <StackPanel Grid.Column="0">
+                <TextBlock Text="Confirm Before Closing Active Work" FontSize="13" FontWeight="Medium"/>
+                <TextBlock Text="Warn before closing or minimizing the app while a scan, workflow, or guided repair is still active." Style="{DynamicResource CardSub}"/>
+              </StackPanel>
+              <ui:ToggleSwitch Grid.Column="1"
+                               IsChecked="{Binding Settings.ConfirmBeforeClosingActiveWork, Mode=TwoWay}"
+                               Checked="SettingsToggle_Changed" Unchecked="SettingsToggle_Changed"
                                VerticalAlignment="Center"/>
             </Grid>
           </StackPanel>
         </Border>
 
-        <!-- System -->
-        <TextBlock Text="SYSTEM" Style="{DynamicResource CardLabel}" Margin="0,0,0,8"/>
+        <TextBlock Text="System" Style="{DynamicResource CardLabel}" Margin="0,0,0,8"/>
         <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,16">
           <StackPanel>
             <Grid Margin="0,0,0,12">
               <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
               <StackPanel Grid.Column="0">
                 <TextBlock Text="Run at Startup" FontSize="13" FontWeight="Medium"/>
-                <TextBlock Text="Launch FixFox automatically with Windows" Style="{DynamicResource CardSub}"/>
+                <TextBlock Text="Launch the app automatically with Windows" Style="{DynamicResource CardSub}"/>
               </StackPanel>
               <ui:ToggleSwitch Grid.Column="1"
                                IsChecked="{Binding Settings.RunAtStartup, Mode=TwoWay}"
@@ -107,10 +234,11 @@
               <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
               <StackPanel Grid.Column="0">
                 <TextBlock Text="Minimize to Tray" FontSize="13" FontWeight="Medium"/>
-                <TextBlock Text="Keep FixFox running in the system tray when closed" Style="{DynamicResource CardSub}"/>
+                <TextBlock Text="Keep the app running in the system tray when closed" Style="{DynamicResource CardSub}"/>
               </StackPanel>
               <ui:ToggleSwitch Grid.Column="1"
                                IsChecked="{Binding Settings.MinimizeToTray, Mode=TwoWay}"
+                               Checked="SettingsToggle_Changed" Unchecked="SettingsToggle_Changed"
                                VerticalAlignment="Center"/>
             </Grid>
             <Separator Margin="0,4,0,12"/>
@@ -118,27 +246,69 @@
               <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
               <StackPanel Grid.Column="0">
                 <TextBlock Text="Show Tray Balloon Tips" FontSize="13" FontWeight="Medium"/>
-                <TextBlock Text="Display a tray notice when FixFox is minimized to the tray" Style="{DynamicResource CardSub}"/>
+                <TextBlock Text="Display a tray notice when the app is minimized to the tray" Style="{DynamicResource CardSub}"/>
               </StackPanel>
               <ui:ToggleSwitch Grid.Column="1"
                                IsChecked="{Binding Settings.ShowTrayBalloons, Mode=TwoWay}"
+                               Checked="SettingsToggle_Changed" Unchecked="SettingsToggle_Changed"
                                VerticalAlignment="Center"/>
             </Grid>
           </StackPanel>
         </Border>
 
-        <!-- About -->
-        <TextBlock Text="ABOUT" Style="{DynamicResource CardLabel}" Margin="0,0,0,8"/>
+        <TextBlock Text="Help, trust &amp; recovery" Style="{DynamicResource CardLabel}" Margin="0,0,0,8"/>
+        <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,16">
+          <StackPanel>
+            <TextBlock Text="{Binding LocalDataSummaryText}"
+                       Style="{DynamicResource CardSub}" TextWrapping="Wrap"/>
+            <WrapPanel Margin="0,12,0,0">
+              <Button Content="Quick Start" Click="OpenQuickStart_Click"
+                      Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
+              <Button Content="Privacy &amp; Data" Click="OpenPrivacyGuide_Click"
+                      Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
+              <Button Content="Support Packages" Click="OpenSupportGuide_Click"
+                      Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
+              <Button Content="Recovery &amp; Resume" Click="OpenRecoveryGuide_Click"
+                      Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
+              <Button Content="Troubleshooting" Click="OpenTroubleshootingGuide_Click"
+                      Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
+              <Button Content="Release Notes" Click="OpenReleaseNotes_Click"
+                      Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8"/>
+            </WrapPanel>
+            <Separator Margin="0,12,0,12"/>
+            <DockPanel>
+              <StackPanel DockPanel.Dock="Left">
+                <TextBlock Text="Settings recovery status" FontSize="13" FontWeight="Medium"/>
+                <TextBlock Text="{Binding SettingsLoadStatusText}" Style="{DynamicResource CardSub}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+              </StackPanel>
+              <Button DockPanel.Dock="Right" Content="Restore Defaults" Click="RestoreDefaults_Click"
+                      Style="{DynamicResource SecondaryButton}"/>
+            </DockPanel>
+          </StackPanel>
+        </Border>
+
+        <TextBlock Text="About &amp; updates" Style="{DynamicResource CardLabel}" Margin="0,0,0,8"/>
         <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,0">
           <StackPanel>
-            <TextBlock Text="FixFox" FontSize="18" FontWeight="Bold"
+            <TextBlock Text="{Binding ProductDisplayName}" FontSize="18" FontWeight="Bold"
                        Foreground="{DynamicResource FoxOrangeBrush}" Margin="0,0,0,4"/>
+            <TextBlock Text="{Binding Branding.AppSubtitle}" Style="{DynamicResource CardSub}"/>
             <TextBlock Text="{Binding AppVersionSummaryText}" Style="{DynamicResource CardSub}"/>
+            <TextBlock Text="{Binding EditionSummaryText}" Style="{DynamicResource CardSub}"/>
+            <TextBlock Text="{Binding DeploymentSummaryText}" Style="{DynamicResource CardSub}"/>
             <TextBlock Text="{Binding PrivilegeModeText}" Style="{DynamicResource CardSub}" Margin="0,6,0,0"/>
-            <TextBlock Margin="0,8,0,0" Style="{DynamicResource CardSub}" TextWrapping="Wrap">
-              FixFox is a self-service Windows PC repair tool. It runs fully offline, collects no data,
-              and has no ads, no upselling, and no registry cleaner.
-            </TextBlock>
+            <TextBlock Text="{Binding LocalDataSummaryText}" Margin="0,8,0,0" Style="{DynamicResource CardSub}" TextWrapping="Wrap"/>
+            <TextBlock Text="{Binding SupportRoutingSummaryText}" Margin="0,8,0,0" Style="{DynamicResource CardSub}" TextWrapping="Wrap"/>
+            <Separator Margin="0,12,0,12"/>
+            <TextBlock Text="Update Status" FontSize="13" FontWeight="Medium"/>
+            <TextBlock Text="{Binding UpdateStatusSummaryText}" Style="{DynamicResource CardSub}"
+                       TextWrapping="Wrap" Margin="0,4,0,10"/>
+            <TextBlock Text="{Binding LastUpdateInfo.ReleaseNotesPath}" Style="{DynamicResource MetaText}"
+                       Visibility="{Binding LastUpdateInfo.ReleaseNotesPath, Converter={StaticResource NullCollapsed}}"
+                       Margin="0,0,0,10"/>
+            <Button Content="Open Download Page" Click="OpenDownloadPage_Click"
+                    Style="{DynamicResource SecondaryButton}" Margin="0,0,0,12"
+                    Visibility="{Binding LastUpdateInfo.DownloadUrl, Converter={StaticResource NullCollapsed}}"/>
             <Separator Margin="0,12,0,12"/>
             <TextBlock Text="Data Folder" FontSize="13" FontWeight="Medium"/>
             <TextBlock Text="{Binding DataFolderPath}" Style="{DynamicResource CardSub}"
@@ -146,9 +316,15 @@
             <WrapPanel>
               <Button Content="Open Data Folder" Click="OpenDataFolder_Click"
                       Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
+              <Button Content="Copy Data Path" Click="CopyDataFolder_Click"
+                      Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
               <Button Content="Open App Log" Click="OpenAppLog_Click"
                       Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
+              <Button Content="Copy App Log Path" Click="CopyAppLog_Click"
+                      Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
               <Button Content="Open Verify Log" Click="OpenVerifyLog_Click"
+                      Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
+              <Button Content="Copy Verify Log Path" Click="CopyVerifyLog_Click"
                       Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8"/>
             </WrapPanel>
           </StackPanel>

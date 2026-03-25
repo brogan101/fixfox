@@ -30,15 +30,24 @@ public static class AppServiceRegistrar
         services.AddSingleton<IRestorePointService, RestorePointService>();
         services.AddSingleton<IStatePersistenceService, StatePersistenceService>();
         services.AddSingleton<IRepairHistoryService, RepairHistoryService>();
+        services.AddSingleton<IAutomationHistoryService, AutomationHistoryService>();
         services.AddSingleton<IRepairExecutionService, RepairExecutionService>();
+        services.AddSingleton<IGuidedRepairExecutionService, GuidedRepairExecutionService>();
         services.AddSingleton<IRunbookExecutionService, RunbookExecutionService>();
         services.AddSingleton<IHealthCheckService, HealthCheckService>();
         services.AddSingleton<IEvidenceBundleService, EvidenceBundleService>();
+        services.AddSingleton<IDeploymentConfigurationService, DeploymentConfigurationService>();
         services.AddSingleton<IKnowledgeBaseService, KnowledgeBaseService>();
         services.AddSingleton<IBrandingConfigurationService, BrandingConfigurationService>();
         services.AddSingleton<IEditionCapabilityService, EditionCapabilityService>();
         services.AddSingleton<IAppUpdateService, AppUpdateService>();
         services.AddSingleton<IErrorReportingService, ErrorReportingService>();
+        services.AddSingleton<IToolboxService, ToolboxService>();
+        services.AddSingleton<IMaintenanceProfileService, MaintenanceProfileService>();
+        services.AddSingleton<ISupportCenterService, SupportCenterService>();
+        services.AddSingleton<ICommandPaletteService, CommandPaletteService>();
+        services.AddSingleton<IDashboardWorkspaceService, DashboardWorkspaceService>();
+        services.AddSingleton<IAutomationCoordinatorService, AutomationCoordinatorService>();
 
         if (headless)
             services.AddSingleton<IAppLogger, ConsoleAppLogger>();
@@ -48,6 +57,8 @@ public static class AppServiceRegistrar
         services.AddSingleton<StartupVerifier>();
         services.AddSingleton<DuplicateFileService>();
         services.AddSingleton<InstalledProgramsService>();
+        services.AddSingleton<StartupAppsService>();
+        services.AddSingleton<StorageInsightsService>();
         services.AddSingleton<SchedulerService>();
     }
 }

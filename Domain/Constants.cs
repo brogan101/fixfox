@@ -64,4 +64,5 @@ public static class Constants
 
     // ── Scheduler ────────────────────────────────────────────────────────────
     public const string ScheduledTaskName = "FixFox_WeeklyTuneUp";
+    public const string AutomationTaskPrefix = "FixFox_Automation_";
 }

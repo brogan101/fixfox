@@ -7,12 +7,11 @@
       Background="{DynamicResource BgPrimaryBrush}">
 
   <Page.Resources>
-    <h:BoolToVisConverter      x:Key="BoolVis"/>
+    <h:BoolToVisConverter x:Key="BoolVis"/>
+    <h:InverseBoolConverter x:Key="InvBool"/>
     <h:InverseBoolToVisConverter x:Key="InvBoolVis"/>
-    <h:SeverityColorConverter  x:Key="SevColor"/>
-    <h:SeverityIconConverter   x:Key="SeverityIcon"/>
-    <h:StatusIconConverter     x:Key="StatusIcon"/>
-    <h:RunningVisConverter     x:Key="RunningVis"/>
+    <h:SeverityColorConverter x:Key="SevColor"/>
+    <h:SeverityIconConverter x:Key="SeverityIcon"/>
     <h:NullToCollapsedConverter x:Key="NullCollapsed"/>
   </Page.Resources>
 
@@ -25,20 +24,18 @@
         <RowDefinition Height="*"/>
       </Grid.RowDefinitions>
 
-      <!-- Page header -->
       <StackPanel Grid.Row="0" Margin="0,0,0,20">
-        <TextBlock Text="Dashboard" Style="{DynamicResource PageTitle}"/>
-        <TextBlock Text="Your PC health at a glance" Style="{DynamicResource PageSubtitle}"/>
+        <TextBlock Text="Home" Style="{DynamicResource PageTitle}"/>
+        <TextBlock Text="See what needs attention, take the next safe action, and jump directly into the Windows tools and workflows that matter."
+                   Style="{DynamicResource PageSubtitle}"/>
       </StackPanel>
 
-      <!-- Scan status bar -->
       <ProgressBar Grid.Row="1" IsIndeterminate="True" Height="3"
                    Foreground="{DynamicResource FoxOrangeBrush}"
                    Background="Transparent" BorderThickness="0"
                    Visibility="{Binding ScanRunning, Converter={StaticResource BoolVis}}"
                    Margin="0,0,0,8"/>
 
-      <!-- Summary pills -->
       <WrapPanel Grid.Row="2" Margin="0,0,0,20">
         <Border Style="{DynamicResource StatPill}">
           <StackPanel>
@@ -49,145 +46,305 @@
         </Border>
         <Border Style="{DynamicResource StatPill}">
           <StackPanel>
-            <TextBlock Text="CRITICAL" Style="{DynamicResource CardLabel}"
-                       Foreground="{DynamicResource AccentRedBrush}"/>
+            <TextBlock Text="Critical" Style="{DynamicResource CardLabel}" Foreground="{DynamicResource AccentRedBrush}"/>
             <TextBlock Text="{Binding ScanCriticalCount}" Style="{DynamicResource CardValue}"/>
           </StackPanel>
         </Border>
         <Border Style="{DynamicResource StatPill}">
           <StackPanel>
-            <TextBlock Text="WARNINGS" Style="{DynamicResource CardLabel}"
-                       Foreground="{DynamicResource AccentAmberBrush}"/>
+            <TextBlock Text="Warnings" Style="{DynamicResource CardLabel}" Foreground="{DynamicResource AccentAmberBrush}"/>
             <TextBlock Text="{Binding ScanWarningCount}" Style="{DynamicResource CardValue}"/>
           </StackPanel>
         </Border>
         <Border Style="{DynamicResource StatPill}">
           <StackPanel>
-            <TextBlock Text="OK" Style="{DynamicResource CardLabel}"
-                       Foreground="{DynamicResource AccentGreenBrush}"/>
-            <TextBlock Text="{Binding ScanGoodCount}" Style="{DynamicResource CardValue}"/>
+            <TextBlock Text="Fixes today" Style="{DynamicResource CardLabel}"/>
+            <TextBlock Text="{Binding FixesTodayCount}" Style="{DynamicResource CardValue}"/>
           </StackPanel>
         </Border>
         <Border Style="{DynamicResource StatPill}">
           <StackPanel>
-            <TextBlock Text="STATUS" Style="{DynamicResource CardLabel}"/>
-            <TextBlock Text="{Binding ScanStatusText}" Style="{DynamicResource CardSub}"
-                       MaxWidth="220" TextTrimming="CharacterEllipsis"/>
+            <TextBlock Text="Maintenance" Style="{DynamicResource CardLabel}"/>
+            <TextBlock Text="{Binding MaintenanceSummaryText}" Style="{DynamicResource CardSub}"
+                       MaxWidth="260" TextWrapping="Wrap"/>
           </StackPanel>
         </Border>
       </WrapPanel>
 
-      <!-- Content grid -->
       <Grid Grid.Row="3">
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="*"/>
-          <ColumnDefinition Width="300"/>
+          <ColumnDefinition Width="340"/>
         </Grid.ColumnDefinitions>
 
-        <!-- Scan results -->
-        <Border Grid.Column="0" Style="{DynamicResource InfoCard}" Margin="0,0,16,0">
-          <DockPanel>
-            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,14">
-              <TextBlock Text="Quick Scan Results" Style="{DynamicResource PageTitle}" FontSize="15" DockPanel.Dock="Left"/>
-              <Button Content="Run Scan" Click="RunScan_Click"
-                      Style="{DynamicResource AccentButtonStyle}"
-                      DockPanel.Dock="Right" HorizontalAlignment="Right"
-                      IsEnabled="{Binding ScanRunning, Converter={StaticResource InvBoolVis}}"/>
-            </DockPanel>
+        <StackPanel Grid.Column="0">
+          <Border Style="{DynamicResource InfoCard}" Margin="0,0,16,12">
+            <StackPanel>
+              <TextBlock Text="Command center" Style="{DynamicResource PanelTitle}"/>
+              <TextBlock Text="{Binding MaintenanceSummaryText}" Style="{DynamicResource CardSub}" Margin="0,6,0,12" TextWrapping="Wrap"/>
+              <WrapPanel>
+                <Button Content="Run Quick Scan" Click="RunScan_Click" Style="{DynamicResource AccentButtonStyle}" Margin="0,0,8,8"/>
+                <Button Content="Safe Maintenance Now" Click="RunMaintenance_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
+                <Button Content="Open Device Health" Click="OpenDeviceHealth_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
+                <Button Content="Open Windows Tools" Click="OpenToolbox_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
+                <Button Content="Open Support Package" Click="OpenSupport_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8"/>
+              </WrapPanel>
+            </StackPanel>
+          </Border>
 
-            <TextBlock DockPanel.Dock="Top" Text="{Binding ScanStatusText}"
-                       Style="{DynamicResource CardSub}" Margin="0,0,0,10"
-                       Visibility="{Binding ScanRunning, Converter={StaticResource InvBoolVis}}"/>
-
-            <ScrollViewer>
-              <ItemsControl ItemsSource="{Binding ScanResults}"
-                            VirtualizingStackPanel.IsVirtualizing="True">
-                <ItemsControl.ItemsPanel>
-                  <ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
+          <Border Style="{DynamicResource InfoCard}" Margin="0,0,16,12"
+                  Visibility="{Binding HasProactiveRecommendations, Converter={StaticResource BoolVis}}">
+            <StackPanel>
+              <TextBlock Text="Recommended next steps" Style="{DynamicResource PanelTitle}" Margin="0,0,0,10"/>
+              <ItemsControl ItemsSource="{Binding ProactiveRecommendations}">
                 <ItemsControl.ItemTemplate>
-                  <DataTemplate DataType="{x:Type m:ScanResult}">
-                    <Border Style="{DynamicResource FixCard}">
+                  <DataTemplate DataType="{x:Type m:ProactiveRecommendation}">
+                    <Border Style="{DynamicResource FixCard}" Padding="12" Margin="0,0,0,8">
                       <DockPanel>
-                        <TextBlock DockPanel.Dock="Left"
-                                   Text="{Binding Severity, Converter={StaticResource SeverityIcon}}"
-                                   FontFamily="{DynamicResource IconFont}" FontSize="16"
-                                   Foreground="{Binding Severity, Converter={StaticResource SevColor}}"
-                                   VerticalAlignment="Center" Margin="0,0,12,0"/>
-                        <Button DockPanel.Dock="Right" Content="Fix it" Tag="{Binding}"
-                                Click="ScanFix_Click" Style="{DynamicResource PrimaryButton}"
-                                Visibility="{Binding FixId, Converter={StaticResource NullCollapsed}}"
-                                VerticalAlignment="Center"/>
+                        <WrapPanel DockPanel.Dock="Right" Margin="12,0,0,0">
+                          <Button Content="Run" Tag="{Binding}" Click="RecommendationAction_Click"
+                                  Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"
+                                  Visibility="{Binding ActionFixId, Converter={StaticResource NullCollapsed}}"/>
+                          <Button Content="Ignore" Tag="{Binding}" Click="RecommendationIgnore_Click"
+                                  Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8"/>
+                        </WrapPanel>
                         <StackPanel>
-                          <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13"/>
-                          <TextBlock Text="{Binding Detail}" Style="{DynamicResource CardSub}"
-                                     TextWrapping="Wrap"/>
+                          <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
+                          <TextBlock Text="{Binding Summary}" Style="{DynamicResource CardSub}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                         </StackPanel>
                       </DockPanel>
                     </Border>
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
-            </ScrollViewer>
-          </DockPanel>
-        </Border>
+            </StackPanel>
+          </Border>
 
-        <!-- Recently run + wizard -->
+          <Border Style="{DynamicResource InfoCard}" Margin="0,0,16,12"
+                  Visibility="{Binding HasDashboardAlerts, Converter={StaticResource BoolVis}}">
+            <StackPanel>
+              <TextBlock Text="Needs attention now" Style="{DynamicResource PanelTitle}" Margin="0,0,0,10"/>
+              <ItemsControl ItemsSource="{Binding DashboardAlerts}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate DataType="{x:Type m:DashboardAlert}">
+                    <Border Style="{DynamicResource FixCard}" Padding="12" Margin="0,0,0,8">
+                      <DockPanel>
+                        <WrapPanel DockPanel.Dock="Right" Margin="12,0,0,0">
+                          <Button Content="{Binding ActionLabel}"
+                                  Tag="{Binding}"
+                                  Click="AlertAction_Click"
+                                  Style="{DynamicResource SecondaryButton}"
+                                  Visibility="{Binding ActionLabel, Converter={StaticResource NullCollapsed}}"
+                                  Margin="0,0,8,8"/>
+                          <Button Content="Snooze"
+                                  Tag="{Binding}"
+                                  Click="AlertSnooze_Click"
+                                  Style="{DynamicResource SecondaryButton}"
+                                  Margin="0,0,0,8"/>
+                        </WrapPanel>
+                        <StackPanel>
+                          <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
+                          <TextBlock Text="{Binding Summary}" Style="{DynamicResource CardSub}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                      </DockPanel>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </Border>
+
+          <Border Style="{DynamicResource InfoCard}" Margin="0,0,16,0">
+            <DockPanel>
+              <DockPanel DockPanel.Dock="Top" Margin="0,0,0,14">
+                <TextBlock Text="Quick scan findings" Style="{DynamicResource PanelTitle}" DockPanel.Dock="Left"/>
+                <Button Content="Run Quick Scan" Click="RunScan_Click"
+                        Style="{DynamicResource AccentButtonStyle}"
+                        DockPanel.Dock="Right" HorizontalAlignment="Right"
+                        IsEnabled="{Binding ScanRunning, Converter={StaticResource InvBool}}"/>
+              </DockPanel>
+
+              <TextBlock DockPanel.Dock="Top" Text="{Binding ScanStatusText}"
+                         Style="{DynamicResource CardSub}" Margin="0,0,0,10"
+                         Visibility="{Binding ScanRunning, Converter={StaticResource InvBoolVis}}"/>
+
+              <ScrollViewer>
+                <ItemsControl ItemsSource="{Binding ScanResults}" VirtualizingStackPanel.IsVirtualizing="True">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type m:ScanResult}">
+                      <Border Style="{DynamicResource FixCard}">
+                        <DockPanel>
+                          <TextBlock DockPanel.Dock="Left"
+                                     Text="{Binding Severity, Converter={StaticResource SeverityIcon}}"
+                                     FontFamily="{DynamicResource IconFont}" FontSize="16"
+                                     Foreground="{Binding Severity, Converter={StaticResource SevColor}}"
+                                     VerticalAlignment="Center" Margin="0,0,12,0"/>
+                          <Button DockPanel.Dock="Right" Content="Fix it" Tag="{Binding}"
+                                  Click="ScanFix_Click" Style="{DynamicResource PrimaryButton}"
+                                  Visibility="{Binding FixId, Converter={StaticResource NullCollapsed}}"
+                                  VerticalAlignment="Center"/>
+                          <StackPanel>
+                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13"/>
+                            <TextBlock Text="{Binding Detail}" Style="{DynamicResource CardSub}" TextWrapping="Wrap"/>
+                          </StackPanel>
+                        </DockPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+            </DockPanel>
+          </Border>
+        </StackPanel>
+
         <StackPanel Grid.Column="1">
           <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,12">
             <StackPanel>
-              <TextBlock Text="Recommended Next Steps" Style="{DynamicResource PageTitle}" FontSize="14" Margin="0,0,0,10"/>
-              <ItemsControl ItemsSource="{Binding ProactiveRecommendations}">
+              <TextBlock Text="Automation" Style="{DynamicResource PanelTitle}" Margin="0,0,0,6"/>
+              <TextBlock Text="{Binding AutomationOverviewText}" Style="{DynamicResource CardSub}" TextWrapping="Wrap"/>
+              <TextBlock Text="{Binding AutomationPauseStatusText}" Style="{DynamicResource MetaText}" Margin="0,6,0,0" TextWrapping="Wrap"/>
+              <TextBlock Text="{Binding LastAutomationResultText}" Style="{DynamicResource MetaText}" Margin="0,6,0,10" TextWrapping="Wrap"/>
+              <WrapPanel>
+                <Button Content="Open Automation" Click="OpenAutomation_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
+                <Button Content="Run Quick Health" Click="RunAutomationQuickHealth_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
+                <Button Content="Run Safe Maintenance" Click="RunAutomationMaintenance_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8"/>
+              </WrapPanel>
+            </StackPanel>
+          </Border>
+
+          <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,12">
+            <StackPanel>
+              <TextBlock Text="Suggested workflows" Style="{DynamicResource PanelTitle}" Margin="0,0,0,10"/>
+              <ItemsControl ItemsSource="{Binding SuggestedRunbooks}" Visibility="{Binding HasSuggestedRunbooks, Converter={StaticResource BoolVis}}">
                 <ItemsControl.ItemTemplate>
-                  <DataTemplate DataType="{x:Type m:ProactiveRecommendation}">
-                    <Border Style="{DynamicResource FixCard}" Padding="12,10">
+                  <DataTemplate DataType="{x:Type m:RunbookDefinition}">
+                    <Border Style="{DynamicResource FixCard}" Padding="12,10"
+                            Tag="{Binding}"
+                            MouseLeftButtonDown="SuggestedRunbookCard_MouseLeftButtonDown">
+                      <Border.ContextMenu>
+                        <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
+                          <MenuItem Header="Start Workflow" Click="SuggestedRunbookMenu_Click" CommandParameter="{Binding}"/>
+                          <MenuItem Header="Open Automation" Click="OpenAutomationMenu_Click" CommandParameter="{Binding}"/>
+                        </ContextMenu>
+                      </Border.ContextMenu>
+                      <DockPanel>
+                        <Button DockPanel.Dock="Right" Content="Start" Tag="{Binding}" Click="SuggestedRunbook_Click"
+                                Style="{DynamicResource SecondaryButton}" Margin="12,0,0,0"/>
+                        <StackPanel>
+                          <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="SemiBold"/>
+                          <TextBlock Text="{Binding Description}" Style="{DynamicResource CardSub}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                      </DockPanel>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <TextBlock Text="Run a quick scan or health check to surface the strongest workflows here."
+                         Style="{DynamicResource CardSub}"
+                         Visibility="{Binding HasSuggestedRunbooks, Converter={StaticResource InvBoolVis}}"/>
+            </StackPanel>
+          </Border>
+
+          <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,12">
+            <StackPanel>
+              <TextBlock Text="Recent failures" Style="{DynamicResource PanelTitle}" Margin="0,0,0,10"/>
+              <ItemsControl ItemsSource="{Binding RecentFailedEntries}" Visibility="{Binding HasRecentFailures, Converter={StaticResource BoolVis}}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate DataType="{x:Type m:RepairHistoryEntry}">
+                    <Border Style="{DynamicResource FixCard}" Padding="12,10"
+                            Tag="{Binding}"
+                            MouseLeftButtonDown="RecentFailureCard_MouseLeftButtonDown">
+                      <Border.ContextMenu>
+                        <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
+                          <MenuItem Header="Create Support Package" Click="RecentFailureSupportMenu_Click" CommandParameter="{Binding}"/>
+                          <MenuItem Header="Open Activity" Click="OpenActivityMenu_Click" CommandParameter="{Binding}"/>
+                        </ContextMenu>
+                      </Border.ContextMenu>
                       <StackPanel>
-                        <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="SemiBold"/>
-                        <TextBlock Text="{Binding Summary}" Style="{DynamicResource CardSub}" TextWrapping="Wrap" FontSize="11"/>
+                        <TextBlock Text="{Binding FixTitle}" FontSize="12" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding VerificationSummary}" Style="{DynamicResource CardSub}" TextWrapping="Wrap" Margin="0,4,0,0"/>
                       </StackPanel>
                     </Border>
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
-              <TextBlock Text="Run a scan to refresh recommendations." Style="{DynamicResource CardSub}"
-                         Visibility="{Binding ProactiveRecommendations.Count, Converter={StaticResource NullCollapsed}}"/>
+              <TextBlock Text="No recent failures are waiting for follow-up." Style="{DynamicResource CardSub}"
+                         Visibility="{Binding HasRecentFailures, Converter={StaticResource InvBoolVis}}"/>
             </StackPanel>
           </Border>
 
-          <!-- Recently Run -->
           <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,12">
             <StackPanel>
-              <TextBlock Text="Recently Run" Style="{DynamicResource PageTitle}" FontSize="14" Margin="0,0,0,10"/>
+              <TextBlock Text="Recent automation" Style="{DynamicResource PanelTitle}" Margin="0,0,0,10"/>
+              <ItemsControl ItemsSource="{Binding RecentAutomationHistoryEntries}" Visibility="{Binding HasRecentAutomationHistory, Converter={StaticResource BoolVis}}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate DataType="{x:Type m:AutomationRunReceipt}">
+                    <Border Style="{DynamicResource FixCard}" Padding="12,10"
+                            Tag="{Binding}"
+                            MouseLeftButtonDown="RecentAutomationCard_MouseLeftButtonDown">
+                      <Border.ContextMenu>
+                        <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
+                          <MenuItem Header="Open Details" Click="RecentAutomationDetailsMenu_Click" CommandParameter="{Binding}"/>
+                          <MenuItem Header="Copy Summary" Click="RecentAutomationCopyMenu_Click" CommandParameter="{Binding}"/>
+                          <MenuItem Header="Open Automation" Click="OpenAutomationMenu_Click" CommandParameter="{Binding}"/>
+                        </ContextMenu>
+                      </Border.ContextMenu>
+                      <StackPanel>
+                        <TextBlock Text="{Binding RuleTitle}" FontSize="12" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding Summary}" Style="{DynamicResource CardSub}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                      </StackPanel>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <TextBlock Text="No automation runs have been recorded yet." Style="{DynamicResource CardSub}"
+                         Visibility="{Binding HasRecentAutomationHistory, Converter={StaticResource InvBoolVis}}"/>
+            </StackPanel>
+          </Border>
+
+          <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,12">
+            <StackPanel>
+              <TextBlock Text="Recent repair activity" Style="{DynamicResource PanelTitle}" Margin="0,0,0,10"/>
               <ItemsControl ItemsSource="{Binding RecentlyRunFixes}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate DataType="{x:Type m:FixItem}">
-                    <Border Style="{DynamicResource FixCard}" Padding="12,10">
+                    <Border Style="{DynamicResource FixCard}" Padding="12,10"
+                            Tag="{Binding}"
+                            MouseLeftButtonDown="RecentFixCard_MouseLeftButtonDown">
+                      <Border.ContextMenu>
+                        <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
+                          <MenuItem Header="Run Again" Click="RecentFixRunMenu_Click" CommandParameter="{Binding}"/>
+                          <MenuItem Header="Open Repair Library" Click="OpenLibraryMenu_Click" CommandParameter="{Binding}"/>
+                        </ContextMenu>
+                      </Border.ContextMenu>
                       <StackPanel>
                         <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="Medium"/>
-                        <TextBlock Text="{Binding Status}" Style="{DynamicResource CardSub}" FontSize="11"/>
+                        <TextBlock Text="{Binding Status}" Style="{DynamicResource MetaText}"/>
                       </StackPanel>
                     </Border>
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
-              <TextBlock Text="No fixes run yet" Style="{DynamicResource CardSub}"
-                         Visibility="{Binding RecentlyRunFixes.Count, Converter={StaticResource NullCollapsed}}"/>
+              <TextBlock Text="No repairs or guided workflows have been run yet." Style="{DynamicResource CardSub}"
+                         Visibility="{Binding HasRecentlyRunFixes, Converter={StaticResource InvBoolVis}}"/>
             </StackPanel>
           </Border>
 
-          <!-- Wizard panel -->
-          <Border Style="{DynamicResource InfoCard}"
-                  Visibility="{Binding WizardVisible, Converter={StaticResource BoolVis}}">
+          <Border Style="{DynamicResource InfoCard}" Visibility="{Binding WizardVisible, Converter={StaticResource BoolVis}}">
             <StackPanel>
               <TextBlock Text="{Binding WizardFix.Title}" FontWeight="Bold" FontSize="14" Margin="0,0,0,4"/>
               <TextBlock Text="{Binding WizardStepLabel}" Style="{DynamicResource CardSub}" Margin="0,0,0,10"/>
-              <TextBlock Text="{Binding CurrentStep.Instruction}" Style="{DynamicResource CardSub}"
-                         TextWrapping="Wrap" Margin="0,0,0,12"/>
+              <TextBlock Text="{Binding WizardSummaryText}" Style="{DynamicResource CardSub}" Margin="0,0,0,8"
+                         Visibility="{Binding WizardSummaryText, Converter={StaticResource NullCollapsed}}"/>
+              <TextBlock Text="{Binding WizardFailedStepText}" Style="{DynamicResource MetaText}" Margin="0,0,0,8"
+                         Visibility="{Binding WizardFailedStepText, Converter={StaticResource NullCollapsed}}"/>
+              <TextBlock Text="{Binding CurrentStep.Instruction}" Style="{DynamicResource CardSub}" TextWrapping="Wrap" Margin="0,0,0,12"/>
               <WrapPanel>
-                <Button Content="{Binding WizardNextLabel}" Click="WizardNext_Click"
-                        Style="{DynamicResource AccentButtonStyle}" Margin="0,0,8,0"/>
-                <Button Content="Cancel" Click="WizardCancel_Click"
-                        Style="{DynamicResource SecondaryButton}"/>
+                <Button Content="{Binding WizardNextLabel}" Click="WizardNext_Click" Style="{DynamicResource AccentButtonStyle}" Margin="0,0,8,0"/>
+                <Button Content="Cancel" Click="WizardCancel_Click" Style="{DynamicResource SecondaryButton}"/>
               </WrapPanel>
             </StackPanel>
           </Border>

@@ -476,6 +476,10 @@ public sealed class StartupVerifier
             snapshot.EvidenceBundles,
             snapshot.Runbooks,
             snapshot.DeepRepairs,
+            snapshot.AdvancedMode,
+            snapshot.TechnicianExports,
+            snapshot.AdvancedToolbox,
+            snapshot.CustomSupportRouting,
             snapshot.WhiteLabelBranding
         }.Count(state => state == CapabilityState.Available);
 

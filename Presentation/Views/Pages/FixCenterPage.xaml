@@ -15,7 +15,18 @@
     <h:StatusFgConverter         x:Key="StatusFg"/>
     <h:RunningVisConverter       x:Key="RunningVis"/>
     <h:AdminShieldVisConverter   x:Key="AdminVis"/>
-    <h:PinIconConverter          x:Key="PinIcon"/>
+
+    <Style x:Key="PinToggleIconStyle" TargetType="ui:SymbolIcon">
+      <Setter Property="Symbol" Value="Pin20"/>
+      <Setter Property="FontSize" Value="15"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextSecBrush}"/>
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding IsPinned}" Value="True">
+          <Setter Property="Symbol" Value="PinOff20"/>
+          <Setter Property="Foreground" Value="{DynamicResource FoxOrangeBrush}"/>
+        </DataTrigger>
+      </Style.Triggers>
+    </Style>
   </Page.Resources>
 
   <Grid Margin="28,24">
@@ -28,11 +39,11 @@
     <!-- Header + search bar -->
     <DockPanel Grid.Row="0" Margin="0,0,0,16">
       <StackPanel DockPanel.Dock="Left">
-        <TextBlock Text="Fix Center" Style="{DynamicResource PageTitle}"/>
-        <TextBlock Text="{Binding SelectedCategory.Title, StringFormat='Category: {0}', FallbackValue='All Categories'}"
+        <TextBlock Text="Repair Library" Style="{DynamicResource PageTitle}"/>
+        <TextBlock Text="{Binding FixLibrarySummaryText}"
                    Style="{DynamicResource PageSubtitle}"/>
       </StackPanel>
-      <Border DockPanel.Dock="Right" Style="{DynamicResource SearchBox}" Width="280" HorizontalAlignment="Right">
+      <Border DockPanel.Dock="Right" Style="{DynamicResource SearchBox}" MinWidth="220" MaxWidth="280" HorizontalAlignment="Right">
         <Grid>
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto"/>
@@ -54,33 +65,63 @@
 
     <!-- Fix count label -->
     <TextBlock Grid.Row="1" Margin="0,0,0,10"
-               Foreground="{DynamicResource TextSecBrush}" FontSize="12">
-      <Run Text="{Binding ActiveFixCount, Mode=OneWay}"/>
-      <Run Text=" fixes"/>
-    </TextBlock>
+               Foreground="{DynamicResource TextSecBrush}" FontSize="12"
+               Text="{Binding ActiveFixCountText}"/>
 
     <!-- Pinned fixes (if any) -->
     <DockPanel Grid.Row="2">
       <ScrollViewer DockPanel.Dock="Top" VerticalScrollBarVisibility="Auto"
                     Visibility="{Binding PinnedFixes.Count, Converter={StaticResource NullCollapsed}}">
         <StackPanel Margin="0,0,0,12">
-          <TextBlock Text="PINNED" Style="{DynamicResource CardLabel}" Margin="0,0,0,6"/>
+          <TextBlock Text="Quick access" Style="{DynamicResource CardLabel}" Margin="0,0,0,6"/>
           <ItemsControl ItemsSource="{Binding PinnedFixes}">
             <ItemsControl.ItemTemplate>
               <DataTemplate DataType="{x:Type m:FixItem}">
                 <Border Style="{DynamicResource FixCard}"
-                        Background="{Binding Status, Converter={StaticResource StatusBg}}">
-                  <DockPanel>
-                    <Button DockPanel.Dock="Right" Tag="{Binding}" Click="TogglePin_Click"
-                            Content="{Binding IsPinned, Converter={StaticResource PinIcon}}"
-                            FontFamily="{DynamicResource IconFont}" FontSize="14"
+                        Background="{Binding Status, Converter={StaticResource StatusBg}}"
+                        Tag="{Binding}"
+                        MouseLeftButtonDown="FixCard_MouseLeftButtonDown">
+                  <Border.ContextMenu>
+                    <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
+                      <MenuItem Header="Run Best Action" Click="RunBestAction_Click" CommandParameter="{Binding}"/>
+                      <MenuItem Header="Start Guided Repair" Click="GuidedMenu_Click" CommandParameter="{Binding}"/>
+                      <MenuItem Header="Run Repair" Click="RunMenu_Click" CommandParameter="{Binding}"/>
+                      <Separator/>
+                      <MenuItem Header="View Details" Click="FixDetails_Click" CommandParameter="{Binding}"/>
+                      <MenuItem Header="Copy Technical Detail" Click="CopyFixDetails_Click" CommandParameter="{Binding}"/>
+                      <MenuItem Header="Open Related Workflow" Click="OpenRelatedWorkflow_Click" CommandParameter="{Binding}"/>
+                      <Separator/>
+                      <MenuItem Header="Remove From Quick Access" Click="TogglePinMenu_Click" CommandParameter="{Binding}"/>
+                      <MenuItem Header="Copy Repair Name" Click="CopyFixTitle_Click" CommandParameter="{Binding}"/>
+                    </ContextMenu>
+                  </Border.ContextMenu>
+                  <DockPanel LastChildFill="True">
+                    <WrapPanel DockPanel.Dock="Right" VerticalAlignment="Top" ItemHeight="36">
+                      <Button Content="Details" Tag="{Binding}"
+                              Click="FixDetailsButton_Click" Style="{DynamicResource SecondaryButton}"
+                              Margin="0,0,8,0" VerticalAlignment="Center"/>
+                      <Button Tag="{Binding}" Click="TogglePin_Click"
                             Background="Transparent" BorderThickness="0" Cursor="Hand"
-                            Foreground="{DynamicResource TextSecBrush}" VerticalAlignment="Top"/>
-                    <Button DockPanel.Dock="Right" Content="Run" Tag="{Binding}"
-                            Click="FixButton_Click" Style="{DynamicResource PrimaryButton}"
-                            Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            Foreground="{DynamicResource TextSecBrush}" VerticalAlignment="Top">
+                        <ui:SymbolIcon Style="{StaticResource PinToggleIconStyle}"/>
+                      </Button>
+                      <Button Content="Run" Tag="{Binding}"
+                              Click="FixButton_Click" Style="{DynamicResource PrimaryButton}"
+                              Margin="0,0,8,0" VerticalAlignment="Center"/>
+                    </WrapPanel>
                     <StackPanel>
-                      <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13"/>
+                      <WrapPanel Margin="0,0,0,2">
+                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13"/>
+                        <Border Style="{DynamicResource CompactStatusBadge}"
+                                Margin="8,0,0,0"
+                                VerticalAlignment="Center"
+                                Visibility="{Binding HasStatusIndicator, Converter={StaticResource BoolVis}}">
+                          <StackPanel Orientation="Horizontal">
+                            <Ellipse Style="{DynamicResource CompactStatusDot}" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding StatusSummary}" Style="{DynamicResource CompactStatusText}" Margin="6,0,0,0"/>
+                          </StackPanel>
+                        </Border>
+                      </WrapPanel>
                       <TextBlock Text="{Binding Description}" Style="{DynamicResource CardSub}"
                                  TextWrapping="Wrap" MaxHeight="40"/>
                       <ProgressBar IsIndeterminate="True" Height="2" Margin="0,6,0,0"
@@ -97,69 +138,115 @@
       </ScrollViewer>
 
       <!-- Main fix list -->
-      <ScrollViewer>
-        <ItemsControl ItemsSource="{Binding ActiveFixes}"
-                      VirtualizingStackPanel.IsVirtualizing="True"
-                      VirtualizingStackPanel.VirtualizationMode="Recycling">
-          <ItemsControl.ItemsPanel>
-            <ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate>
-          </ItemsControl.ItemsPanel>
-          <ItemsControl.ItemTemplate>
-            <DataTemplate DataType="{x:Type m:FixItem}">
-              <Border Style="{DynamicResource FixCard}"
-                      Background="{Binding Status, Converter={StaticResource StatusBg}}">
-                <DockPanel>
-                  <!-- Side actions -->
-                  <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
-                    <TextBlock Text="&#xE7EF;" FontFamily="{DynamicResource IconFont}" FontSize="12"
-                               Foreground="{DynamicResource AccentAmberBrush}" VerticalAlignment="Center" Margin="0,0,6,0"
-                               ToolTip="Requires admin"
-                               Visibility="{Binding RequiresAdmin, Converter={StaticResource AdminVis}}"/>
-                    <Button Tag="{Binding}" Click="TogglePin_Click"
-                            Content="{Binding IsPinned, Converter={StaticResource PinIcon}}"
-                            FontFamily="{DynamicResource IconFont}" FontSize="14"
-                            Background="Transparent" BorderThickness="0" Cursor="Hand"
-                            Foreground="{DynamicResource TextSecBrush}" Margin="0,0,6,0"/>
-                    <Button Content="Guide" Tag="{Binding}" Click="GuidedButton_Click"
-                            Style="{DynamicResource SecondaryButton}"
-                            Visibility="{Binding HasSteps, Converter={StaticResource BoolVis}}"
-                            Margin="0,0,6,0"/>
-                    <Button Content="Run" Tag="{Binding}" Click="FixButton_Click"
-                            Style="{DynamicResource PrimaryButton}"
-                            Visibility="{Binding HasScript, Converter={StaticResource BoolVis}}"/>
-                  </StackPanel>
+      <Grid>
+        <Border Style="{DynamicResource InfoCard}"
+                Visibility="{Binding HasActiveFixes, Converter={StaticResource InvBoolVis}}">
+          <StackPanel>
+            <TextBlock Text="{Binding FixLibraryEmptyStateTitle}" Style="{DynamicResource PanelTitle}"/>
+            <TextBlock Text="{Binding FixLibraryEmptyStateText}" Style="{DynamicResource CardSub}" Margin="0,6,0,12"/>
+            <WrapPanel>
+              <Button Content="Clear Search"
+                      Click="ClearSearch_Click"
+                      Style="{DynamicResource SecondaryButton}"
+                      Margin="0,0,8,8"
+                      Visibility="{Binding SearchText, Converter={StaticResource NullCollapsed}}"/>
+              <Button Content="Open Guided Diagnosis"
+                      Click="OpenGuidedDiagnosis_Click"
+                      Style="{DynamicResource SecondaryButton}"
+                      Margin="0,0,0,8"/>
+            </WrapPanel>
+          </StackPanel>
+        </Border>
 
-                  <!-- Fix info -->
-                  <StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,3">
-                      <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13"/>
-                      <Border Background="{DynamicResource BgCard2Brush}" CornerRadius="4"
-                              Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding Type}" FontSize="10"
-                                   Foreground="{DynamicResource TextSecBrush}"/>
+        <ScrollViewer Visibility="{Binding HasActiveFixes, Converter={StaticResource BoolVis}}">
+          <ItemsControl ItemsSource="{Binding ActiveFixes}"
+                        VirtualizingStackPanel.IsVirtualizing="True"
+                        VirtualizingStackPanel.VirtualizationMode="Recycling">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate DataType="{x:Type m:FixItem}">
+                <Border Style="{DynamicResource FixCard}"
+                        Background="{Binding Status, Converter={StaticResource StatusBg}}"
+                        Tag="{Binding}"
+                        MouseLeftButtonDown="FixCard_MouseLeftButtonDown">
+                  <Border.ContextMenu>
+                    <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
+                      <MenuItem Header="Run Best Action" Click="RunBestAction_Click" CommandParameter="{Binding}"/>
+                      <MenuItem Header="Start Guided Repair" Click="GuidedMenu_Click" CommandParameter="{Binding}"/>
+                      <MenuItem Header="Run Repair" Click="RunMenu_Click" CommandParameter="{Binding}"/>
+                      <Separator/>
+                      <MenuItem Header="View Details" Click="FixDetails_Click" CommandParameter="{Binding}"/>
+                      <MenuItem Header="Copy Technical Detail" Click="CopyFixDetails_Click" CommandParameter="{Binding}"/>
+                      <MenuItem Header="Open Related Workflow" Click="OpenRelatedWorkflow_Click" CommandParameter="{Binding}"/>
+                      <Separator/>
+                      <MenuItem Header="Pin To Quick Access" Click="TogglePinMenu_Click" CommandParameter="{Binding}"/>
+                      <MenuItem Header="Copy Repair Name" Click="CopyFixTitle_Click" CommandParameter="{Binding}"/>
+                    </ContextMenu>
+                  </Border.ContextMenu>
+                  <DockPanel LastChildFill="True">
+                    <WrapPanel DockPanel.Dock="Right" VerticalAlignment="Top" Margin="8,0,0,0" ItemHeight="36">
+                      <TextBlock Text="&#xE7EF;" FontFamily="{DynamicResource IconFont}" FontSize="12"
+                                 Foreground="{DynamicResource AccentAmberBrush}" VerticalAlignment="Center" Margin="0,0,6,0"
+                                 ToolTip="Requires admin"
+                                 Visibility="{Binding RequiresAdmin, Converter={StaticResource AdminVis}}"/>
+                      <Button Tag="{Binding}" Click="TogglePin_Click"
+                              Background="Transparent" BorderThickness="0" Cursor="Hand"
+                              Foreground="{DynamicResource TextSecBrush}" Margin="0,0,6,0">
+                        <ui:SymbolIcon Style="{StaticResource PinToggleIconStyle}"/>
+                      </Button>
+                      <Button Content="Guide" Tag="{Binding}" Click="GuidedButton_Click"
+                              Style="{DynamicResource SecondaryButton}"
+                              Visibility="{Binding HasSteps, Converter={StaticResource BoolVis}}"
+                              Margin="0,0,6,0"/>
+                      <Button Content="Details" Tag="{Binding}" Click="FixDetailsButton_Click"
+                              Style="{DynamicResource SecondaryButton}"
+                              Margin="0,0,6,0"/>
+                      <Button Content="Run" Tag="{Binding}" Click="FixButton_Click"
+                              Style="{DynamicResource PrimaryButton}"
+                              Visibility="{Binding HasScript, Converter={StaticResource BoolVis}}"/>
+                    </WrapPanel>
+
+                    <StackPanel>
+                      <WrapPanel Margin="0,0,0,3">
+                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13"/>
+                        <Border Background="{DynamicResource BgCard2Brush}" CornerRadius="4"
+                                Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
+                          <TextBlock Text="{Binding Type}" FontSize="10"
+                                     Foreground="{DynamicResource TextSecBrush}"/>
+                        </Border>
+                        <Border Style="{DynamicResource CompactStatusBadge}"
+                                Margin="8,0,0,0"
+                                VerticalAlignment="Center"
+                                Visibility="{Binding HasStatusIndicator, Converter={StaticResource BoolVis}}">
+                          <StackPanel Orientation="Horizontal">
+                            <Ellipse Style="{DynamicResource CompactStatusDot}" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding StatusSummary}" Style="{DynamicResource CompactStatusText}" Margin="6,0,0,0"/>
+                          </StackPanel>
+                        </Border>
+                      </WrapPanel>
+                      <TextBlock Text="{Binding Description}" Style="{DynamicResource CardSub}"
+                                 TextWrapping="Wrap" MaxHeight="48"/>
+                      <Border Background="{DynamicResource BgCardBrush}" CornerRadius="5" Padding="10,6"
+                              Margin="0,8,0,0"
+                              Visibility="{Binding LastOutput, Converter={StaticResource NullCollapsed}}">
+                        <TextBlock Text="{Binding LastOutput}" FontFamily="Consolas" FontSize="11"
+                                   Foreground="{Binding Status, Converter={StaticResource StatusFg}}"
+                                   TextWrapping="Wrap" MaxHeight="72"/>
                       </Border>
+                      <ProgressBar IsIndeterminate="True" Height="2" Margin="0,6,0,0"
+                                   Foreground="{DynamicResource FoxOrangeBrush}"
+                                   Background="Transparent" BorderThickness="0"
+                                   Visibility="{Binding Status, Converter={StaticResource RunningVis}}"/>
                     </StackPanel>
-                    <TextBlock Text="{Binding Description}" Style="{DynamicResource CardSub}"
-                               TextWrapping="Wrap" MaxHeight="48"/>
-                    <!-- Output -->
-                    <Border Background="{DynamicResource BgCardBrush}" CornerRadius="5" Padding="10,6"
-                            Margin="0,8,0,0"
-                            Visibility="{Binding LastOutput, Converter={StaticResource NullCollapsed}}">
-                      <TextBlock Text="{Binding LastOutput}" FontFamily="Consolas" FontSize="11"
-                                 Foreground="{Binding Status, Converter={StaticResource StatusFg}}"
-                                 TextWrapping="Wrap" MaxHeight="60"/>
-                    </Border>
-                    <ProgressBar IsIndeterminate="True" Height="2" Margin="0,6,0,0"
-                                 Foreground="{DynamicResource FoxOrangeBrush}"
-                                 Background="Transparent" BorderThickness="0"
-                                 Visibility="{Binding Status, Converter={StaticResource RunningVis}}"/>
-                  </StackPanel>
-                </DockPanel>
-              </Border>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-      </ScrollViewer>
+                  </DockPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+      </Grid>
     </DockPanel>
   </Grid>
 </Page>

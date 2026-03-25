@@ -1,0 +1,7 @@
+﻿{
+    "ChannelName":  "Stable",
+    "LatestVersion":  "1.0.0",
+    "DownloadUrl":  "https://github.com/brogan101/fixfox/releases",
+    "ReleaseNotesPath":  "CHANGELOG.md",
+    "Summary":  "You are on the current public FixFox build."
+}

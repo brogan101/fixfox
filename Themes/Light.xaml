@@ -61,6 +61,25 @@
     </Style.Triggers>
   </Style>
 
+  <Style TargetType="ContextMenu">
+    <Setter Property="Background" Value="{StaticResource BgCardBrush}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="Padding" Value="4"/>
+  </Style>
+
+  <Style TargetType="MenuItem">
+    <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="Padding" Value="10,6"/>
+    <Setter Property="Margin" Value="2"/>
+    <Style.Triggers>
+      <Trigger Property="IsHighlighted" Value="True">
+        <Setter Property="Background" Value="{StaticResource BgCard2Brush}"/>
+      </Trigger>
+    </Style.Triggers>
+  </Style>
+
   <Style TargetType="CheckBox">
     <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
     <Setter Property="VerticalContentAlignment" Value="Center"/>
@@ -140,8 +159,9 @@
     <Setter Property="Background"      Value="{StaticResource FoxOrangeBrush}"/>
     <Setter Property="Foreground"      Value="White"/>
     <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="MinWidth"        Value="92"/>
+    <Setter Property="MinHeight"       Value="36"/>
     <Setter Property="Padding"         Value="16,8"/>
-    <Setter Property="Height"          Value="36"/>
     <Setter Property="FontSize"        Value="13"/>
     <Setter Property="FontWeight"      Value="SemiBold"/>
     <Setter Property="FontFamily"      Value="Segoe UI"/>
@@ -151,8 +171,10 @@
         <ControlTemplate TargetType="Button">
           <Border x:Name="bg" Background="{TemplateBinding Background}"
                   CornerRadius="8" Padding="{TemplateBinding Padding}"
-                  Height="{TemplateBinding Height}">
-            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                  MinHeight="{TemplateBinding MinHeight}">
+            <ContentPresenter HorizontalAlignment="Center"
+                              VerticalAlignment="Center"
+                              RecognizesAccessKey="True"/>
           </Border>
           <ControlTemplate.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
@@ -160,6 +182,10 @@
             </Trigger>
             <Trigger Property="IsPressed" Value="True">
               <Setter TargetName="bg" Property="Background" Value="#A05508"/>
+            </Trigger>
+            <Trigger Property="IsKeyboardFocused" Value="True">
+              <Setter TargetName="bg" Property="BorderBrush" Value="#FFF0B27A"/>
+              <Setter TargetName="bg" Property="BorderThickness" Value="1"/>
             </Trigger>
             <Trigger Property="IsEnabled" Value="False">
               <Setter TargetName="bg" Property="Background" Value="{StaticResource BgCard2Brush}"/>
@@ -180,8 +206,9 @@
     <Setter Property="Foreground"      Value="{StaticResource TextPrimaryBrush}"/>
     <Setter Property="BorderBrush"     Value="{StaticResource BorderBrush}"/>
     <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="MinWidth"        Value="92"/>
+    <Setter Property="MinHeight"       Value="36"/>
     <Setter Property="Padding"         Value="14,7"/>
-    <Setter Property="Height"          Value="36"/>
     <Setter Property="FontSize"        Value="12"/>
     <Setter Property="FontFamily"      Value="Segoe UI"/>
     <Setter Property="Cursor"          Value="Hand"/>
@@ -192,8 +219,10 @@
                   BorderBrush="{TemplateBinding BorderBrush}"
                   BorderThickness="{TemplateBinding BorderThickness}"
                   CornerRadius="8" Padding="{TemplateBinding Padding}"
-                  Height="{TemplateBinding Height}">
-            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                  MinHeight="{TemplateBinding MinHeight}">
+            <ContentPresenter HorizontalAlignment="Center"
+                              VerticalAlignment="Center"
+                              RecognizesAccessKey="True"/>
           </Border>
           <ControlTemplate.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
@@ -202,6 +231,14 @@
             </Trigger>
             <Trigger Property="IsPressed" Value="True">
               <Setter TargetName="bg" Property="Background" Value="{StaticResource ButtonPressedBrush}"/>
+            </Trigger>
+            <Trigger Property="IsKeyboardFocused" Value="True">
+              <Setter TargetName="bg" Property="BorderBrush" Value="{StaticResource FoxOrangeBrush}"/>
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter TargetName="bg" Property="Background" Value="{StaticResource BgCardBrush}"/>
+              <Setter TargetName="bg" Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+              <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
             </Trigger>
           </ControlTemplate.Triggers>
         </ControlTemplate>
@@ -307,12 +344,54 @@
     <Setter Property="Foreground"      Value="{StaticResource FoxOrangeBrush}"/>
   </Style>
 
+  <Style x:Key="CompactStatusBadge" TargetType="Border">
+    <Setter Property="Background" Value="{StaticResource BgCard2Brush}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="999"/>
+    <Setter Property="Padding" Value="8,4"/>
+  </Style>
+
+  <Style x:Key="CompactStatusText" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="10"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="Foreground" Value="{StaticResource TextSecBrush}"/>
+  </Style>
+
+  <Style x:Key="CompactStatusDot" TargetType="Ellipse">
+    <Setter Property="Width" Value="7"/>
+    <Setter Property="Height" Value="7"/>
+    <Setter Property="Fill" Value="{StaticResource TextMutedBrush}"/>
+    <Setter Property="Opacity" Value="0.9"/>
+    <Style.Triggers>
+      <DataTrigger Binding="{Binding IsRunning}" Value="True">
+        <Setter Property="Fill" Value="{StaticResource FoxOrangeBrush}"/>
+        <DataTrigger.EnterActions>
+          <BeginStoryboard x:Name="PulseDotStoryboard">
+            <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+              <DoubleAnimation Storyboard.TargetProperty="Opacity" From="1" To="0.35" Duration="0:0:0.7"/>
+            </Storyboard>
+          </BeginStoryboard>
+        </DataTrigger.EnterActions>
+        <DataTrigger.ExitActions>
+          <StopStoryboard BeginStoryboardName="PulseDotStoryboard"/>
+        </DataTrigger.ExitActions>
+      </DataTrigger>
+      <DataTrigger Binding="{Binding IsSucceeded}" Value="True">
+        <Setter Property="Fill" Value="{StaticResource AccentGreenBrush}"/>
+      </DataTrigger>
+      <DataTrigger Binding="{Binding IsFailed}" Value="True">
+        <Setter Property="Fill" Value="{StaticResource AccentRedBrush}"/>
+      </DataTrigger>
+    </Style.Triggers>
+  </Style>
+
   <!-- ═══════════════════════ TEXT LABEL STYLES ═══════════════════════ -->
   <Style x:Key="CardLabel" TargetType="TextBlock">
-    <Setter Property="FontSize"   Value="9"/>
+    <Setter Property="FontSize"   Value="10"/>
     <Setter Property="FontWeight" Value="Bold"/>
     <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
-    <Setter Property="Margin"     Value="0,0,0,8"/>
+    <Setter Property="Margin"     Value="0,0,0,6"/>
   </Style>
 
   <Style x:Key="CardValue" TargetType="TextBlock">
@@ -327,6 +406,8 @@
     <Setter Property="Foreground" Value="{StaticResource TextSecBrush}"/>
     <Setter Property="Margin"     Value="0,3,0,0"/>
     <Setter Property="TextWrapping" Value="Wrap"/>
+    <Setter Property="LineStackingStrategy" Value="BlockLineHeight"/>
+    <Setter Property="LineHeight" Value="16"/>
   </Style>
 
   <Style x:Key="PageTitle" TargetType="TextBlock">
@@ -339,6 +420,22 @@
     <Setter Property="FontSize"   Value="12"/>
     <Setter Property="Foreground" Value="{StaticResource TextSecBrush}"/>
     <Setter Property="Margin"     Value="0,3,0,0"/>
+    <Setter Property="TextWrapping" Value="Wrap"/>
+    <Setter Property="LineStackingStrategy" Value="BlockLineHeight"/>
+    <Setter Property="LineHeight" Value="17"/>
+  </Style>
+
+  <Style x:Key="PanelTitle" TargetType="TextBlock">
+    <Setter Property="FontSize"   Value="15"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+  </Style>
+
+  <Style x:Key="MetaText" TargetType="TextBlock">
+    <Setter Property="FontSize"   Value="11"/>
+    <Setter Property="Foreground" Value="{StaticResource TextSecBrush}"/>
+    <Setter Property="LineStackingStrategy" Value="BlockLineHeight"/>
+    <Setter Property="LineHeight" Value="16"/>
   </Style>
 
   <Style x:Key="SectionLabel" TargetType="TextBlock">
@@ -355,7 +452,7 @@
     <Setter Property="BorderThickness" Value="1"/>
     <Setter Property="CornerRadius"    Value="8"/>
     <Setter Property="Padding"         Value="12,0"/>
-    <Setter Property="Height"          Value="36"/>
+    <Setter Property="MinHeight"       Value="38"/>
   </Style>
 
   <!-- ═══════════════════════ STAT PILL ═══════════════════════ -->

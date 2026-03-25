@@ -26,6 +26,18 @@ public sealed class NullToCollapsedConverter : IValueConverter
     public object ConvertBack(object v, Type t, object p, CultureInfo c) => throw new NotSupportedException();
 }
 
+/// <summary>Shows an element only when a string is null, empty, or whitespace.</summary>
+[ValueConversion(typeof(string), typeof(Visibility))]
+public sealed class NullOrWhiteSpaceToVisibleConverter : IValueConverter
+{
+    public object Convert(object? value, Type t, object p, CultureInfo c) =>
+        value is string s && !string.IsNullOrWhiteSpace(s)
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+
+    public object ConvertBack(object v, Type t, object p, CultureInfo c) => throw new NotSupportedException();
+}
+
 /// <summary>Inverts a bool.</summary>
 [ValueConversion(typeof(bool), typeof(bool))]
 public sealed class InverseBoolConverter : IValueConverter

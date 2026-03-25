@@ -23,10 +23,10 @@
     <!-- Header -->
     <DockPanel Grid.Row="0" Margin="0,0,0,20">
       <StackPanel DockPanel.Dock="Left">
-        <TextBlock Text="Fix History" Style="{DynamicResource PageTitle}"/>
+        <TextBlock Text="Activity" Style="{DynamicResource PageTitle}"/>
         <TextBlock Text="{Binding HistorySummaryText}" Style="{DynamicResource PageSubtitle}"/>
       </StackPanel>
-      <Button DockPanel.Dock="Right" Content="Clear History" Click="ClearHistory_Click"
+      <Button DockPanel.Dock="Right" Content="Clear Activity" Click="ClearHistory_Click"
               Style="{DynamicResource DangerButton}" HorizontalAlignment="Right"/>
     </DockPanel>
 
@@ -35,11 +35,15 @@
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="Auto"/>
           <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="Auto"/>
         </Grid.ColumnDefinitions>
         <ui:SymbolIcon Grid.Column="0" Symbol="Search20" FontSize="14"
                        Foreground="{DynamicResource TextSecBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
         <TextBox Grid.Column="1" Text="{Binding HistorySearchText, UpdateSourceTrigger=PropertyChanged}"
                  BorderThickness="0" Background="Transparent" VerticalContentAlignment="Center"/>
+        <Button Grid.Column="2" Content="Clear" Click="ClearSearch_Click"
+                Style="{DynamicResource SecondaryButton}" MinWidth="72" Margin="8,0,0,0"
+                Visibility="{Binding HistorySearchText, Converter={StaticResource NullCollapsed}}"/>
       </Grid>
     </Border>
 
@@ -48,9 +52,18 @@
       <Border Style="{DynamicResource InfoCard}"
               Visibility="{Binding HasFilteredHistoryEntries, Converter={StaticResource InvBoolVis}}">
         <StackPanel>
-          <TextBlock Text="No matching history entries" Style="{DynamicResource PageTitle}" FontSize="16"/>
-          <TextBlock Text="Run a fix or bundle, or clear your history search to see past runs here."
-                     Style="{DynamicResource CardSub}" Margin="0,6,0,0"/>
+          <TextBlock Text="{Binding HistoryEmptyStateTitle}" Style="{DynamicResource PanelTitle}"/>
+          <TextBlock Text="{Binding HistoryEmptyStateText}"
+                     Style="{DynamicResource CardSub}" Margin="0,6,0,12"/>
+          <WrapPanel>
+            <Button Content="Open Repair Library" Click="OpenRepairLibrary_Click"
+                    Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
+            <Button Content="Open Automation" Click="OpenAutomation_Click"
+                    Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
+            <Button Content="Clear Search" Click="ClearSearch_Click"
+                    Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8"
+                    Visibility="{Binding HistorySearchText, Converter={StaticResource NullCollapsed}}"/>
+          </WrapPanel>
         </StackPanel>
       </Border>
 
@@ -62,8 +75,18 @@
           <ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate>
         </ItemsControl.ItemsPanel>
         <ItemsControl.ItemTemplate>
-          <DataTemplate DataType="{x:Type m:FixLogEntry}">
-            <Border Style="{DynamicResource FixCard}" Padding="14,10">
+          <DataTemplate DataType="{x:Type m:RepairHistoryEntry}">
+            <Border Style="{DynamicResource FixCard}" Padding="14,10"
+                    Tag="{Binding}"
+                    MouseLeftButtonDown="HistoryCard_MouseLeftButtonDown">
+              <Border.ContextMenu>
+                <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
+                  <MenuItem Header="Run Again" Click="RerunFix_Click" CommandParameter="{Binding}"/>
+                  <MenuItem Header="View Receipt Details" Click="ReceiptDetails_Click" CommandParameter="{Binding}"/>
+                  <MenuItem Header="Copy Details" Click="CopyDetails_Click" CommandParameter="{Binding}"/>
+                  <MenuItem Header="Create Support Package" Click="CreateSupportPackage_Click" CommandParameter="{Binding}"/>
+                </ContextMenu>
+              </Border.ContextMenu>
               <Grid>
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition Width="Auto"/>
@@ -87,18 +110,34 @@
                 </TextBlock>
                 <StackPanel Grid.Column="1">
                   <TextBlock Text="{Binding FixTitle}" FontWeight="SemiBold" FontSize="13"/>
-                  <TextBlock Text="{Binding Category}" Style="{DynamicResource CardSub}" FontSize="11"/>
-                  <TextBlock Text="{Binding Output}" Style="{DynamicResource CardSub}" FontFamily="Consolas"
+                  <TextBlock Text="{Binding CategoryName}" Style="{DynamicResource MetaText}"/>
+                  <TextBlock Text="{Binding PostStateSummary}" Style="{DynamicResource CardSub}"
                              TextWrapping="Wrap" Margin="0,4,0,0"
-                             Visibility="{Binding Output, Converter={StaticResource NullCollapsed}}"/>
+                             Visibility="{Binding PostStateSummary, Converter={StaticResource NullCollapsed}}"/>
+                  <TextBlock Text="{Binding VerificationSummary}" Style="{DynamicResource MetaText}" Margin="0,4,0,0"
+                             Visibility="{Binding VerificationSummary, Converter={StaticResource NullCollapsed}}"/>
+                  <TextBlock Text="{Binding NextStep}" Style="{DynamicResource MetaText}" Margin="0,4,0,0"
+                             Visibility="{Binding NextStep, Converter={StaticResource NullCollapsed}}"/>
+                  <TextBlock Text="{Binding ChangedSummary}" Style="{DynamicResource MetaText}" Margin="0,4,0,0"
+                             TextWrapping="Wrap"
+                             Visibility="{Binding DataContext.AdvancedModeEnabled, RelativeSource={RelativeSource AncestorType=Page}, Converter={StaticResource BoolVis}}"/>
+                  <TextBlock Text="{Binding RollbackSummary}" Style="{DynamicResource MetaText}" Margin="0,4,0,0"
+                             TextWrapping="Wrap"
+                             Visibility="{Binding DataContext.AdvancedModeEnabled, RelativeSource={RelativeSource AncestorType=Page}, Converter={StaticResource BoolVis}}"/>
                 </StackPanel>
                 <StackPanel Grid.Column="2" HorizontalAlignment="Right">
                   <TextBlock Text="{Binding Timestamp, Converter={StaticResource RelDate}}"
                              Style="{DynamicResource CardSub}" VerticalAlignment="Center" FontSize="11"
                              HorizontalAlignment="Right"/>
-                  <Button Content="Run Again" Tag="{Binding}" Click="RerunFix_Click"
-                          Style="{DynamicResource SecondaryButton}" Margin="0,8,0,0"
-                          Visibility="{Binding FixId, Converter={StaticResource NullCollapsed}}"/>
+                  <WrapPanel HorizontalAlignment="Right" Margin="0,8,0,0">
+                    <Button Content="Details" Tag="{Binding}" Click="ReceiptDetailsButton_Click"
+                            Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
+                    <Button Content="Copy" Tag="{Binding}" Click="CopyDetails_Click"
+                            Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
+                    <Button Content="Run Again" Tag="{Binding}" Click="RerunFix_Click"
+                            Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8"
+                            Visibility="{Binding FixId, Converter={StaticResource NullCollapsed}}"/>
+                  </WrapPanel>
                 </StackPanel>
               </Grid>
             </Border>

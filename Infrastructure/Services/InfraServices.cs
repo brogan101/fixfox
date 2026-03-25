@@ -7,6 +7,7 @@ using HelpDesk.Domain.Enums;
 using HelpDesk.Domain.Models;
 using LibreHardwareMonitor.Hardware;
 using Newtonsoft.Json;
+using SharedConstants = HelpDesk.Shared.Constants;
 
 namespace HelpDesk.Infrastructure.Services;
 
@@ -15,49 +16,126 @@ namespace HelpDesk.Infrastructure.Services;
 // ══════════════════════════════════════════════════════════════════════════
 public sealed class SettingsService : ISettingsService
 {
-    private static readonly string Dir  = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "FixFox");
-    private static readonly string _settingsPath = System.IO.Path.Combine(Dir, "settings.json");
-    private static readonly string Bak           = System.IO.Path.Combine(Dir, "settings.bak.json");
+    private readonly string _dir;
+    private readonly string _settingsPath;
+    private readonly string _backupPath;
+
+    public SettingsLoadStatus LastLoadStatus { get; private set; } = new()
+    {
+        LoadedFromPrimary = true,
+        SchemaVersion = ProductizationPolicies.CurrentSettingsSchemaVersion
+    };
+
+    public SettingsService()
+        : this(SharedConstants.AppDataDir)
+    {
+    }
+
+    internal SettingsService(string baseDirectory)
+    {
+        _dir = baseDirectory;
+        _settingsPath = Path.Combine(_dir, "settings.json");
+        _backupPath = Path.Combine(_dir, "settings.bak.json");
+    }
 
     public AppSettings Load()
     {
-        foreach (var file in new[] { _settingsPath, Bak })
+        foreach (var file in new[] { _settingsPath, _backupPath })
         {
             try
             {
-                if (File.Exists(file))
+                if (!File.Exists(file))
+                    continue;
+
+                var obj = JsonConvert.DeserializeObject<AppSettings>(File.ReadAllText(file));
+                if (obj is null)
+                    continue;
+
+                var notes = new List<string>();
+                var loadedFromPrimary = string.Equals(file, _settingsPath, StringComparison.OrdinalIgnoreCase);
+                var wasDirty = !obj.LastSessionEndedCleanly;
+                var normalized = ProductizationPolicies.Normalize(
+                    obj,
+                    out var migrationApplied,
+                    out var validationApplied,
+                    notes);
+
+                if (!loadedFromPrimary)
+                    notes.Add("FixFox recovered settings from the backup copy.");
+                if (wasDirty)
+                    notes.Add("FixFox detected that the previous session did not close cleanly.");
+
+                LastLoadStatus = new SettingsLoadStatus
                 {
-                    var obj = JsonConvert.DeserializeObject<AppSettings>(File.ReadAllText(file));
-                    if (obj is not null) return Validated(obj);
-                }
+                    LoadedFromPrimary = loadedFromPrimary,
+                    LoadedFromBackup = !loadedFromPrimary,
+                    RecoveredDefaults = false,
+                    MigrationApplied = migrationApplied,
+                    ValidationApplied = validationApplied,
+                    PreviousSessionEndedUncleanly = wasDirty,
+                    SchemaVersion = normalized.SettingsSchemaVersion,
+                    Notes = notes
+                };
+
+                if (migrationApplied || validationApplied)
+                    Save(normalized);
+
+                return normalized;
             }
-            catch { /* try backup */ }
+            catch
+            {
+                MoveCorruptFileAside(file);
+            }
         }
-        return new AppSettings();
+
+        var defaults = ProductizationPolicies.CreateDefaultSettings();
+        LastLoadStatus = new SettingsLoadStatus
+        {
+            RecoveredDefaults = true,
+            SchemaVersion = defaults.SettingsSchemaVersion,
+            Notes = ["FixFox restored product defaults because the saved settings could not be read."]
+        };
+        Save(defaults);
+        return defaults;
     }
 
     public void Save(AppSettings settings)
     {
-        Directory.CreateDirectory(Dir);
+        Directory.CreateDirectory(_dir);
+        ProductizationPolicies.Normalize(settings, out _, out _, null);
         var json = JsonConvert.SerializeObject(settings, Formatting.Indented);
-        // Atomic write: temp → rename
         var tmp = _settingsPath + ".tmp";
         File.WriteAllText(tmp, json);
-        if (File.Exists(_settingsPath)) File.Copy(_settingsPath, Bak, overwrite: true);
+        if (File.Exists(_settingsPath))
+            File.Copy(_settingsPath, _backupPath, overwrite: true);
         File.Move(tmp, _settingsPath, overwrite: true);
     }
 
-    // Clamp all numeric settings to sane ranges
-    private static AppSettings Validated(AppSettings s)
+    public void ResetToDefaults()
     {
-        s.CpuWarningPct    = Math.Clamp(s.CpuWarningPct,    50, 99);
-        s.RamWarningPct    = Math.Clamp(s.RamWarningPct,    50, 99);
-        s.DiskWarningPct   = Math.Clamp(s.DiskWarningPct,   50, 99);
-        s.CpuTempWarningC  = Math.Clamp(s.CpuTempWarningC,  50, 110);
-        s.WindowWidth      = Math.Clamp(s.WindowWidth,       800, 3840);
-        s.WindowHeight     = Math.Clamp(s.WindowHeight,      500, 2160);
-        return s;
+        var defaults = ProductizationPolicies.CreateDefaultSettings();
+        Save(defaults);
+        LastLoadStatus = new SettingsLoadStatus
+        {
+            RecoveredDefaults = true,
+            SchemaVersion = defaults.SettingsSchemaVersion,
+            Notes = ["FixFox restored the default settings for this device."]
+        };
+    }
+
+    private static void MoveCorruptFileAside(string file)
+    {
+        try
+        {
+            if (!File.Exists(file))
+                return;
+
+            var corruptPath = file + $".corrupt-{DateTime.Now:yyyyMMddHHmmss}";
+            File.Move(file, corruptPath, overwrite: true);
+        }
+        catch
+        {
+        }
     }
 }
 

@@ -12,23 +12,42 @@ namespace HelpDesk.Presentation.Helpers;
 public static class ImageHelper
 {
     private static BitmapSource? _logoTransparent;
+    private static string? _cachedLogoPath;
 
     /// <summary>Returns the FixFox logo with black background removed, cached after first call.</summary>
-    public static BitmapSource GetLogoTransparent()
+    public static BitmapSource GetLogoTransparent(string? customPath = null)
     {
-        if (_logoTransparent is not null) return _logoTransparent;
+        if (_logoTransparent is not null
+            && string.Equals(_cachedLogoPath, customPath ?? string.Empty, StringComparison.OrdinalIgnoreCase))
+            return _logoTransparent;
 
         try
         {
-            var uri = new Uri("pack://application:,,,/FixFoxLogo.png", UriKind.Absolute);
-            var original = new BitmapImage(uri);
+            BitmapSource original;
+            if (!string.IsNullOrWhiteSpace(customPath) && File.Exists(customPath))
+            {
+                var custom = new BitmapImage();
+                custom.BeginInit();
+                custom.CacheOption = BitmapCacheOption.OnLoad;
+                custom.UriSource = new Uri(customPath, UriKind.Absolute);
+                custom.EndInit();
+                custom.Freeze();
+                original = custom;
+            }
+            else
+            {
+                var uri = new Uri("pack://application:,,,/FixFoxLogo.png", UriKind.Absolute);
+                original = new BitmapImage(uri);
+            }
             _logoTransparent = RemoveNearBlack(original, threshold: 40);
+            _cachedLogoPath = customPath ?? string.Empty;
         }
         catch
         {
             // Fallback: return a 1x1 transparent bitmap so the app doesn't crash
             var fallback = new WriteableBitmap(1, 1, 96, 96, PixelFormats.Bgra32, null);
             _logoTransparent = fallback;
+            _cachedLogoPath = customPath ?? string.Empty;
         }
         return _logoTransparent;
     }

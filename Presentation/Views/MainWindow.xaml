@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         xmlns:h="clr-namespace:HelpDesk.Presentation.Helpers"
-        Title="FixFox"
+        Title="{Binding ProductDisplayName}"
         MinWidth="960" MinHeight="620"
         Width="{Binding Settings.WindowWidth,  Mode=TwoWay}"
         Height="{Binding Settings.WindowHeight, Mode=TwoWay}"
@@ -14,6 +14,7 @@
 
   <ui:FluentWindow.Resources>
     <h:NullToCollapsedConverter    x:Key="NullCollapsed"/>
+    <h:NullOrWhiteSpaceToVisibleConverter x:Key="NullOrWhiteSpaceVisible"/>
     <h:InverseBoolConverter        x:Key="InvBool"/>
     <h:BoolToVisConverter          x:Key="BoolVis"/>
     <h:InverseBoolToVisConverter   x:Key="InvBoolVis"/>
@@ -55,26 +56,70 @@
       <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
         <Image x:Name="LogoImage" Width="32" Height="32" Margin="0,0,8,0"
                RenderOptions.BitmapScalingMode="HighQuality" VerticalAlignment="Center"/>
-        <TextBlock Text="FixFox" FontSize="14" FontWeight="Bold"
+        <TextBlock Text="{Binding ProductDisplayName}" FontSize="14" FontWeight="Bold"
                    Foreground="{DynamicResource FoxOrangeBrush}" VerticalAlignment="Center"/>
       </StackPanel>
 
-      <!-- Spacer / drag area (handled by MouseLeftButtonDown on parent) -->
-      <Border Grid.Column="1"/>
+      <!-- Center drag area with lightweight context -->
+      <Grid Grid.Column="1">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="16,0,0,0">
+          <WrapPanel>
+            <TextBlock Text="{Binding CurrentPageLabel}" FontSize="12" FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+            <TextBlock Text="  •  " FontSize="11" Foreground="{DynamicResource TextSecBrush}" VerticalAlignment="Center"/>
+            <TextBlock Text="{Binding CurrentPageSummaryText}" FontSize="11"
+                       Foreground="{DynamicResource TextSecBrush}" VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis"/>
+          </WrapPanel>
+        </StackPanel>
+        <Border Grid.Column="1"
+                Background="{DynamicResource BgCard2Brush}"
+                CornerRadius="10"
+                Padding="10,4"
+                Margin="12,0,0,0"
+                VerticalAlignment="Center">
+          <TextBlock Text="{Binding CurrentProfileStatusText}" Style="{DynamicResource MetaText}"/>
+        </Border>
+      </Grid>
 
       <!-- Min / Max / Close buttons -->
       <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Stretch">
-        <Button Style="{DynamicResource TitleBarButtonStyle}" Click="WinMin_Click"
-                ToolTip="Minimize" ToolTipService.InitialShowDelay="400">
+        <Button x:Name="NotificationsToggle"
+                Style="{DynamicResource TitleBarButtonStyle}"
+                Click="NotificationsToggle_Click">
+          <Grid Width="30" Height="28">
+            <ui:SymbolIcon Symbol="Alert20" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,1,0,0"/>
+            <Border HorizontalAlignment="Right"
+                    VerticalAlignment="Top"
+                    MinWidth="14"
+                    Height="14"
+                    Margin="0,2,2,0"
+                    Padding="3,0"
+                    Background="{DynamicResource AccentRedBrush}"
+                    CornerRadius="7"
+                    Visibility="{Binding UnreadNotifCount, Converter={StaticResource NullCollapsed}}">
+              <TextBlock Text="{Binding UnreadNotifCount}"
+                         FontSize="9"
+                         FontWeight="Bold"
+                         Foreground="White"
+                         HorizontalAlignment="Center"
+                         VerticalAlignment="Center"
+                         TextAlignment="Center"/>
+            </Border>
+          </Grid>
+        </Button>
+        <Button Style="{DynamicResource TitleBarButtonStyle}" Click="WinMin_Click">
           <ui:SymbolIcon Symbol="Subtract16" FontSize="9"/>
         </Button>
         <Button x:Name="BtnMaxRestore" Style="{DynamicResource TitleBarButtonStyle}"
-                Click="WinMaxRestore_Click" ToolTip="Maximize"
-                ToolTipService.InitialShowDelay="400">
+                Click="WinMaxRestore_Click">
           <ui:SymbolIcon x:Name="MaxRestoreIcon" Symbol="Maximize16" FontSize="9"/>
         </Button>
-        <Button Style="{DynamicResource TitleBarCloseButtonStyle}" Click="WinClose_Click"
-                ToolTip="Close" ToolTipService.InitialShowDelay="400">
+        <Button Style="{DynamicResource TitleBarCloseButtonStyle}" Click="WinClose_Click">
           <ui:SymbolIcon Symbol="Dismiss16" FontSize="9"/>
         </Button>
       </StackPanel>
@@ -112,8 +157,11 @@
           <Border DockPanel.Dock="Bottom" Padding="0,8,0,10"
                   Visibility="{Binding IsSidebarCollapsed, Converter={StaticResource InvBoolVis}}">
             <StackPanel HorizontalAlignment="Center">
-              <TextBlock Text="FixFox" FontSize="10"
+              <TextBlock Text="{Binding ProductDisplayName}" FontSize="10"
                          Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+              <TextBlock Text="{Binding ProductSubtitle}" FontSize="10"
+                         Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center"
+                         Visibility="{Binding IsSidebarCollapsed, Converter={StaticResource InvBoolVis}}"/>
             </StackPanel>
           </Border>
 
@@ -126,7 +174,7 @@
             <StackPanel Orientation="Horizontal">
               <ui:SymbolIcon Symbol="PanelLeftContract20" FontSize="16" Width="18"
                              VerticalAlignment="Center" HorizontalAlignment="Center"/>
-              <TextBlock Text="Collapse" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12"
+              <TextBlock Text="Collapse panel" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12"
                          Visibility="{Binding IsSidebarCollapsed, Converter={StaticResource InvBoolVis}}"/>
             </StackPanel>
           </Button>
@@ -136,7 +184,7 @@
                         Visibility="{Binding ShowFixes, Converter={StaticResource BoolVis}}"
                         MaxHeight="260" VerticalScrollBarVisibility="Auto">
             <StackPanel>
-              <TextBlock Text="CATEGORIES" Style="{DynamicResource SectionLabelStyle}"
+              <TextBlock Text="REPAIR CATEGORIES" Style="{DynamicResource SectionLabelStyle}"
                          Visibility="{Binding IsSidebarCollapsed, Converter={StaticResource InvBoolVis}}"/>
               <ItemsControl ItemsSource="{Binding Categories}">
                 <ItemsControl.ItemTemplate>
@@ -171,18 +219,30 @@
           <ScrollViewer DockPanel.Dock="Top" VerticalScrollBarVisibility="Disabled">
             <StackPanel>
 
-              <!-- MAIN -->
-              <TextBlock Text="MAIN" Style="{DynamicResource SectionLabelStyle}"
+              <!-- WORKSPACE -->
+              <TextBlock Text="WORKSPACE" Style="{DynamicResource SectionLabelStyle}"
                          Visibility="{Binding IsSidebarCollapsed, Converter={StaticResource InvBoolVis}}"/>
 
               <Button x:Name="NavDashboard" Tag="Dashboard" Click="Nav_Click"
                       Style="{DynamicResource NavButtonStyle}"
                       Padding="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarPad}}"
                       HorizontalContentAlignment="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarAlign}}"
-                      ToolTip="Dashboard  Ctrl+1" ToolTipService.InitialShowDelay="400" Cursor="Hand">
+                      ToolTip="Home  Ctrl+1" ToolTipService.InitialShowDelay="400" Cursor="Hand">
                 <StackPanel Orientation="Horizontal">
                   <ui:SymbolIcon Symbol="Home20" FontSize="16" Width="18" VerticalAlignment="Center"/>
-                  <TextBlock Text="Dashboard" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12"
+                  <TextBlock Text="Home" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12"
+                             Visibility="{Binding IsSidebarCollapsed, Converter={StaticResource InvBoolVis}}"/>
+                </StackPanel>
+              </Button>
+
+              <Button x:Name="NavSymptomChecker" Tag="SymptomChecker" Click="Nav_Click"
+                      Style="{DynamicResource NavButtonStyle}"
+                      Padding="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarPad}}"
+                      HorizontalContentAlignment="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarAlign}}"
+                      ToolTip="Guided Diagnosis  Ctrl+2" ToolTipService.InitialShowDelay="400" Cursor="Hand">
+                <StackPanel Orientation="Horizontal">
+                  <ui:SymbolIcon Symbol="QuestionCircle20" FontSize="16" Width="18" VerticalAlignment="Center"/>
+                  <TextBlock Text="Guided Diagnosis" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12"
                              Visibility="{Binding IsSidebarCollapsed, Converter={StaticResource InvBoolVis}}"/>
                 </StackPanel>
               </Button>
@@ -191,10 +251,10 @@
                       Style="{DynamicResource NavButtonStyle}"
                       Padding="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarPad}}"
                       HorizontalContentAlignment="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarAlign}}"
-                      ToolTip="Fix Center  Ctrl+2" ToolTipService.InitialShowDelay="400" Cursor="Hand">
+                      ToolTip="Repair Library  Ctrl+3" ToolTipService.InitialShowDelay="400" Cursor="Hand">
                 <StackPanel Orientation="Horizontal">
                   <ui:SymbolIcon Symbol="Wrench20" FontSize="16" Width="18" VerticalAlignment="Center"/>
-                  <TextBlock Text="Fix Center" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12"
+                  <TextBlock Text="Repair Library" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12"
                              Visibility="{Binding IsSidebarCollapsed, Converter={StaticResource InvBoolVis}}"/>
                 </StackPanel>
               </Button>
@@ -203,36 +263,18 @@
                       Style="{DynamicResource NavButtonStyle}"
                       Padding="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarPad}}"
                       HorizontalContentAlignment="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarAlign}}"
-                      ToolTip="Runbooks  Ctrl+3" ToolTipService.InitialShowDelay="400" Cursor="Hand">
+                      ToolTip="Automation  Ctrl+4" ToolTipService.InitialShowDelay="400" Cursor="Hand">
                 <StackPanel Orientation="Horizontal">
                   <ui:SymbolIcon Symbol="LayerDiagonal20" FontSize="16" Width="18" VerticalAlignment="Center"/>
-                  <TextBlock Text="Runbooks" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12"
+                  <TextBlock Text="Automation" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12"
                              Visibility="{Binding IsSidebarCollapsed, Converter={StaticResource InvBoolVis}}"/>
                 </StackPanel>
               </Button>
 
               <Separator Margin="12,4"/>
 
-              <!-- REPAIR -->
-              <TextBlock Text="REPAIR" Style="{DynamicResource SectionLabelStyle}"
-                         Visibility="{Binding IsSidebarCollapsed, Converter={StaticResource InvBoolVis}}"/>
-
-              <Button x:Name="NavSymptomChecker" Tag="SymptomChecker" Click="Nav_Click"
-                      Style="{DynamicResource NavButtonStyle}"
-                      Padding="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarPad}}"
-                      HorizontalContentAlignment="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarAlign}}"
-                      ToolTip="Fix an Issue  Ctrl+4" ToolTipService.InitialShowDelay="400" Cursor="Hand">
-                <StackPanel Orientation="Horizontal">
-                  <ui:SymbolIcon Symbol="QuestionCircle20" FontSize="16" Width="18" VerticalAlignment="Center"/>
-                  <TextBlock Text="Fix an Issue" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12"
-                             Visibility="{Binding IsSidebarCollapsed, Converter={StaticResource InvBoolVis}}"/>
-                </StackPanel>
-              </Button>
-
-              <Separator Margin="12,4"/>
-
-              <!-- TOOLS -->
-              <TextBlock Text="TOOLS" Style="{DynamicResource SectionLabelStyle}"
+              <!-- SUPPORT -->
+              <TextBlock Text="SUPPORT" Style="{DynamicResource SectionLabelStyle}"
                          Visibility="{Binding IsSidebarCollapsed, Converter={StaticResource InvBoolVis}}"/>
 
               <Button x:Name="NavSystemInfo" Tag="SystemInfo" Click="Nav_Click"
@@ -247,50 +289,53 @@
                 </StackPanel>
               </Button>
 
-              <!-- Help desk handoff with unread badge -->
-              <Grid Margin="6,1">
-                <Button x:Name="NavHandoff" Tag="Handoff" Click="Nav_Click"
-                        HorizontalAlignment="Stretch"
-                        Style="{DynamicResource NavButtonStyle}"
-                        Padding="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarPad}}"
-                        HorizontalContentAlignment="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarAlign}}"
-                        ToolTip="Help Desk Handoff  Ctrl+6" ToolTipService.InitialShowDelay="400" Cursor="Hand">
-                  <StackPanel Orientation="Horizontal">
-                    <ui:SymbolIcon Symbol="Alert20" FontSize="16" Width="18" VerticalAlignment="Center"/>
-                    <TextBlock Text="Handoff" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12"
-                               Visibility="{Binding IsSidebarCollapsed, Converter={StaticResource InvBoolVis}}"/>
-                  </StackPanel>
-                </Button>
-                <ui:InfoBadge Value="{Binding UnreadNotifCount}"
-                              Severity="Critical"
-                              HorizontalAlignment="Right" VerticalAlignment="Center"
-                              Margin="0,0,8,0"
-                              Visibility="{Binding UnreadNotifCount, Converter={StaticResource NullCollapsed}}"/>
-              </Grid>
+              <Button x:Name="NavToolbox" Tag="Toolbox" Click="Nav_Click"
+                      Style="{DynamicResource NavButtonStyle}"
+                      Padding="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarPad}}"
+                      HorizontalContentAlignment="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarAlign}}"
+                      ToolTip="Windows Tools  Ctrl+8" ToolTipService.InitialShowDelay="400" Cursor="Hand">
+                <StackPanel Orientation="Horizontal">
+                  <ui:SymbolIcon Symbol="Toolbox20" FontSize="16" Width="18" VerticalAlignment="Center"/>
+                  <TextBlock Text="Windows Tools" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12"
+                             Visibility="{Binding IsSidebarCollapsed, Converter={StaticResource InvBoolVis}}"/>
+                </StackPanel>
+              </Button>
+
+              <Button x:Name="NavHandoff" Tag="Handoff" Click="Nav_Click"
+                      Style="{DynamicResource NavButtonStyle}"
+                      Padding="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarPad}}"
+                      HorizontalContentAlignment="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarAlign}}"
+                      ToolTip="Support Package  Ctrl+6" ToolTipService.InitialShowDelay="400" Cursor="Hand">
+                <StackPanel Orientation="Horizontal">
+                  <ui:SymbolIcon Symbol="DocumentBulletList20" FontSize="16" Width="18" VerticalAlignment="Center"/>
+                  <TextBlock Text="Support Package" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12"
+                             Visibility="{Binding IsSidebarCollapsed, Converter={StaticResource InvBoolVis}}"/>
+                </StackPanel>
+              </Button>
 
               <Button x:Name="NavHistory" Tag="History" Click="Nav_Click"
                       Style="{DynamicResource NavButtonStyle}"
                       Padding="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarPad}}"
                       HorizontalContentAlignment="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarAlign}}"
-                      ToolTip="History  Ctrl+7" ToolTipService.InitialShowDelay="400" Cursor="Hand">
+                      ToolTip="Activity  Ctrl+7" ToolTipService.InitialShowDelay="400" Cursor="Hand">
                 <StackPanel Orientation="Horizontal">
                   <ui:SymbolIcon Symbol="History20" FontSize="16" Width="18" VerticalAlignment="Center"/>
-                  <TextBlock Text="History" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12"
+                  <TextBlock Text="Activity" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12"
                              Visibility="{Binding IsSidebarCollapsed, Converter={StaticResource InvBoolVis}}"/>
                 </StackPanel>
               </Button>
 
               <Separator Margin="12,4"/>
 
-              <!-- SYSTEM -->
-              <TextBlock Text="SYSTEM" Style="{DynamicResource SectionLabelStyle}"
+              <!-- APP -->
+              <TextBlock Text="APP" Style="{DynamicResource SectionLabelStyle}"
                          Visibility="{Binding IsSidebarCollapsed, Converter={StaticResource InvBoolVis}}"/>
 
               <Button x:Name="NavSettings" Tag="Settings" Click="Nav_Click"
                       Style="{DynamicResource NavButtonStyle}"
                       Padding="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarPad}}"
                       HorizontalContentAlignment="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarAlign}}"
-                      ToolTip="Settings  Ctrl+8" ToolTipService.InitialShowDelay="400" Cursor="Hand">
+                      ToolTip="Settings  Ctrl+9" ToolTipService.InitialShowDelay="400" Cursor="Hand">
                 <StackPanel Orientation="Horizontal">
                   <ui:SymbolIcon Symbol="Settings20" FontSize="16" Width="18" VerticalAlignment="Center"/>
                   <TextBlock Text="Settings" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12"
@@ -312,22 +357,24 @@
     <!-- ════════════════════ STATUS BAR ════════════════════ -->
     <Border Grid.Row="3" Background="{DynamicResource StatusBarBrush}"
             BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
-      <Grid Margin="12,0">
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="*"/>
-          <ColumnDefinition Width="Auto"/>
-          <ColumnDefinition Width="Auto"/>
-          <ColumnDefinition Width="Auto"/>
-        </Grid.ColumnDefinitions>
-        <TextBlock Grid.Column="0" Text="{Binding CurrentPageLabel}"
-                   FontSize="11" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"/>
-        <TextBlock Grid.Column="1" Text="{Binding LastScanTimeText}"
-                   FontSize="11" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" Margin="0,0,16,0"/>
-        <TextBlock Grid.Column="2" Text="{Binding FixesTodayText}"
-                   FontSize="11" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" Margin="0,0,16,0"/>
-        <TextBlock Grid.Column="3" Text="{Binding CurrentTimeText}"
-                   FontSize="11" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"/>
-      </Grid>
+      <DockPanel Margin="12,0" LastChildFill="False">
+        <TextBlock DockPanel.Dock="Left"
+                   Text="{Binding ShellStatusText}"
+                   FontSize="11"
+                   Foreground="{DynamicResource TextMutedBrush}"
+                   VerticalAlignment="Center"
+                   TextTrimming="CharacterEllipsis"/>
+        <WrapPanel DockPanel.Dock="Right" HorizontalAlignment="Right" VerticalAlignment="Center">
+          <TextBlock Text="{Binding CurrentProfileStatusText}"
+                     FontSize="11" Foreground="{DynamicResource TextMutedBrush}" Margin="0,0,16,0" VerticalAlignment="Center"/>
+          <TextBlock Text="{Binding LastScanTimeText}"
+                     FontSize="11" Foreground="{DynamicResource TextMutedBrush}" Margin="0,0,16,0" VerticalAlignment="Center"/>
+          <TextBlock Text="{Binding FixesTodayText}"
+                     FontSize="11" Foreground="{DynamicResource TextMutedBrush}" Margin="0,0,16,0" VerticalAlignment="Center"/>
+          <TextBlock Text="{Binding CurrentTimeText}"
+                     FontSize="11" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"/>
+        </WrapPanel>
+      </DockPanel>
     </Border>
 
     <!-- ════════════════════ COMMAND PALETTE OVERLAY ════════════════════ -->
@@ -364,11 +411,11 @@
                       <Setter.Value>
                         <ControlTemplate TargetType="TextBox">
                           <Grid>
-                            <TextBlock Text="Search fixes, categories, symptoms..."
+                            <TextBlock Text="Search a page, repair, workflow, tool, or support action..."
                                        Foreground="{DynamicResource TextMutedBrush}"
                                        FontSize="15" VerticalAlignment="Center"
                                        Visibility="{Binding Text, RelativeSource={RelativeSource TemplatedParent},
-                                                    Converter={StaticResource NullCollapsed}}"/>
+                                                    Converter={StaticResource NullOrWhiteSpaceVisible}}"/>
                             <ScrollViewer x:Name="PART_ContentHost"/>
                           </Grid>
                         </ControlTemplate>
@@ -382,41 +429,65 @@
           <Separator DockPanel.Dock="Top"/>
           <Border DockPanel.Dock="Bottom" Padding="16,8" Background="{DynamicResource BgSurfaceBrush}">
             <StackPanel Orientation="Horizontal">
-              <TextBlock Text="↵ run" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" Margin="0,0,12,0"/>
-              <TextBlock Text="Esc close" FontSize="10" Foreground="{DynamicResource TextMutedBrush}"/>
+              <TextBlock Text="↵ open or run" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" Margin="0,0,12,0"/>
+              <TextBlock Text="Esc closes search" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" Margin="0,0,12,0"/>
+              <TextBlock Text="Ctrl+Shift+M runs safe maintenance" FontSize="10" Foreground="{DynamicResource TextMutedBrush}"/>
             </StackPanel>
           </Border>
           <ScrollViewer VerticalScrollBarVisibility="Auto">
-            <ItemsControl ItemsSource="{Binding CommandPaletteResults}"
-                          VirtualizingStackPanel.IsVirtualizing="True"
-                          VirtualizingStackPanel.VirtualizationMode="Recycling">
-              <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate>
-                  <VirtualizingStackPanel/>
-                </ItemsPanelTemplate>
-              </ItemsControl.ItemsPanel>
-              <ItemsControl.ItemTemplate>
-                <DataTemplate>
-                  <Button Tag="{Binding}" Click="PaletteRun_Click"
-                          HorizontalContentAlignment="Stretch" Cursor="Hand"
-                          Background="Transparent" BorderThickness="0" Padding="16,8">
-                    <Grid>
-                      <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                      </Grid.ColumnDefinitions>
-                      <StackPanel Grid.Column="0">
-                        <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="Medium"/>
-                        <TextBlock Text="{Binding Description}" FontSize="11"
-                                   Foreground="{DynamicResource TextSecBrush}" TextTrimming="CharacterEllipsis"/>
-                      </StackPanel>
-                      <ui:SymbolIcon Grid.Column="1" Symbol="ArrowRight20" FontSize="14"
-                                     Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"/>
-                    </Grid>
-                  </Button>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
+            <Grid>
+              <ItemsControl ItemsSource="{Binding CommandPaletteResults}"
+                            VirtualizingStackPanel.IsVirtualizing="True"
+                            VirtualizingStackPanel.VirtualizationMode="Recycling"
+                            Visibility="{Binding HasCommandPaletteResults, Converter={StaticResource BoolVis}}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <VirtualizingStackPanel/>
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <Button Tag="{Binding}" Click="PaletteRun_Click"
+                            HorizontalContentAlignment="Stretch" Cursor="Hand"
+                            Background="Transparent" BorderThickness="0" Padding="16,8">
+                      <Grid>
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="Auto"/>
+                          <ColumnDefinition Width="*"/>
+                          <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Text="{Binding Glyph}"
+                                   FontFamily="{DynamicResource IconFont}"
+                                   FontSize="15"
+                                   Foreground="{DynamicResource TextSecBrush}"
+                                   VerticalAlignment="Top"
+                                   Margin="0,2,12,0"/>
+                        <StackPanel Grid.Column="1">
+                          <TextBlock Text="{Binding Section}" Style="{DynamicResource CardLabel}"/>
+                          <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="Medium"/>
+                          <TextBlock Text="{Binding Subtitle}" FontSize="11"
+                                     Foreground="{DynamicResource TextSecBrush}" TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Margin="12,0,0,0" VerticalAlignment="Center">
+                          <TextBlock Text="{Binding Hint}" Style="{DynamicResource MetaText}" HorizontalAlignment="Right"/>
+                          <ui:SymbolIcon Symbol="ArrowRight20" FontSize="14"
+                                         Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                        </StackPanel>
+                      </Grid>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <Border Padding="20"
+                      Visibility="{Binding HasCommandPaletteResults, Converter={StaticResource InvBoolVis}}">
+                <StackPanel>
+                  <TextBlock Text="Nothing matches that search yet." Style="{DynamicResource PanelTitle}"/>
+                  <TextBlock Text="Try a page name, a repair keyword like network or printer, a workflow, or a Windows tool."
+                             Style="{DynamicResource CardSub}" Margin="0,6,0,0"/>
+                </StackPanel>
+              </Border>
+            </Grid>
           </ScrollViewer>
         </DockPanel>
       </Border>
@@ -427,31 +498,105 @@
           Visibility="{Binding ShowPrivacyNotice, Converter={StaticResource BoolVis}}">
       <Border Background="#CC000000"/>
       <Border Background="{DynamicResource BgCardBrush}" CornerRadius="10"
-              Width="480" HorizontalAlignment="Center" VerticalAlignment="Center"
+              Width="720" HorizontalAlignment="Center" VerticalAlignment="Center"
               Padding="32" Effect="{DynamicResource CardShadow}">
         <StackPanel>
           <Image x:Name="PrivacyLogoImage" Width="48" Height="48"
-                 HorizontalAlignment="Center" Margin="0,0,0,16"
+                 HorizontalAlignment="Left" Margin="0,0,0,16"
                  RenderOptions.BitmapScalingMode="HighQuality"/>
-          <TextBlock Text="Welcome to FixFox" FontSize="20" FontWeight="Bold"
-                     Foreground="{DynamicResource FoxOrangeBrush}"
-                     HorizontalAlignment="Center" Margin="0,0,0,12"/>
-          <TextBlock TextWrapping="Wrap" HorizontalAlignment="Center" Margin="0,0,0,8"
-                     Foreground="{DynamicResource TextSecBrush}" FontSize="13">
-            FixFox is a free, ad-free, and open self-service PC repair tool.
-          </TextBlock>
-          <TextBlock TextWrapping="Wrap" HorizontalAlignment="Center" Margin="0,0,0,8"
-                     Foreground="{DynamicResource TextSecBrush}" FontSize="13">
-            <Bold>No data leaves your PC.</Bold> FixFox runs fully offline. It does not
-            phone home, collect usage data, or include any third-party trackers.
-          </TextBlock>
-          <TextBlock TextWrapping="Wrap" HorizontalAlignment="Center" Margin="0,0,0,20"
-                     Foreground="{DynamicResource TextSecBrush}" FontSize="13">
-            FixFox intentionally has no registry cleaner — Microsoft recommends against them.
-          </TextBlock>
-          <Button Content="I understand — get started" Click="PrivacyOk_Click"
-                  Style="{DynamicResource AccentButtonStyle}"
-                  HorizontalAlignment="Center" Padding="24,10" Cursor="Hand"/>
+          <TextBlock Text="{Binding OnboardingTitleText}" FontSize="22" FontWeight="SemiBold"
+                     Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8"/>
+          <TextBlock Text="{Binding OnboardingSummaryText}"
+                     Foreground="{DynamicResource TextSecBrush}" FontSize="13" TextWrapping="Wrap" Margin="0,0,0,18"/>
+          <Grid Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Border Grid.Column="0" Style="{DynamicResource InfoCard}" Margin="0,0,8,0">
+              <StackPanel>
+                <TextBlock Text="What This Build Handles" Style="{DynamicResource PanelTitle}"/>
+                <TextBlock Text="{Binding OnboardingCapabilitySummaryText}"
+                           Style="{DynamicResource CardSub}" Margin="0,6,0,0" TextWrapping="Wrap"/>
+              </StackPanel>
+            </Border>
+            <Border Grid.Column="1" Style="{DynamicResource InfoCard}" Margin="8,0,0,0">
+              <StackPanel>
+                <TextBlock Text="Local data and recovery" Style="{DynamicResource PanelTitle}"/>
+                <TextBlock Text="{Binding OnboardingPrivacySummaryText}"
+                           Style="{DynamicResource CardSub}" Margin="0,6,0,0" TextWrapping="Wrap"/>
+              </StackPanel>
+            </Border>
+          </Grid>
+          <TextBlock Text="Behavior profile" Style="{DynamicResource CardLabel}" Margin="0,0,0,8"/>
+          <WrapPanel Margin="0,0,0,8" IsEnabled="{Binding CanEditBehaviorProfile}">
+            <Button Content="Quiet" Tag="Quiet" Click="OnboardingProfile_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
+            <Button Content="Standard" Tag="Standard" Click="OnboardingProfile_Click" Style="{DynamicResource AccentButtonStyle}" Margin="0,0,8,8"/>
+            <Button Content="Power User" Tag="Power User" Click="OnboardingProfile_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"
+                    Visibility="{Binding CanToggleAdvancedMode, Converter={StaticResource BoolVis}}"/>
+            <Button Content="Work Laptop" Tag="Work Laptop" Click="OnboardingProfile_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
+            <Button Content="Home PC" Tag="Home PC" Click="OnboardingProfile_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8"/>
+          </WrapPanel>
+          <TextBlock Text="{Binding ManagedPolicySummaryText}" Style="{DynamicResource MetaText}" Margin="0,0,0,16" TextWrapping="Wrap"
+                     Visibility="{Binding HasManagedRestrictions, Converter={StaticResource BoolVis}}"/>
+          <Grid Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Border Grid.Column="0" Style="{DynamicResource InfoCard}" Margin="0,0,8,0">
+              <StackPanel>
+                <TextBlock Text="Baseline" Style="{DynamicResource PanelTitle}"/>
+                <TextBlock Text="{Binding FirstRunSummaryText}" Style="{DynamicResource CardSub}" Margin="0,6,0,0" TextWrapping="Wrap"/>
+              </StackPanel>
+            </Border>
+            <Border Grid.Column="1" Style="{DynamicResource InfoCard}" Margin="8,0,0,0">
+              <StackPanel>
+                <TextBlock Text="Startup defaults" Style="{DynamicResource PanelTitle}" Margin="0,0,0,8"/>
+                <CheckBox Content="Run a quick scan when this app opens"
+                          IsChecked="{Binding Settings.RunQuickScanOnLaunch, Mode=TwoWay}"
+                          Checked="OnboardingToggle_Changed" Unchecked="OnboardingToggle_Changed"
+                          Margin="0,0,0,8"/>
+                <CheckBox Content="Run the first health check after setup"
+                          IsChecked="{Binding RunHealthCheckAfterSetup, Mode=TwoWay}"
+                          Margin="0,0,0,8"/>
+                <CheckBox Content="Keep this app in the tray when closed"
+                          IsChecked="{Binding Settings.MinimizeToTray, Mode=TwoWay}"
+                          Checked="OnboardingToggle_Changed" Unchecked="OnboardingToggle_Changed"
+                          Margin="0,0,0,8"/>
+                <CheckBox Content="Start this app with Windows"
+                          IsChecked="{Binding Settings.RunAtStartup, Mode=TwoWay}"
+                          Checked="OnboardingRunAtStartup_Changed" Unchecked="OnboardingRunAtStartup_Changed"/>
+                <TextBlock Text="Notification mode" Style="{DynamicResource CardLabel}" Margin="0,12,0,6"/>
+                <ComboBox ItemsSource="{Binding NotificationModeOptions}"
+                          SelectedItem="{Binding SelectedNotificationMode, Mode=TwoWay}"
+                          SelectionChanged="OnboardingToggle_Changed"
+                          IsEnabled="{Binding CanEditNotificationMode}"
+                          Width="180"/>
+                <CheckBox Content="Prefer the safest maintenance workflow by default"
+                          IsChecked="{Binding Settings.PreferSafeMaintenanceDefaults, Mode=TwoWay}"
+                          Checked="OnboardingToggle_Changed" Unchecked="OnboardingToggle_Changed"
+                          Margin="0,12,0,0"/>
+              </StackPanel>
+            </Border>
+          </Grid>
+          <DockPanel>
+            <WrapPanel DockPanel.Dock="Left" Margin="0,0,12,0">
+              <Button Content="Quick Start" Click="OnboardingQuickStart_Click"
+                      Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
+              <Button Content="Privacy Notes" Click="OnboardingPrivacy_Click"
+                      Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
+            </WrapPanel>
+            <StackPanel DockPanel.Dock="Right" HorizontalAlignment="Right">
+              <TextBlock Text="You can change every setup choice later in Settings."
+                         Style="{DynamicResource CardSub}"
+                         Margin="0,0,0,8"
+                         HorizontalAlignment="Right"/>
+              <Button Content="Finish Setup" Click="PrivacyOk_Click"
+                      Style="{DynamicResource AccentButtonStyle}"
+                      HorizontalAlignment="Right" Padding="24,10" Cursor="Hand"/>
+            </StackPanel>
+          </DockPanel>
         </StackPanel>
       </Border>
     </Grid>
@@ -462,6 +607,87 @@
                           VerticalAlignment="Bottom"
                           HorizontalAlignment="Stretch"
                           Margin="24,0,24,12"/>
+
+    <Popup x:Name="NotificationsPopup"
+           PlacementTarget="{Binding ElementName=NotificationsToggle}"
+           Placement="Bottom"
+           StaysOpen="False"
+           AllowsTransparency="True"
+           PopupAnimation="Fade"
+           Closed="NotificationsPopup_Closed">
+      <Border Width="380"
+              Margin="0,10,12,0"
+              Padding="16"
+              Background="{DynamicResource BgCardBrush}"
+              BorderBrush="{DynamicResource BorderBrush}"
+              BorderThickness="1"
+              CornerRadius="10"
+              Effect="{DynamicResource CardShadow}">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+            <DockPanel>
+              <TextBlock Text="Notifications" Style="{DynamicResource PanelTitle}"/>
+              <TextBlock DockPanel.Dock="Right"
+                         Text="{Binding NotificationSummaryText}"
+                         Style="{DynamicResource CardSub}"
+                         VerticalAlignment="Center"/>
+            </DockPanel>
+            <TextBlock Text="Recent alerts and fast actions stay here so the rest of the app can stay calm."
+                       Style="{DynamicResource CardSub}"
+                       TextWrapping="Wrap"
+                       Margin="0,4,0,0"/>
+          </StackPanel>
+
+          <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,12,0,0">
+            <Button Content="Open Support" Click="NotificationOpenSupport_Click"
+                    Style="{DynamicResource SecondaryButton}" Margin="0,0,8,0"/>
+            <Button Content="Clear All" Click="NotificationClearAll_Click"
+                    Style="{DynamicResource SecondaryButton}"/>
+          </StackPanel>
+
+          <ScrollViewer MaxHeight="420" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+              <ItemsControl ItemsSource="{Binding NotificationEntries}"
+                            Visibility="{Binding HasNotifications, Converter={StaticResource BoolVis}}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <Border Style="{DynamicResource FixCard}" Padding="12" Margin="0,0,0,8">
+                      <Grid>
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="4"/>
+                          <ColumnDefinition Width="*"/>
+                          <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Background="{Binding Level, Converter={StaticResource NotifColor}}" CornerRadius="2" Margin="0,0,10,0"/>
+                        <StackPanel Grid.Column="1">
+                          <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
+                          <TextBlock Text="{Binding Message}" Style="{DynamicResource CardSub}" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                          <TextBlock Text="{Binding Timestamp, Converter={StaticResource RelDate}}" Style="{DynamicResource MetaText}" Margin="0,6,0,0"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Margin="12,0,0,0">
+                          <Button Content="Read" Tag="{Binding}" Click="NotificationRead_Click"
+                                  Style="{DynamicResource SecondaryButton}" Margin="0,0,0,6"/>
+                          <Button Content="Dismiss" Tag="{Binding}" Click="NotificationDismiss_Click"
+                                  Style="{DynamicResource SecondaryButton}" Margin="0,0,0,6"/>
+                          <Button Content="Run Fix"
+                                  Tag="{Binding ActionFixId}"
+                                  Click="NotificationRunFix_Click"
+                                  Style="{DynamicResource SecondaryButton}"
+                                  Visibility="{Binding ActionFixId, Converter={StaticResource NullCollapsed}}"/>
+                        </StackPanel>
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <TextBlock Text="No active alerts in this session."
+                         Style="{DynamicResource CardSub}"
+                         Visibility="{Binding HasNotifications, Converter={StaticResource InvBoolVis}}"/>
+            </StackPanel>
+          </ScrollViewer>
+        </DockPanel>
+      </Border>
+    </Popup>
 
   </Grid>
 </ui:FluentWindow>

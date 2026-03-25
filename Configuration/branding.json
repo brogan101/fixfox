@@ -1,0 +1,13 @@
+{
+  "AppName": "FixFox",
+  "AppSubtitle": "Windows support and repair workspace",
+  "VendorName": "FixFox",
+  "SupportDisplayName": "FixFox Support",
+  "SupportEmail": "",
+  "SupportPortalLabel": "Open FixFox guides",
+  "SupportPortalUrl": "Docs\\Quick-Start.md",
+  "AccentHex": "#F97316",
+  "LogoPath": "",
+  "ProductTagline": "Explainable Windows support with guided fixes and clean handoff.",
+  "ManagedModeLabel": "Managed build"
+}

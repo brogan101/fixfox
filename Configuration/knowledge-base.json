@@ -1,0 +1,34 @@
+{
+  "Entries": [
+    {
+      "Key": "quick-start",
+      "Title": "Quick Start",
+      "Description": "Get comfortable with Home, Guided Diagnosis, repairs, maintenance, and support packages.",
+      "Url": "Docs\\Quick-Start.md"
+    },
+    {
+      "Key": "privacy-and-data",
+      "Title": "Privacy and Local Data",
+      "Description": "Review what FixFox stores locally and how support bundle redaction works.",
+      "Url": "Docs\\Privacy-and-Data.md"
+    },
+    {
+      "Key": "support-bundles",
+      "Title": "Support Packages",
+      "Description": "See exactly what support packages contain and when to generate one.",
+      "Url": "Docs\\Support-Packages.md"
+    },
+    {
+      "Key": "recovery-and-resume",
+      "Title": "Recovery and Resume",
+      "Description": "Understand interrupted repairs, restart behavior, and safe recovery choices.",
+      "Url": "Docs\\Recovery-and-Resume.md"
+    },
+    {
+      "Key": "troubleshooting-and-faq",
+      "Title": "Troubleshooting and FAQ",
+      "Description": "Review common launch, update, repair, and support-package questions.",
+      "Url": "Docs\\Troubleshooting-and-FAQ.md"
+    }
+  ]
+}

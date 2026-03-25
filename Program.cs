@@ -12,7 +12,6 @@ public static class Program
     [STAThread]
     public static void Main(string[] args)
     {
-        // ── Headless verify mode — no UI, writes results to stdout + verify log ──
         if (args.Contains("--verify-headless", StringComparer.OrdinalIgnoreCase))
         {
             try { Console.OutputEncoding = Encoding.UTF8; } catch { }
@@ -30,9 +29,15 @@ public static class Program
             return;
         }
 
-        bool forceVerify = args.Contains("--verify", StringComparer.OrdinalIgnoreCase);
+        var automationIndex = Array.FindIndex(args, a => string.Equals(a, "--run-automation", StringComparison.OrdinalIgnoreCase));
+        if (automationIndex >= 0 && automationIndex < args.Length - 1)
+        {
+            Environment.Exit(RunAutomationHeadlessAsync(args[automationIndex + 1]).GetAwaiter().GetResult());
+            return;
+        }
 
-        // Run on a 64 MB stack to prevent native DirectWrite stack overflow
+        var forceVerify = args.Contains("--verify", StringComparer.OrdinalIgnoreCase);
+
         var thread = new System.Threading.Thread(() =>
         {
             try
@@ -44,11 +49,13 @@ public static class Program
             catch (Exception ex)
             {
                 try { new CrashLogger().Log(ex, "Program.Main thread"); } catch { }
-                System.Windows.MessageBox.Show(ex.ToString(), "FixFox — Fatal Error",
-                    System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                System.Windows.MessageBox.Show(
+                    $"FixFox could not start.\n\n{ex.Message}\n\nA crash report was written to AppData\\Roaming\\FixFox\\crashes.",
+                    "FixFox",
+                    System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Error);
             }
-        },
-        64 * 1024 * 1024);
+        }, 64 * 1024 * 1024);
 
         thread.SetApartmentState(System.Threading.ApartmentState.STA);
         thread.Start();
@@ -72,11 +79,12 @@ public static class Program
         try { Console.OutputEncoding = Encoding.UTF8; } catch { }
 
         var services = BuildServices(headless: true);
-        var catalog  = services.GetRequiredService<IFixCatalogService>();
-        var scripts  = services.GetRequiredService<IScriptService>();
-        var log      = services.GetRequiredService<ILogService>();
-        var logger   = services.GetRequiredService<IAppLogger>();
+        var catalog = services.GetRequiredService<IFixCatalogService>();
+        var logger = services.GetRequiredService<IAppLogger>();
         var elevation = services.GetRequiredService<IElevationService>();
+        var repairExecution = services.GetRequiredService<IRepairExecutionService>();
+        var runbookCatalog = services.GetRequiredService<IRunbookCatalogService>();
+        var runbookExecution = services.GetRequiredService<IRunbookExecutionService>();
 
         var bundle = catalog.Bundles.FirstOrDefault(b =>
             string.Equals(b.Id, bundleId, StringComparison.OrdinalIgnoreCase));
@@ -88,6 +96,19 @@ public static class Program
 
         logger.Info($"Running bundle headless: {bundle.Id}");
         Console.WriteLine($"Running bundle: {bundle.Title}");
+
+        var mappedRunbook = runbookCatalog.Runbooks.FirstOrDefault(runbook =>
+            string.Equals(runbook.Id, bundle.Id, StringComparison.OrdinalIgnoreCase));
+        if (mappedRunbook is not null)
+        {
+            var summary = await runbookExecution.ExecuteAsync(mappedRunbook);
+            foreach (var line in summary.Timeline)
+                Console.WriteLine($"  - {line}");
+
+            Console.WriteLine();
+            Console.WriteLine(summary.Summary);
+            return summary.Success ? 0 : 1;
+        }
 
         var adminFixCount = bundle.FixIds
             .Select(catalog.GetById)
@@ -108,7 +129,7 @@ public static class Program
             if (fix is null)
             {
                 failCount++;
-                Console.WriteLine($"  ✗ Missing fix: {fixId}");
+                Console.WriteLine($"  x Missing fix: {fixId}");
                 continue;
             }
 
@@ -119,17 +140,15 @@ public static class Program
             }
 
             Console.WriteLine($"  - {fix.Title}");
-            await scripts.RunFixAsync(fix);
-            log.Record(catalog.GetCategoryTitle(fix), fix);
-
-            if (fix.Status == FixStatus.Failed)
+            var result = await repairExecution.ExecuteAsync(fix);
+            if (!result.Success)
             {
                 failCount++;
-                Console.WriteLine($"    ✗ {fix.LastOutput}");
+                Console.WriteLine($"    x {result.FailureSummary}");
             }
             else
             {
-                Console.WriteLine("    ✓ Done");
+                Console.WriteLine($"    v {result.Summary}");
             }
         }
 
@@ -138,5 +157,28 @@ public static class Program
             ? "Bundle completed successfully."
             : $"Bundle completed with {failCount} failure(s).");
         return failCount == 0 ? 0 : 1;
+    }
+
+    private static async Task<int> RunAutomationHeadlessAsync(string ruleId)
+    {
+        try { Console.OutputEncoding = Encoding.UTF8; } catch { }
+
+        var services = BuildServices(headless: true);
+        var automation = services.GetRequiredService<IAutomationCoordinatorService>();
+
+        var receipt = await automation.RunAsync(ruleId, "Scheduled", manualOverride: false);
+        Console.WriteLine($"{receipt.RuleTitle}");
+        Console.WriteLine($"{receipt.Outcome}: {receipt.Summary}");
+        if (!string.IsNullOrWhiteSpace(receipt.ConditionSummary))
+            Console.WriteLine(receipt.ConditionSummary);
+        if (!string.IsNullOrWhiteSpace(receipt.NextStep))
+            Console.WriteLine(receipt.NextStep);
+
+        return receipt.Outcome switch
+        {
+            AutomationRunOutcome.Completed => receipt.UserActionRequired ? 1 : 0,
+            AutomationRunOutcome.Skipped => 0,
+            _ => 1
+        };
     }
 }

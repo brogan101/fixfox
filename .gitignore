@@ -22,6 +22,9 @@ wpftmp/
 
 AppData/
 LocalData/
+.claude/
+dist/
+publish/
 
 .DS_Store
 Thumbs.db
