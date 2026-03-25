@@ -4,6 +4,7 @@
       xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
       xmlns:h="clr-namespace:HelpDesk.Presentation.Helpers"
       xmlns:m="clr-namespace:HelpDesk.Domain.Models"
+      xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
       Background="{DynamicResource BgPrimaryBrush}">
 
   <Page.Resources>
@@ -21,7 +22,8 @@
       </Grid.RowDefinitions>
 
       <StackPanel Grid.Row="0" Margin="0,0,0,20">
-        <TextBlock Text="Guided Diagnosis" Style="{DynamicResource PageTitle}"/>
+        <TextBlock Text="Guided Diagnosis" Style="{DynamicResource PageTitle}"
+                   automation:AutomationProperties.AutomationId="SymptomCheckerPageMarker"/>
         <TextBlock Text="Describe what the user is seeing, what changed, and what already failed. FixFox will rank the most likely problem areas, suggest the safest first move, and surface the strongest matching fixes."
                    Style="{DynamicResource PageSubtitle}" TextWrapping="Wrap"/>
       </StackPanel>
@@ -48,13 +50,16 @@
 
             <WrapPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Top">
               <Button Content="Analyze" Click="SymptomSearch_Click"
+                      automation:AutomationProperties.AutomationId="SymptomAnalyzeButton"
                       Style="{DynamicResource AccentButtonStyle}" Margin="0,0,8,8" MinWidth="108"/>
               <Button Content="Clear" Click="ClearDiagnosis_Click"
+                      automation:AutomationProperties.AutomationId="SymptomClearButton"
                       Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8" MinWidth="92"/>
             </WrapPanel>
           </Grid>
 
           <TextBox Grid.Row="1"
+                   automation:AutomationProperties.AutomationId="SymptomInputBox"
                    Text="{Binding SymptomInput, UpdateSourceTrigger=PropertyChanged}"
                    AcceptsReturn="True"
                    TextWrapping="Wrap"
@@ -237,6 +242,7 @@
                                   Visibility="{Binding HasScript, Converter={StaticResource BoolVis}}"
                                   Margin="0,0,0,8"/>
                           <Button Content="Details" Tag="{Binding}" Click="FixDetailsButton_Click"
+                                  automation:AutomationProperties.AutomationId="SymptomResultDetailsButton"
                                   Style="{DynamicResource SecondaryButton}"
                                   Margin="0,0,0,8"/>
                         </WrapPanel>

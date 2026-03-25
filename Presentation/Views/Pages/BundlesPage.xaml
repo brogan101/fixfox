@@ -4,6 +4,7 @@
       xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
       xmlns:h="clr-namespace:HelpDesk.Presentation.Helpers"
       xmlns:m="clr-namespace:HelpDesk.Domain.Models"
+      xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
       Background="{DynamicResource BgPrimaryBrush}">
 
   <Page.Resources>
@@ -25,7 +26,8 @@
       </Grid.RowDefinitions>
 
       <StackPanel Grid.Row="0" Margin="0,0,0,20">
-        <TextBlock Text="Automation" Style="{DynamicResource PageTitle}"/>
+        <TextBlock Text="Automation" Style="{DynamicResource PageTitle}"
+                   automation:AutomationProperties.AutomationId="BundlesPageMarker"/>
         <TextBlock Text="Review schedules, watchers, safe maintenance, and guided workflows without losing sight of what runs automatically."
                    Style="{DynamicResource PageSubtitle}"/>
       </StackPanel>
@@ -140,14 +142,19 @@
             </StackPanel>
             <WrapPanel DockPanel.Dock="Right" HorizontalAlignment="Right" VerticalAlignment="Center">
               <Button Content="Run Quick Health" Click="RunAutomationQuickHealth_Click"
+                      automation:AutomationProperties.AutomationId="AutomationRunQuickHealthButton"
                       Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
               <Button Content="Run Safe Maintenance" Click="RunAutomationMaintenance_Click"
+                      automation:AutomationProperties.AutomationId="AutomationRunSafeMaintenanceButton"
                       Style="{DynamicResource AccentButtonStyle}" Margin="0,0,8,8"/>
               <Button Content="Pause 1 Hour" Click="PauseAutomationHour_Click"
+                      automation:AutomationProperties.AutomationId="AutomationPauseHourButton"
                       Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
               <Button Content="Pause Until Tomorrow" Click="PauseAutomationTomorrow_Click"
+                      automation:AutomationProperties.AutomationId="AutomationPauseTomorrowButton"
                       Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
               <Button Content="Resume" Click="ResumeAutomation_Click"
+                      automation:AutomationProperties.AutomationId="AutomationResumeButton"
                       Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8"/>
             </WrapPanel>
           </DockPanel>
@@ -319,7 +326,13 @@
             <ItemsControl ItemsSource="{Binding FilteredAutomationHistoryEntries}" Visibility="{Binding HasFilteredAutomationHistoryEntries, Converter={StaticResource BoolVis}}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate DataType="{x:Type m:AutomationRunReceipt}">
-                  <Border Style="{DynamicResource FixCard}" Padding="12" Margin="0,0,0,8" Tag="{Binding}" MouseLeftButtonDown="AutomationReceiptCard_MouseLeftButtonDown">
+                  <Border Style="{DynamicResource FixCard}"
+                          Padding="12"
+                          Margin="0,0,0,8"
+                          Tag="{Binding}"
+                          Focusable="True"
+                          automation:AutomationProperties.AutomationId="AutomationHistoryCard"
+                          MouseLeftButtonDown="AutomationReceiptCard_MouseLeftButtonDown">
                     <Border.ContextMenu>
                       <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
                         <MenuItem Header="Open Details" Click="AutomationReceiptDetails_Click" CommandParameter="{Binding}"/>
@@ -330,7 +343,12 @@
                     </Border.ContextMenu>
                     <DockPanel>
                       <WrapPanel DockPanel.Dock="Right" Margin="12,0,0,0">
-                        <Button Content="Details" Tag="{Binding}" Click="AutomationReceiptDetailsButton_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
+                        <Button Content="Details"
+                                Tag="{Binding}"
+                                Click="AutomationReceiptDetailsButton_Click"
+                                automation:AutomationProperties.AutomationId="AutomationReceiptDetailsButton"
+                                Style="{DynamicResource SecondaryButton}"
+                                Margin="0,0,8,8"/>
                         <Button Content="Rerun" Tag="{Binding}" Click="AutomationReceiptRerun_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
                         <Button Content="Support" Tag="{Binding}" Click="AutomationReceiptSupportButton_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8"/>
                       </WrapPanel>

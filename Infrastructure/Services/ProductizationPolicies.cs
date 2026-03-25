@@ -39,7 +39,18 @@ internal static class ProductizationPolicies
         .GetNames<Page>()
         .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-    public static AppSettings CreateDefaultSettings() => Normalize(new AppSettings(), out _, out _, null);
+    public static AppSettings CreateDefaultSettings()
+    {
+        var defaults = new AppSettings
+        {
+            RunQuickScanOnLaunch = false,
+            CheckForUpdatesOnLaunch = false,
+            ShowTrayBalloons = false,
+            RunFirstHealthCheckAfterSetup = true
+        };
+
+        return Normalize(defaults, out _, out _, null);
+    }
 
     public static AppSettings Normalize(
         AppSettings settings,

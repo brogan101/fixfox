@@ -63,6 +63,10 @@
     <EmbeddedResource Remove="HelpDesk.Tests\**\*" />
     <None Remove="HelpDesk.Tests\**\*" />
     <Page Remove="HelpDesk.Tests\**\*" />
+    <Compile Remove="HelpDesk.UiTests\**\*.cs" />
+    <EmbeddedResource Remove="HelpDesk.UiTests\**\*" />
+    <None Remove="HelpDesk.UiTests\**\*" />
+    <Page Remove="HelpDesk.UiTests\**\*" />
   </ItemGroup>
 </Project>
 

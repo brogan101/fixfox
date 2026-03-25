@@ -3,6 +3,7 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:h="clr-namespace:HelpDesk.Presentation.Helpers"
       xmlns:m="clr-namespace:HelpDesk.Domain.Models"
+      xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
       Background="{DynamicResource BgPrimaryBrush}">
 
   <Page.Resources>
@@ -23,12 +24,14 @@
 
       <DockPanel Grid.Row="0" Margin="0,0,0,20">
         <StackPanel DockPanel.Dock="Left">
-          <TextBlock Text="Support Package" Style="{DynamicResource PageTitle}"/>
+          <TextBlock Text="Support Package" Style="{DynamicResource PageTitle}"
+                     automation:AutomationProperties.AutomationId="HandoffPageMarker"/>
           <TextBlock Text="Keep escalation work focused: generate a support package, review approved resources, and capture the next best step when self-service stops helping."
                      Style="{DynamicResource PageSubtitle}"/>
         </StackPanel>
         <WrapPanel DockPanel.Dock="Right" HorizontalAlignment="Right" ItemHeight="36">
           <Button Content="Run Health Check" Click="RunHealthCheck_Click"
+                  automation:AutomationProperties.AutomationId="HandoffRunHealthCheckButton"
                   Style="{DynamicResource SecondaryButton}" Margin="0,0,8,0"/>
           <Button Content="{Binding SupportPortalLabel}" Click="OpenSupportPortal_Click"
                   Style="{DynamicResource SecondaryButton}" Margin="0,0,8,0"
@@ -37,6 +40,7 @@
                   Style="{DynamicResource SecondaryButton}" Margin="0,0,8,0"
                   Visibility="{Binding HasSupportEmail, Converter={StaticResource BoolVis}}"/>
           <Button Content="Create Support Package" Click="CreateBundle_Click"
+                  automation:AutomationProperties.AutomationId="HandoffCreateSupportPackageButton"
                   Style="{DynamicResource AccentButtonStyle}"/>
         </WrapPanel>
       </DockPanel>

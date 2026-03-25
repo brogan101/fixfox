@@ -4,6 +4,7 @@
       xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
       xmlns:h="clr-namespace:HelpDesk.Presentation.Helpers"
       xmlns:m="clr-namespace:HelpDesk.Domain.Models"
+      xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
       Background="{DynamicResource BgPrimaryBrush}">
 
   <Page.Resources>
@@ -39,7 +40,8 @@
     <!-- Header + search bar -->
     <DockPanel Grid.Row="0" Margin="0,0,0,16">
       <StackPanel DockPanel.Dock="Left">
-        <TextBlock Text="Repair Library" Style="{DynamicResource PageTitle}"/>
+        <TextBlock Text="Repair Library" Style="{DynamicResource PageTitle}"
+                   automation:AutomationProperties.AutomationId="FixCenterPageMarker"/>
         <TextBlock Text="{Binding FixLibrarySummaryText}"
                    Style="{DynamicResource PageSubtitle}"/>
       </StackPanel>
@@ -53,6 +55,7 @@
           <ui:SymbolIcon Grid.Column="0" Symbol="Search20" FontSize="14"
                          Foreground="{DynamicResource TextSecBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
           <TextBox Grid.Column="1" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                   automation:AutomationProperties.AutomationId="FixCenterSearchBox"
                    BorderThickness="0" Background="Transparent" VerticalContentAlignment="Center"/>
           <Button Grid.Column="2" Content="&#xE711;" Click="ClearSearch_Click"
                   FontFamily="{DynamicResource IconFont}" FontSize="10"
@@ -98,6 +101,7 @@
                   <DockPanel LastChildFill="True">
                     <WrapPanel DockPanel.Dock="Right" VerticalAlignment="Top" ItemHeight="36">
                       <Button Content="Details" Tag="{Binding}"
+                              automation:AutomationProperties.AutomationId="FixCenterPinnedDetailsButton"
                               Click="FixDetailsButton_Click" Style="{DynamicResource SecondaryButton}"
                               Margin="0,0,8,0" VerticalAlignment="Center"/>
                       <Button Tag="{Binding}" Click="TogglePin_Click"
@@ -201,6 +205,7 @@
                               Visibility="{Binding HasSteps, Converter={StaticResource BoolVis}}"
                               Margin="0,0,6,0"/>
                       <Button Content="Details" Tag="{Binding}" Click="FixDetailsButton_Click"
+                              automation:AutomationProperties.AutomationId="FixCenterDetailsButton"
                               Style="{DynamicResource SecondaryButton}"
                               Margin="0,0,6,0"/>
                       <Button Content="Run" Tag="{Binding}" Click="FixButton_Click"

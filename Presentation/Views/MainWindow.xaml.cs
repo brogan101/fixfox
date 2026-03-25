@@ -5,6 +5,7 @@ using System.Windows.Controls.Primitives;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using HelpDesk.Application.Interfaces;
 using HelpDesk.Domain.Enums;
 using HelpDesk.Domain.Models;
@@ -29,55 +30,34 @@ public partial class MainWindow : FluentWindow
     private readonly MainViewModel _vm;
     private readonly ISnackbarService _snackbar;
     private readonly IAppLogger _logger;
-    private readonly DashboardPage _dashPage;
-    private readonly FixCenterPage _fixPage;
-    private readonly BundlesPage _bundlesPage;
-    private readonly SystemInfoPage _sysInfoPage;
-    private readonly SymptomCheckerPage _symptomPage;
-    private readonly ToolboxPage _toolboxPage;
-    private readonly HistoryPage _historyPage;
-    private readonly HandoffPage _handoffPage;
-    private readonly SettingsPage _settingsPage;
+    private readonly IServiceProvider _services;
+    private readonly Dictionary<NavPage, System.Windows.Controls.Page> _pageCache = [];
     private FormsNotifyIcon? _trayIcon;
     private bool _allowExit;
     private bool _trayBalloonShown;
+    private bool _startupRendered;
 
     public MainWindow(
         MainViewModel vm,
         ISnackbarService snackbar,
         IAppLogger logger,
-        DashboardPage dashPage,
-        FixCenterPage fixPage,
-        BundlesPage bundlesPage,
-        SystemInfoPage sysInfoPage,
-        SymptomCheckerPage symptomPage,
-        ToolboxPage toolboxPage,
-        HistoryPage historyPage,
-        HandoffPage handoffPage,
-        SettingsPage settingsPage)
+        IServiceProvider services)
     {
         InitializeComponent();
         _vm = vm;
         _snackbar = snackbar;
         _logger = logger;
-        _dashPage = dashPage;
-        _fixPage = fixPage;
-        _bundlesPage = bundlesPage;
-        _sysInfoPage = sysInfoPage;
-        _symptomPage = symptomPage;
-        _toolboxPage = toolboxPage;
-        _historyPage = historyPage;
-        _handoffPage = handoffPage;
-        _settingsPage = settingsPage;
+        _services = services;
         DataContext = vm;
 
         Loaded += OnLoaded;
+        ContentRendered += OnContentRendered;
         StateChanged += OnWindowStateChanged;
         _vm.PropertyChanged += ViewModel_PropertyChanged;
         CreateTrayIcon();
     }
 
-    private async void OnLoaded(object sender, RoutedEventArgs e)
+    private void OnLoaded(object sender, RoutedEventArgs e)
     {
         try
         {
@@ -91,24 +71,10 @@ public partial class MainWindow : FluentWindow
             }
 
             _snackbar.SetSnackbarPresenter(MainSnackbarPresenter);
-
-            SelectPage(_vm.GetStartupLandingPage(), runPageActivation: false);
-
-            await _vm.LoadSystemInfoAsync();
-            _ = _vm.LoadInstalledProgramsAsync();
-            _ = _vm.RunStartupAutomationAsync();
-
-            if (_vm.HasStartupRecoverySummary)
-            {
-            _snackbar.Show(
-                "Startup notice",
-                _vm.StartupRecoverySummaryText,
-                ControlAppearance.Secondary,
-                new SymbolIcon(SymbolRegular.Info20),
-                TimeSpan.FromSeconds(8));
-            }
             Title = _vm.ProductDisplayName;
+            _vm.ShowPrivacyNotice = !_vm.Settings.OnboardingDismissed;
             UpdateTrayState();
+            Dispatcher.BeginInvoke(new Action(() => _ = EnsureStartupShellReadyAsync()));
         }
         catch (Exception ex)
         {
@@ -118,6 +84,42 @@ public partial class MainWindow : FluentWindow
                 _vm.ProductDisplayName,
                 System.Windows.MessageBoxButton.OK,
                 System.Windows.MessageBoxImage.Warning);
+        }
+    }
+
+    private async void OnContentRendered(object? sender, EventArgs e)
+        => await EnsureStartupShellReadyAsync();
+
+    private async Task EnsureStartupShellReadyAsync()
+    {
+        if (_startupRendered)
+            return;
+
+        _startupRendered = true;
+        var startupStopwatch = Stopwatch.StartNew();
+
+        try
+        {
+            await Task.Yield();
+
+            SelectPage(_vm.GetStartupLandingPage(), runPageActivation: false);
+
+            if (_vm.HasStartupRecoverySummary)
+            {
+                _snackbar.Show(
+                    "Startup notice",
+                    _vm.StartupRecoverySummaryText,
+                    ControlAppearance.Secondary,
+                    new SymbolIcon(SymbolRegular.Info20),
+                    TimeSpan.FromSeconds(8));
+            }
+
+            _ = RunStartupWorkAsync();
+            _logger.Info($"Shell became interactive in {startupStopwatch.ElapsedMilliseconds} ms.");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("Main window failed after first render", ex);
         }
     }
 
@@ -324,24 +326,57 @@ public partial class MainWindow : FluentWindow
 
     private void NavigateTo(NavPage page)
     {
-        System.Windows.Controls.Page target = page switch
-        {
-            NavPage.Dashboard => _dashPage,
-            NavPage.Fixes => _fixPage,
-            NavPage.Bundles => _bundlesPage,
-            NavPage.SystemInfo => _sysInfoPage,
-            NavPage.SymptomChecker => _symptomPage,
-            NavPage.Toolbox => _toolboxPage,
-            NavPage.History => _historyPage,
-            NavPage.Handoff => _handoffPage,
-            NavPage.Settings => _settingsPage,
-            _ => _dashPage
-        };
+        var target = ResolvePage(page);
 
         if (PageFrame.Content != target)
             PageFrame.Navigate(target);
 
         UpdateNavVisualState(page);
+    }
+
+    private System.Windows.Controls.Page ResolvePage(NavPage page)
+    {
+        if (_pageCache.TryGetValue(page, out var cached))
+            return cached;
+
+        System.Windows.Controls.Page resolved = page switch
+        {
+            NavPage.Dashboard => _services.GetRequiredService<DashboardPage>(),
+            NavPage.Fixes => _services.GetRequiredService<FixCenterPage>(),
+            NavPage.Bundles => _services.GetRequiredService<BundlesPage>(),
+            NavPage.SystemInfo => _services.GetRequiredService<SystemInfoPage>(),
+            NavPage.SymptomChecker => _services.GetRequiredService<SymptomCheckerPage>(),
+            NavPage.Toolbox => _services.GetRequiredService<ToolboxPage>(),
+            NavPage.History => _services.GetRequiredService<HistoryPage>(),
+            NavPage.Handoff => _services.GetRequiredService<HandoffPage>(),
+            NavPage.Settings => _services.GetRequiredService<SettingsPage>(),
+            _ => _services.GetRequiredService<DashboardPage>()
+        };
+
+        _pageCache[page] = resolved;
+        return resolved;
+    }
+
+    private async Task RunStartupWorkAsync()
+    {
+        var startupWorkStopwatch = Stopwatch.StartNew();
+        try
+        {
+            var loadSystemInfoTask = _vm.LoadSystemInfoAsync();
+            var shouldWarmInstalledPrograms = _vm.GetStartupLandingPage() == NavPage.SystemInfo;
+            var loadInstalledProgramsTask = shouldWarmInstalledPrograms
+                ? _vm.LoadInstalledProgramsAsync()
+                : Task.CompletedTask;
+
+            await Task.WhenAll(loadSystemInfoTask, loadInstalledProgramsTask);
+            await _vm.RunStartupAutomationAsync();
+            await _vm.PrimeDeferredWorkspaceStateAsync();
+            _logger.Info($"Startup background work completed in {startupWorkStopwatch.ElapsedMilliseconds} ms.");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("Startup background work failed", ex);
+        }
     }
 
     private void SelectPage(NavPage page, bool runPageActivation = true)
@@ -508,7 +543,7 @@ public partial class MainWindow : FluentWindow
     }
 
     private void OnboardingToggle_Changed(object sender, RoutedEventArgs e)
-        => _vm.SaveSettings();
+        => _vm.SaveSettingsLight();
 
     private void OnboardingRunAtStartup_Changed(object sender, RoutedEventArgs e)
     {
@@ -518,7 +553,7 @@ public partial class MainWindow : FluentWindow
         var enable = toggle.IsChecked == true;
         SettingsPage.SetRunAtStartupForShell(enable, _vm.ProductDisplayName);
         _vm.Settings.RunAtStartup = enable;
-        _vm.SaveSettings();
+        _vm.SaveSettingsLight();
     }
 
     private void OnboardingQuickStart_Click(object sender, RoutedEventArgs e) => OpenPath(_vm.QuickStartPath);
@@ -528,6 +563,12 @@ public partial class MainWindow : FluentWindow
     private void NotificationsToggle_Click(object sender, RoutedEventArgs e)
     {
         NotificationsPopup.IsOpen = !NotificationsPopup.IsOpen;
+    }
+
+    private void OpenCommandPaletteButton_Click(object sender, RoutedEventArgs e)
+    {
+        _vm.OpenCommandPalette();
+        Dispatcher.BeginInvoke(() => CommandPaletteBox.Focus());
     }
 
     private void NotificationsPopup_Closed(object sender, EventArgs e)

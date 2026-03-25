@@ -16,9 +16,11 @@ namespace HelpDesk.Infrastructure.Services;
 // ══════════════════════════════════════════════════════════════════════════
 public sealed class SettingsService : ISettingsService
 {
+    private const int SaveRetryCount = 4;
     private readonly string _dir;
     private readonly string _settingsPath;
     private readonly string _backupPath;
+    private readonly object _syncRoot = new();
 
     public SettingsLoadStatus LastLoadStatus { get; private set; } = new()
     {
@@ -40,75 +42,72 @@ public sealed class SettingsService : ISettingsService
 
     public AppSettings Load()
     {
-        foreach (var file in new[] { _settingsPath, _backupPath })
+        lock (_syncRoot)
         {
-            try
+            foreach (var file in new[] { _settingsPath, _backupPath })
             {
-                if (!File.Exists(file))
-                    continue;
-
-                var obj = JsonConvert.DeserializeObject<AppSettings>(File.ReadAllText(file));
-                if (obj is null)
-                    continue;
-
-                var notes = new List<string>();
-                var loadedFromPrimary = string.Equals(file, _settingsPath, StringComparison.OrdinalIgnoreCase);
-                var wasDirty = !obj.LastSessionEndedCleanly;
-                var normalized = ProductizationPolicies.Normalize(
-                    obj,
-                    out var migrationApplied,
-                    out var validationApplied,
-                    notes);
-
-                if (!loadedFromPrimary)
-                    notes.Add("FixFox recovered settings from the backup copy.");
-                if (wasDirty)
-                    notes.Add("FixFox detected that the previous session did not close cleanly.");
-
-                LastLoadStatus = new SettingsLoadStatus
+                try
                 {
-                    LoadedFromPrimary = loadedFromPrimary,
-                    LoadedFromBackup = !loadedFromPrimary,
-                    RecoveredDefaults = false,
-                    MigrationApplied = migrationApplied,
-                    ValidationApplied = validationApplied,
-                    PreviousSessionEndedUncleanly = wasDirty,
-                    SchemaVersion = normalized.SettingsSchemaVersion,
-                    Notes = notes
-                };
+                    if (!File.Exists(file))
+                        continue;
 
-                if (migrationApplied || validationApplied)
-                    Save(normalized);
+                    var obj = JsonConvert.DeserializeObject<AppSettings>(File.ReadAllText(file));
+                    if (obj is null)
+                        continue;
 
-                return normalized;
+                    var notes = new List<string>();
+                    var loadedFromPrimary = string.Equals(file, _settingsPath, StringComparison.OrdinalIgnoreCase);
+                    var wasDirty = !obj.LastSessionEndedCleanly;
+                    var normalized = ProductizationPolicies.Normalize(
+                        obj,
+                        out var migrationApplied,
+                        out var validationApplied,
+                        notes);
+
+                    if (!loadedFromPrimary)
+                        notes.Add("FixFox recovered settings from the backup copy.");
+                    if (wasDirty)
+                        notes.Add("FixFox detected that the previous session did not close cleanly.");
+
+                    LastLoadStatus = new SettingsLoadStatus
+                    {
+                        LoadedFromPrimary = loadedFromPrimary,
+                        LoadedFromBackup = !loadedFromPrimary,
+                        RecoveredDefaults = false,
+                        MigrationApplied = migrationApplied,
+                        ValidationApplied = validationApplied,
+                        PreviousSessionEndedUncleanly = wasDirty,
+                        SchemaVersion = normalized.SettingsSchemaVersion,
+                        Notes = notes
+                    };
+
+                    if (migrationApplied || validationApplied)
+                        SaveCore(normalized);
+
+                    return normalized;
+                }
+                catch
+                {
+                    MoveCorruptFileAside(file);
+                }
             }
-            catch
+
+            var defaults = ProductizationPolicies.CreateDefaultSettings();
+            LastLoadStatus = new SettingsLoadStatus
             {
-                MoveCorruptFileAside(file);
-            }
+                RecoveredDefaults = true,
+                SchemaVersion = defaults.SettingsSchemaVersion,
+                Notes = ["FixFox restored product defaults because the saved settings could not be read."]
+            };
+            SaveCore(defaults);
+            return defaults;
         }
-
-        var defaults = ProductizationPolicies.CreateDefaultSettings();
-        LastLoadStatus = new SettingsLoadStatus
-        {
-            RecoveredDefaults = true,
-            SchemaVersion = defaults.SettingsSchemaVersion,
-            Notes = ["FixFox restored product defaults because the saved settings could not be read."]
-        };
-        Save(defaults);
-        return defaults;
     }
 
     public void Save(AppSettings settings)
     {
-        Directory.CreateDirectory(_dir);
-        ProductizationPolicies.Normalize(settings, out _, out _, null);
-        var json = JsonConvert.SerializeObject(settings, Formatting.Indented);
-        var tmp = _settingsPath + ".tmp";
-        File.WriteAllText(tmp, json);
-        if (File.Exists(_settingsPath))
-            File.Copy(_settingsPath, _backupPath, overwrite: true);
-        File.Move(tmp, _settingsPath, overwrite: true);
+        lock (_syncRoot)
+            SaveCore(settings);
     }
 
     public void ResetToDefaults()
@@ -130,12 +129,78 @@ public sealed class SettingsService : ISettingsService
             if (!File.Exists(file))
                 return;
 
-            var corruptPath = file + $".corrupt-{DateTime.Now:yyyyMMddHHmmss}";
+            var corruptPath = file + $".corrupt-{DateTime.Now:yyyyMMddHHmmssfff}";
             File.Move(file, corruptPath, overwrite: true);
         }
         catch
         {
         }
+    }
+
+    private void SaveCore(AppSettings settings)
+    {
+        Directory.CreateDirectory(_dir);
+        ProductizationPolicies.Normalize(settings, out _, out _, null);
+        var json = JsonConvert.SerializeObject(settings, Formatting.Indented);
+
+        Exception? lastError = null;
+        for (var attempt = 1; attempt <= SaveRetryCount; attempt++)
+        {
+            var tmp = _settingsPath + $".tmp-{Environment.ProcessId}-{Environment.CurrentManagedThreadId}-{Guid.NewGuid():N}";
+            try
+            {
+                File.WriteAllText(tmp, json);
+                CommitSettingsFile(tmp);
+                return;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                lastError = ex;
+                try
+                {
+                    if (File.Exists(tmp))
+                        File.Delete(tmp);
+                }
+                catch
+                {
+                }
+
+                if (attempt < SaveRetryCount)
+                    System.Threading.Thread.Sleep(40 * attempt);
+            }
+        }
+
+        throw new IOException($"FixFox could not save settings to '{_settingsPath}'.", lastError);
+    }
+
+    private void CommitSettingsFile(string tempPath)
+    {
+        if (!File.Exists(_settingsPath))
+        {
+            File.Move(tempPath, _settingsPath);
+            return;
+        }
+
+        try
+        {
+            File.Replace(tempPath, _settingsPath, _backupPath, ignoreMetadataErrors: true);
+            return;
+        }
+        catch (IOException)
+        {
+            // Some fresh-profile launches can briefly reject Replace even though a direct overwrite succeeds.
+        }
+
+        try
+        {
+            File.Copy(_settingsPath, _backupPath, overwrite: true);
+        }
+        catch
+        {
+        }
+
+        File.Copy(tempPath, _settingsPath, overwrite: true);
+        File.Delete(tempPath);
     }
 }
 

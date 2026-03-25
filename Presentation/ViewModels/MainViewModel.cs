@@ -855,7 +855,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 return;
 
             _settings.DefaultLandingPage = page.ToString();
-            SaveSettings();
+            SaveSettingsLight();
             OnPropertyChanged();
         }
     }
@@ -870,7 +870,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 return;
 
             _settings.NotificationMode = value;
-            SaveSettings();
+            SaveSettingsLight();
             OnPropertyChanged();
         }
     }
@@ -888,7 +888,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
             _settings.SupportBundleExportLevel = value;
             _deployment.ApplyPolicy(_settings);
-            SaveSettings();
+            SaveSettingsLight();
             OnPropertyChanged();
         }
     }
@@ -898,7 +898,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         set
         {
             _settings.AutomationQuietHoursStart = value;
-            SaveSettings();
+            SaveSettingsLight(refreshAutomationState: true);
             OnPropertyChanged();
         }
     }
@@ -908,7 +908,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         set
         {
             _settings.AutomationQuietHoursEnd = value;
-            SaveSettings();
+            SaveSettingsLight(refreshAutomationState: true);
             OnPropertyChanged();
         }
     }
@@ -1086,6 +1086,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
         get => _commandPaletteQuery;
         set
         {
+            if (string.Equals(_commandPaletteQuery, value, StringComparison.Ordinal))
+                return;
+
             _commandPaletteQuery = value;
             OnPropertyChanged();
             RefreshCommandPalette();
@@ -1095,6 +1098,24 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public ObservableCollection<CommandPaletteItem> CommandPaletteResults { get; } = [];
 
     public void RefreshCommandPalette()
+    {
+        _commandPaletteDirty = true;
+
+        if (!IsCommandPaletteOpen && string.IsNullOrWhiteSpace(_commandPaletteQuery))
+            return;
+
+        if (string.IsNullOrWhiteSpace(_commandPaletteQuery))
+        {
+            _commandPaletteRefreshTimer.Stop();
+            RefreshCommandPaletteCore();
+            return;
+        }
+
+        _commandPaletteRefreshTimer.Stop();
+        _commandPaletteRefreshTimer.Start();
+    }
+
+    private void RefreshCommandPaletteCore()
     {
         CommandPaletteResults.Clear();
         var results = _commandPaletteService.Search(
@@ -1115,6 +1136,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
                      .Take(16))
             CommandPaletteResults.Add(r);
 
+        _commandPaletteDirty = false;
         OnPropertyChanged(nameof(HasCommandPaletteResults));
     }
 
@@ -1322,11 +1344,19 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public void OpenCommandPalette()
     {
-        CommandPaletteQuery  = "";
+        _commandPaletteRefreshTimer.Stop();
+        _commandPaletteQuery = "";
+        OnPropertyChanged(nameof(CommandPaletteQuery));
         IsCommandPaletteOpen = true;
+        if (_commandPaletteDirty || CommandPaletteResults.Count == 0)
+            RefreshCommandPaletteCore();
     }
 
-    public void CloseCommandPalette() => IsCommandPaletteOpen = false;
+    public void CloseCommandPalette()
+    {
+        _commandPaletteRefreshTimer.Stop();
+        IsCommandPaletteOpen = false;
+    }
 
     // ── Status bar ────────────────────────────────────────────────────────
     private string _currentTimeText = "";
@@ -1393,6 +1423,21 @@ public sealed class MainViewModel : INotifyPropertyChanged
         RefreshAutomationWorkspace();
         RefreshActiveFixes();
         RefreshCommandPalette();
+    }
+
+    public Task PrimeDeferredWorkspaceStateAsync()
+    {
+        if (_deferredWorkspacePrimed)
+            return Task.CompletedTask;
+
+        _deferredWorkspacePrimed = true;
+        RefreshHistory();
+        RefreshRecentlyRun();
+        RefreshSupportCenters();
+        RefreshAutomationWorkspace();
+        RefreshDashboardWorkspace();
+        RefreshCommandPalette();
+        return Task.CompletedTask;
     }
 
     public void SnoozeDashboardAlert(DashboardAlert alert)
@@ -1504,6 +1549,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
     // ── Clock timer ───────────────────────────────────────────────────────
     private readonly DispatcherTimer _clock;
     private readonly DispatcherTimer _automationHeartbeat;
+    private readonly DispatcherTimer _commandPaletteRefreshTimer;
+    private bool _commandPaletteDirty = true;
+    private bool _deferredWorkspacePrimed;
 
     // ── Constructor ───────────────────────────────────────────────────────
     public MainViewModel(
@@ -1619,10 +1667,6 @@ public sealed class MainViewModel : INotifyPropertyChanged
         RefreshWeeklyTuneUpSchedule();
 
         RefreshBreadcrumb();
-        RefreshHistory();
-        RefreshRecentlyRun();
-        RefreshSupportCenters();
-        RefreshAutomationWorkspace();
         var startupNotices = new List<string>();
         if (_settingsSvc.LastLoadStatus.HasRecoveryNotice)
             startupNotices.Add(_settingsSvc.LastLoadStatus.Summary);
@@ -1658,8 +1702,6 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
 
         StartupRecoverySummaryText = string.Join(" ", startupNotices.Where(note => !string.IsNullOrWhiteSpace(note)).Distinct(StringComparer.OrdinalIgnoreCase));
-        RefreshDashboardWorkspace();
-        RefreshCommandPalette();
 
         ShowPrivacyNotice = !_settings.OnboardingDismissed;
 
@@ -1681,6 +1723,16 @@ public sealed class MainViewModel : INotifyPropertyChanged
             await RunAutomationHeartbeatAsync();
         };
         _automationHeartbeat.Start();
+
+        _commandPaletteRefreshTimer = new DispatcherTimer(DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromMilliseconds(140)
+        };
+        _commandPaletteRefreshTimer.Tick += (_, _) =>
+        {
+            _commandPaletteRefreshTimer.Stop();
+            RefreshCommandPaletteCore();
+        };
 
         _ = LoadUpdateInfoAsync();
     }
@@ -2202,6 +2254,41 @@ public sealed class MainViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(ShellStatusText));
     }
 
+    private void RefreshAutomationRuntimeDetailsInPlace()
+    {
+        _automationCoordinator.EnsureRules(_settings);
+
+        foreach (var rule in _settings.AutomationRules)
+        {
+            _automationCoordinator.PopulateRuntimeDetails(
+                rule,
+                _settings,
+                Snapshot,
+                LastHealthCheckReport,
+                InterruptedOperation,
+                HistoryEntries.ToList(),
+                _automationHistory.Entries,
+                HasActiveWork,
+                DateTime.Now);
+        }
+
+        FilterAutomationHistory();
+        RefreshRecentAutomationHistory();
+        OnPropertyChanged(nameof(HasAutomationRules));
+        OnPropertyChanged(nameof(HasScheduledAutomationRules));
+        OnPropertyChanged(nameof(HasWatcherAutomationRules));
+        OnPropertyChanged(nameof(HasAutomationHistoryEntries));
+        OnPropertyChanged(nameof(AutomationPaused));
+        OnPropertyChanged(nameof(AutomationPauseStatusText));
+        OnPropertyChanged(nameof(ActiveAutomationCount));
+        OnPropertyChanged(nameof(PausedAutomationCount));
+        OnPropertyChanged(nameof(AutomationAttentionCount));
+        OnPropertyChanged(nameof(NextAutomationRunText));
+        OnPropertyChanged(nameof(LastAutomationResultText));
+        OnPropertyChanged(nameof(AutomationOverviewText));
+        OnPropertyChanged(nameof(ShellStatusText));
+    }
+
     private void RefreshRecentAutomationHistory()
     {
         RecentAutomationHistoryEntries.Clear();
@@ -2254,14 +2341,14 @@ public sealed class MainViewModel : INotifyPropertyChanged
             return;
 
         SaveSettings();
-        RefreshAutomationWorkspace();
+        RefreshAutomationRuntimeDetailsInPlace();
     }
 
     public void PauseAutomationForHour()
     {
         _settings.AutomationPausedUntilUtc = DateTime.UtcNow.AddHours(1);
         SaveSettings();
-        RefreshAutomationWorkspace();
+        RefreshAutomationRuntimeDetailsInPlace();
     }
 
     public void PauseAutomationUntilTomorrow()
@@ -2269,14 +2356,14 @@ public sealed class MainViewModel : INotifyPropertyChanged
         var tomorrow = DateTime.Today.AddDays(1).AddHours(8);
         _settings.AutomationPausedUntilUtc = tomorrow.ToUniversalTime();
         SaveSettings();
-        RefreshAutomationWorkspace();
+        RefreshAutomationRuntimeDetailsInPlace();
     }
 
     public void ResumeAutomation()
     {
         _settings.AutomationPausedUntilUtc = null;
         SaveSettings();
-        RefreshAutomationWorkspace();
+        RefreshAutomationRuntimeDetailsInPlace();
     }
 
     public void PauseAutomationRuleUntilTomorrow(AutomationRuleSettings rule)
@@ -2851,6 +2938,35 @@ public sealed class MainViewModel : INotifyPropertyChanged
         RefreshAutomationWorkspace();
         RefreshActiveFixes();
         RefreshCommandPalette();
+    }
+
+    public void SaveSettingsLight(bool refreshAutomationState = false)
+    {
+        _deployment.ApplyPolicy(_settings);
+        _automationCoordinator.EnsureRules(_settings);
+        _settingsSvc.Save(_settings);
+        OnPropertyChanged(nameof(Settings));
+        OnPropertyChanged(nameof(HasSuppressedItems));
+        OnPropertyChanged(nameof(CurrentProfileStatusText));
+        OnPropertyChanged(nameof(SelectedLandingPage));
+        OnPropertyChanged(nameof(SelectedNotificationMode));
+        OnPropertyChanged(nameof(SelectedSupportBundleExportLevel));
+        OnPropertyChanged(nameof(SelectedAutomationQuietHoursStart));
+        OnPropertyChanged(nameof(SelectedAutomationQuietHoursEnd));
+        OnPropertyChanged(nameof(SettingsLoadStatus));
+        OnPropertyChanged(nameof(SettingsLoadStatusText));
+        OnPropertyChanged(nameof(HasSettingsLoadNotice));
+        OnPropertyChanged(nameof(ShellStatusText));
+
+        if (refreshAutomationState)
+        {
+            SyncAutomationSchedules();
+            RefreshAutomationRuntimeDetailsInPlace();
+        }
+        else
+        {
+            RefreshCommandPalette();
+        }
     }
 
     public void ApplyTheme(string theme)

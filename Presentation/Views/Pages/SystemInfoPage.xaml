@@ -5,6 +5,7 @@
       xmlns:h="clr-namespace:HelpDesk.Presentation.Helpers"
       xmlns:m="clr-namespace:HelpDesk.Domain.Models"
       xmlns:svc="clr-namespace:HelpDesk.Infrastructure.Services"
+      xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
       Background="{DynamicResource BgPrimaryBrush}">
 
   <Page.Resources>
@@ -27,17 +28,20 @@
 
       <DockPanel Grid.Row="0" Margin="0,0,0,20">
         <StackPanel DockPanel.Dock="Left">
-          <TextBlock Text="Device Health" Style="{DynamicResource PageTitle}"/>
+          <TextBlock Text="Device Health" Style="{DynamicResource PageTitle}"
+                     automation:AutomationProperties.AutomationId="SystemInfoPageMarker"/>
           <TextBlock Text="Review the device baseline, then jump straight into the support center that matches the real problem."
                      Style="{DynamicResource PageSubtitle}"/>
         </StackPanel>
         <WrapPanel DockPanel.Dock="Right" ItemHeight="36">
           <Button Content="Refresh Apps"
+                  automation:AutomationProperties.AutomationId="SystemInfoRefreshAppsButton"
                   Click="RefreshPrograms_Click"
                   Style="{DynamicResource SecondaryButton}"
                   Margin="0,0,8,0"
                   IsEnabled="{Binding InstalledProgramsLoading, Converter={StaticResource InvBool}}"/>
           <Button Content="Refresh Snapshot"
+                  automation:AutomationProperties.AutomationId="SystemInfoRefreshSnapshotButton"
                   Click="RefreshSysInfo_Click"
                   Style="{DynamicResource AccentButtonStyle}"
                   IsEnabled="{Binding SnapshotLoading, Converter={StaticResource InvBool}}"/>

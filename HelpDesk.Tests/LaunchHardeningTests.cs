@@ -54,6 +54,59 @@ public sealed class LaunchHardeningTests : IDisposable
     }
 
     [Fact]
+    public async Task SettingsService_SerializesConcurrentSaves_WithoutCorruptingSettings()
+    {
+        Directory.CreateDirectory(_tempRoot);
+        var service = new SettingsService(_tempRoot);
+        var settings = service.Load();
+
+        var tasks = Enumerable.Range(0, 12)
+            .Select(async index =>
+            {
+                await Task.Yield();
+                settings.WindowWidth = 1100 + index;
+                settings.WindowHeight = 700 + index;
+                service.Save(settings);
+            });
+
+        await Task.WhenAll(tasks);
+
+        var reloaded = service.Load();
+        Assert.True(reloaded.WindowWidth >= 1100);
+        Assert.True(reloaded.WindowHeight >= 700);
+        Assert.True(File.Exists(Path.Combine(_tempRoot, "settings.json")));
+        Assert.Empty(Directory.GetFiles(_tempRoot, "*.tmp-*"));
+    }
+
+    [Fact]
+    public void SettingsService_CanSaveTwice_OnFreshProfile()
+    {
+        Directory.CreateDirectory(_tempRoot);
+        var service = new SettingsService(_tempRoot);
+        var settings = service.Load();
+
+        settings.LastSessionEndedCleanly = false;
+        service.Save(settings);
+        settings.ShowNotifications = false;
+        service.Save(settings);
+
+        var reloaded = service.Load();
+        Assert.False(reloaded.ShowNotifications);
+    }
+
+    [Fact]
+    public void DefaultSettings_Are_Calm_Until_Onboarding_Completes()
+    {
+        var defaults = ProductizationPolicies.CreateDefaultSettings();
+
+        Assert.False(defaults.RunQuickScanOnLaunch);
+        Assert.False(defaults.CheckForUpdatesOnLaunch);
+        Assert.False(defaults.ShowTrayBalloons);
+        Assert.True(defaults.RunFirstHealthCheckAfterSetup);
+        Assert.False(defaults.OnboardingDismissed);
+    }
+
+    [Fact]
     public void BehaviorProfilePolicy_AppliesQuietPresetSafely()
     {
         var settings = new AppSettings();

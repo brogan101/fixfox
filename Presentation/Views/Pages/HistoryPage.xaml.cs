@@ -117,7 +117,8 @@ public partial class HistoryPage : Page
 
     private void NavigateTo(NavPage page)
     {
-        if (Window.GetWindow(this) is MainWindow shell)
-            shell.NavigateToPage(page);
+        var shell = Window.GetWindow(this) as MainWindow
+            ?? System.Windows.Application.Current?.MainWindow as MainWindow;
+        shell?.NavigateToPage(page);
     }
 }

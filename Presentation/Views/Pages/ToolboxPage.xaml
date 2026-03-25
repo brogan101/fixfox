@@ -3,6 +3,7 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:h="clr-namespace:HelpDesk.Presentation.Helpers"
       xmlns:m="clr-namespace:HelpDesk.Domain.Models"
+      xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
       Background="{DynamicResource BgPrimaryBrush}">
 
   <Page.Resources>
@@ -19,7 +20,8 @@
       </Grid.RowDefinitions>
 
       <StackPanel Grid.Row="0" Margin="0,0,0,20">
-        <TextBlock Text="Windows Tools" Style="{DynamicResource PageTitle}"/>
+        <TextBlock Text="Windows Tools" Style="{DynamicResource PageTitle}"
+                   automation:AutomationProperties.AutomationId="ToolboxPageMarker"/>
         <TextBlock Text="Open the native utilities and settings pages most support sessions actually need, without hunting through Windows."
                    Style="{DynamicResource PageSubtitle}"/>
       </StackPanel>

@@ -4,6 +4,7 @@
       xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
       xmlns:h="clr-namespace:HelpDesk.Presentation.Helpers"
       xmlns:m="clr-namespace:HelpDesk.Domain.Models"
+      xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
       Background="{DynamicResource BgPrimaryBrush}">
 
   <Page.Resources>
@@ -25,7 +26,8 @@
       </Grid.RowDefinitions>
 
       <StackPanel Grid.Row="0" Margin="0,0,0,20">
-        <TextBlock Text="Home" Style="{DynamicResource PageTitle}"/>
+        <TextBlock Text="Home" Style="{DynamicResource PageTitle}"
+                   automation:AutomationProperties.AutomationId="DashboardPageMarker"/>
         <TextBlock Text="See what needs attention, take the next safe action, and jump directly into the Windows tools and workflows that matter."
                    Style="{DynamicResource PageSubtitle}"/>
       </StackPanel>
@@ -83,11 +85,16 @@
               <TextBlock Text="Command center" Style="{DynamicResource PanelTitle}"/>
               <TextBlock Text="{Binding MaintenanceSummaryText}" Style="{DynamicResource CardSub}" Margin="0,6,0,12" TextWrapping="Wrap"/>
               <WrapPanel>
-                <Button Content="Run Quick Scan" Click="RunScan_Click" Style="{DynamicResource AccentButtonStyle}" Margin="0,0,8,8"/>
-                <Button Content="Safe Maintenance Now" Click="RunMaintenance_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
-                <Button Content="Open Device Health" Click="OpenDeviceHealth_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
-                <Button Content="Open Windows Tools" Click="OpenToolbox_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
-                <Button Content="Open Support Package" Click="OpenSupport_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8"/>
+                <Button Content="Run Quick Scan" Click="RunScan_Click" Style="{DynamicResource AccentButtonStyle}" Margin="0,0,8,8"
+                        automation:AutomationProperties.AutomationId="DashboardRunQuickScanButton"/>
+                <Button Content="Safe Maintenance Now" Click="RunMaintenance_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"
+                        automation:AutomationProperties.AutomationId="DashboardRunMaintenanceButton"/>
+                <Button Content="Open Device Health" Click="OpenDeviceHealth_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"
+                        automation:AutomationProperties.AutomationId="DashboardOpenDeviceHealthButton"/>
+                <Button Content="Open Windows Tools" Click="OpenToolbox_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"
+                        automation:AutomationProperties.AutomationId="DashboardOpenToolboxButton"/>
+                <Button Content="Open Support Package" Click="OpenSupport_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8"
+                        automation:AutomationProperties.AutomationId="DashboardOpenSupportButton"/>
               </WrapPanel>
             </StackPanel>
           </Border>
@@ -208,9 +215,12 @@
               <TextBlock Text="{Binding AutomationPauseStatusText}" Style="{DynamicResource MetaText}" Margin="0,6,0,0" TextWrapping="Wrap"/>
               <TextBlock Text="{Binding LastAutomationResultText}" Style="{DynamicResource MetaText}" Margin="0,6,0,10" TextWrapping="Wrap"/>
               <WrapPanel>
-                <Button Content="Open Automation" Click="OpenAutomation_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
-                <Button Content="Run Quick Health" Click="RunAutomationQuickHealth_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
-                <Button Content="Run Safe Maintenance" Click="RunAutomationMaintenance_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8"/>
+                <Button Content="Open Automation" Click="OpenAutomation_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"
+                        automation:AutomationProperties.AutomationId="DashboardOpenAutomationButton"/>
+                <Button Content="Run Quick Health" Click="RunAutomationQuickHealth_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"
+                        automation:AutomationProperties.AutomationId="DashboardRunQuickHealthButton"/>
+                <Button Content="Run Safe Maintenance" Click="RunAutomationMaintenance_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8"
+                        automation:AutomationProperties.AutomationId="DashboardRunSafeMaintenanceButton"/>
               </WrapPanel>
             </StackPanel>
           </Border>

@@ -118,7 +118,8 @@ public partial class SymptomCheckerPage : Page
             return;
 
         var relatedRunbooks = _vm.GetRelatedRunbooks(fix);
-        var owner = Window.GetWindow(this) as HelpDesk.Presentation.Views.MainWindow;
+        var owner = Window.GetWindow(this) as HelpDesk.Presentation.Views.MainWindow
+            ?? System.Windows.Application.Current?.MainWindow as HelpDesk.Presentation.Views.MainWindow;
         owner?.NavigateToPage(HelpDesk.Domain.Enums.Page.Bundles);
 
         if (relatedRunbooks.Count == 0)

@@ -3,6 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         xmlns:h="clr-namespace:HelpDesk.Presentation.Helpers"
+        xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
+        automation:AutomationProperties.AutomationId="MainWindow"
         Title="{Binding ProductDisplayName}"
         MinWidth="960" MinHeight="620"
         Width="{Binding Settings.WindowWidth,  Mode=TwoWay}"
@@ -88,7 +90,15 @@
 
       <!-- Min / Max / Close buttons -->
       <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Stretch">
+        <Button x:Name="OpenCommandPaletteButton"
+                automation:AutomationProperties.AutomationId="OpenCommandPaletteButton"
+                Style="{DynamicResource TitleBarButtonStyle}"
+                ToolTip="Quick Command  Ctrl+K"
+                Click="OpenCommandPaletteButton_Click">
+          <ui:SymbolIcon Symbol="Search20" FontSize="15"/>
+        </Button>
         <Button x:Name="NotificationsToggle"
+                automation:AutomationProperties.AutomationId="NotificationsToggle"
                 Style="{DynamicResource TitleBarButtonStyle}"
                 Click="NotificationsToggle_Click">
           <Grid Width="30" Height="28">
@@ -224,6 +234,7 @@
                          Visibility="{Binding IsSidebarCollapsed, Converter={StaticResource InvBoolVis}}"/>
 
               <Button x:Name="NavDashboard" Tag="Dashboard" Click="Nav_Click"
+                      automation:AutomationProperties.AutomationId="NavDashboard"
                       Style="{DynamicResource NavButtonStyle}"
                       Padding="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarPad}}"
                       HorizontalContentAlignment="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarAlign}}"
@@ -236,6 +247,7 @@
               </Button>
 
               <Button x:Name="NavSymptomChecker" Tag="SymptomChecker" Click="Nav_Click"
+                      automation:AutomationProperties.AutomationId="NavSymptomChecker"
                       Style="{DynamicResource NavButtonStyle}"
                       Padding="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarPad}}"
                       HorizontalContentAlignment="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarAlign}}"
@@ -248,6 +260,7 @@
               </Button>
 
               <Button x:Name="NavFixes" Tag="Fixes" Click="Nav_Click"
+                      automation:AutomationProperties.AutomationId="NavFixes"
                       Style="{DynamicResource NavButtonStyle}"
                       Padding="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarPad}}"
                       HorizontalContentAlignment="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarAlign}}"
@@ -260,6 +273,7 @@
               </Button>
 
               <Button x:Name="NavBundles" Tag="Bundles" Click="Nav_Click"
+                      automation:AutomationProperties.AutomationId="NavBundles"
                       Style="{DynamicResource NavButtonStyle}"
                       Padding="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarPad}}"
                       HorizontalContentAlignment="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarAlign}}"
@@ -278,6 +292,7 @@
                          Visibility="{Binding IsSidebarCollapsed, Converter={StaticResource InvBoolVis}}"/>
 
               <Button x:Name="NavSystemInfo" Tag="SystemInfo" Click="Nav_Click"
+                      automation:AutomationProperties.AutomationId="NavSystemInfo"
                       Style="{DynamicResource NavButtonStyle}"
                       Padding="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarPad}}"
                       HorizontalContentAlignment="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarAlign}}"
@@ -290,6 +305,7 @@
               </Button>
 
               <Button x:Name="NavToolbox" Tag="Toolbox" Click="Nav_Click"
+                      automation:AutomationProperties.AutomationId="NavToolbox"
                       Style="{DynamicResource NavButtonStyle}"
                       Padding="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarPad}}"
                       HorizontalContentAlignment="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarAlign}}"
@@ -302,6 +318,7 @@
               </Button>
 
               <Button x:Name="NavHandoff" Tag="Handoff" Click="Nav_Click"
+                      automation:AutomationProperties.AutomationId="NavHandoff"
                       Style="{DynamicResource NavButtonStyle}"
                       Padding="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarPad}}"
                       HorizontalContentAlignment="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarAlign}}"
@@ -314,6 +331,7 @@
               </Button>
 
               <Button x:Name="NavHistory" Tag="History" Click="Nav_Click"
+                      automation:AutomationProperties.AutomationId="NavHistory"
                       Style="{DynamicResource NavButtonStyle}"
                       Padding="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarPad}}"
                       HorizontalContentAlignment="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarAlign}}"
@@ -332,6 +350,7 @@
                          Visibility="{Binding IsSidebarCollapsed, Converter={StaticResource InvBoolVis}}"/>
 
               <Button x:Name="NavSettings" Tag="Settings" Click="Nav_Click"
+                      automation:AutomationProperties.AutomationId="NavSettings"
                       Style="{DynamicResource NavButtonStyle}"
                       Padding="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarPad}}"
                       HorizontalContentAlignment="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarAlign}}"
@@ -350,6 +369,7 @@
 
       <!-- ══ PAGE CONTENT ══ -->
       <Frame x:Name="PageFrame" Grid.Column="1"
+             automation:AutomationProperties.AutomationId="MainPageFrame"
              NavigationUIVisibility="Hidden"
              Background="{DynamicResource BgPrimaryBrush}"/>
     </Grid>
@@ -400,6 +420,7 @@
                              Foreground="{DynamicResource TextSecBrush}" Margin="0,0,10,0"
                              VerticalAlignment="Center"/>
               <TextBox Grid.Column="1" x:Name="CommandPaletteBox"
+                       automation:AutomationProperties.AutomationId="CommandPaletteBox"
                        Text="{Binding CommandPaletteQuery, UpdateSourceTrigger=PropertyChanged}"
                        BorderThickness="0" Background="Transparent"
                        FontSize="15" VerticalContentAlignment="Center"
@@ -448,6 +469,7 @@
                 <ItemsControl.ItemTemplate>
                   <DataTemplate>
                     <Button Tag="{Binding}" Click="PaletteRun_Click"
+                            automation:AutomationProperties.AutomationId="{Binding Id}"
                             HorizontalContentAlignment="Stretch" Cursor="Hand"
                             Background="Transparent" BorderThickness="0" Padding="16,8">
                       <Grid>
@@ -499,6 +521,7 @@
       <Border Background="#CC000000"/>
       <Border Background="{DynamicResource BgCardBrush}" CornerRadius="10"
               Width="720" HorizontalAlignment="Center" VerticalAlignment="Center"
+              automation:AutomationProperties.AutomationId="OnboardingOverlay"
               Padding="32" Effect="{DynamicResource CardShadow}">
         <StackPanel>
           <Image x:Name="PrivacyLogoImage" Width="48" Height="48"
@@ -530,12 +553,17 @@
           </Grid>
           <TextBlock Text="Behavior profile" Style="{DynamicResource CardLabel}" Margin="0,0,0,8"/>
           <WrapPanel Margin="0,0,0,8" IsEnabled="{Binding CanEditBehaviorProfile}">
-            <Button Content="Quiet" Tag="Quiet" Click="OnboardingProfile_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
-            <Button Content="Standard" Tag="Standard" Click="OnboardingProfile_Click" Style="{DynamicResource AccentButtonStyle}" Margin="0,0,8,8"/>
+            <Button Content="Quiet" Tag="Quiet" Click="OnboardingProfile_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"
+                    automation:AutomationProperties.AutomationId="OnboardingProfileQuietButton"/>
+            <Button Content="Standard" Tag="Standard" Click="OnboardingProfile_Click" Style="{DynamicResource AccentButtonStyle}" Margin="0,0,8,8"
+                    automation:AutomationProperties.AutomationId="OnboardingProfileStandardButton"/>
             <Button Content="Power User" Tag="Power User" Click="OnboardingProfile_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"
+                    automation:AutomationProperties.AutomationId="OnboardingProfilePowerUserButton"
                     Visibility="{Binding CanToggleAdvancedMode, Converter={StaticResource BoolVis}}"/>
-            <Button Content="Work Laptop" Tag="Work Laptop" Click="OnboardingProfile_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
-            <Button Content="Home PC" Tag="Home PC" Click="OnboardingProfile_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8"/>
+            <Button Content="Work Laptop" Tag="Work Laptop" Click="OnboardingProfile_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"
+                    automation:AutomationProperties.AutomationId="OnboardingProfileWorkLaptopButton"/>
+            <Button Content="Home PC" Tag="Home PC" Click="OnboardingProfile_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8"
+                    automation:AutomationProperties.AutomationId="OnboardingProfileHomePcButton"/>
           </WrapPanel>
           <TextBlock Text="{Binding ManagedPolicySummaryText}" Style="{DynamicResource MetaText}" Margin="0,0,0,16" TextWrapping="Wrap"
                      Visibility="{Binding HasManagedRestrictions, Converter={StaticResource BoolVis}}"/>
@@ -583,9 +611,11 @@
           <DockPanel>
             <WrapPanel DockPanel.Dock="Left" Margin="0,0,12,0">
               <Button Content="Quick Start" Click="OnboardingQuickStart_Click"
-                      Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
+                      Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"
+                      automation:AutomationProperties.AutomationId="OnboardingQuickStartButton"/>
               <Button Content="Privacy Notes" Click="OnboardingPrivacy_Click"
-                      Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
+                      Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"
+                      automation:AutomationProperties.AutomationId="OnboardingPrivacyNotesButton"/>
             </WrapPanel>
             <StackPanel DockPanel.Dock="Right" HorizontalAlignment="Right">
               <TextBlock Text="You can change every setup choice later in Settings."
@@ -594,7 +624,8 @@
                          HorizontalAlignment="Right"/>
               <Button Content="Finish Setup" Click="PrivacyOk_Click"
                       Style="{DynamicResource AccentButtonStyle}"
-                      HorizontalAlignment="Right" Padding="24,10" Cursor="Hand"/>
+                      HorizontalAlignment="Right" Padding="24,10" Cursor="Hand"
+                      automation:AutomationProperties.AutomationId="OnboardingFinishButton"/>
             </StackPanel>
           </DockPanel>
         </StackPanel>

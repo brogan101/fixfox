@@ -29,8 +29,9 @@ public partial class FixCenterPage : Page
 
     private void OpenGuidedDiagnosis_Click(object sender, RoutedEventArgs e)
     {
-        if (Window.GetWindow(this) is MainWindow shell)
-            shell.NavigateToPage(NavPage.SymptomChecker);
+        var shell = Window.GetWindow(this) as MainWindow
+            ?? System.Windows.Application.Current?.MainWindow as MainWindow;
+        shell?.NavigateToPage(NavPage.SymptomChecker);
     }
 
     private async void FixButton_Click(object sender, RoutedEventArgs e)
@@ -113,7 +114,8 @@ public partial class FixCenterPage : Page
             return;
 
         var relatedRunbooks = _vm.GetRelatedRunbooks(fix);
-        var owner = Window.GetWindow(this) as HelpDesk.Presentation.Views.MainWindow;
+        var owner = Window.GetWindow(this) as HelpDesk.Presentation.Views.MainWindow
+            ?? System.Windows.Application.Current?.MainWindow as HelpDesk.Presentation.Views.MainWindow;
         owner?.NavigateToPage(HelpDesk.Domain.Enums.Page.Bundles);
 
         if (relatedRunbooks.Count == 0)

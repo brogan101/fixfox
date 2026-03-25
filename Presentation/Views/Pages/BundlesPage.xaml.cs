@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 using HelpDesk.Domain.Models;
 using HelpDesk.Presentation.ViewModels;
 using Button = System.Windows.Controls.Button;
@@ -12,12 +13,21 @@ namespace HelpDesk.Presentation.Views.Pages;
 public partial class BundlesPage : Page
 {
     private readonly MainViewModel _vm;
+    private bool _automationRuleAutoSaveEnabled;
 
     public BundlesPage(MainViewModel vm)
     {
         InitializeComponent();
         _vm = vm;
         DataContext = _vm;
+        Loaded += OnLoaded;
+    }
+
+    private void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        Dispatcher.BeginInvoke(
+            () => _automationRuleAutoSaveEnabled = true,
+            DispatcherPriority.ApplicationIdle);
     }
 
     private void MaintenanceProfileDetailsButton_Click(object sender, RoutedEventArgs e)
@@ -158,12 +168,18 @@ public partial class BundlesPage : Page
 
     private void AutomationRuleSetting_Changed(object sender, RoutedEventArgs e)
     {
+        if (!ShouldAutoSaveAutomationRuleChange(sender as FrameworkElement))
+            return;
+
         if ((sender as FrameworkElement)?.DataContext is AutomationRuleSettings rule)
             _vm.SaveAutomationRule(rule);
     }
 
     private void AutomationRuleSetting_Changed(object sender, SelectionChangedEventArgs e)
     {
+        if (!ShouldAutoSaveAutomationRuleChange(sender as FrameworkElement))
+            return;
+
         if ((sender as FrameworkElement)?.DataContext is AutomationRuleSettings rule)
             _vm.SaveAutomationRule(rule);
     }
@@ -339,5 +355,16 @@ public partial class BundlesPage : Page
             $"{_vm.ProductDisplayName} - Automation Result",
             MessageBoxButton.OK,
             MessageBoxImage.Information);
+    }
+
+    private bool ShouldAutoSaveAutomationRuleChange(FrameworkElement? element)
+    {
+        if (!_automationRuleAutoSaveEnabled || element is null || !element.IsLoaded)
+            return false;
+
+        return element.IsKeyboardFocusWithin
+               || ReferenceEquals(Keyboard.FocusedElement, element)
+               || Mouse.LeftButton == MouseButtonState.Pressed
+               || Mouse.RightButton == MouseButtonState.Pressed;
     }
 }

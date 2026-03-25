@@ -101,7 +101,9 @@ public partial class App : System.Windows.Application
         vm.ForceShowVerifyPanel = _forceVerify;
 
         Services.GetRequiredService<IAppLogger>().Info("FixFox starting");
+        MainWindow = window;
         window.Show();
+        window.Activate();
     }
 
     private static void ReportUnhandledException(Exception ex, string context, string headline)

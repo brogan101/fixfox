@@ -5,13 +5,25 @@ namespace HelpDesk.Shared;
 /// <summary>Computed path helpers and app identity constants.</summary>
 public static class Constants
 {
+    private const string AppDataOverrideVariable = "FIXFOX_APPDATA_DIR";
+
     // â”€â”€ App identity â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     public const string AppName    = "FixFox";
     public const string AppVersion = "1.0.0";
 
     // â”€â”€ Computed paths â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    public static string AppDataDir    => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "FixFox");
+    public static string AppDataDir
+    {
+        get
+        {
+            var overridePath = Environment.GetEnvironmentVariable(AppDataOverrideVariable);
+            if (!string.IsNullOrWhiteSpace(overridePath))
+                return Path.GetFullPath(overridePath);
+
+            return Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "FixFox");
+        }
+    }
 
     public static string TempDir       => Path.Combine(Path.GetTempPath(), "FixFox");
     public static string DocsDir       => Path.Combine(AppContext.BaseDirectory, "Docs");

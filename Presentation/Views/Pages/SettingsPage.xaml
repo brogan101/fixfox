@@ -3,6 +3,7 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
       xmlns:h="clr-namespace:HelpDesk.Presentation.Helpers"
+      xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
       Background="{DynamicResource BgPrimaryBrush}">
 
   <Page.Resources>
@@ -20,7 +21,8 @@
 
       <!-- Header -->
       <StackPanel Grid.Row="0" Margin="0,0,0,24">
-        <TextBlock Text="Settings" Style="{DynamicResource PageTitle}"/>
+        <TextBlock Text="Settings" Style="{DynamicResource PageTitle}"
+                   automation:AutomationProperties.AutomationId="SettingsPageMarker"/>
         <TextBlock Text="Profiles, automation, startup, notifications, updates, and local data handling. Changes save immediately." Style="{DynamicResource PageSubtitle}"/>
       </StackPanel>
 
@@ -126,6 +128,7 @@
                            Style="{DynamicResource CardSub}" Margin="0,4,0,0" TextWrapping="Wrap"/>
               </StackPanel>
               <Button DockPanel.Dock="Right" Content="Open Automation Center" Click="OpenAutomationCenter_Click"
+                      automation:AutomationProperties.AutomationId="SettingsOpenAutomationCenterButton"
                       Style="{DynamicResource SecondaryButton}" Margin="12,0,0,0"/>
             </DockPanel>
             <Separator Margin="0,4,0,12"/>
@@ -137,6 +140,7 @@
               </StackPanel>
               <ui:ToggleSwitch Grid.Column="1"
                                IsChecked="{Binding Settings.RunQuickScanOnLaunch, Mode=TwoWay}"
+                               automation:AutomationProperties.AutomationId="SettingsRunQuickScanOnLaunchToggle"
                                Checked="SettingsToggle_Changed" Unchecked="SettingsToggle_Changed"
                                VerticalAlignment="Center"/>
             </Grid>
@@ -161,6 +165,7 @@
               </StackPanel>
               <ui:ToggleSwitch Grid.Column="1"
                                IsChecked="{Binding Settings.ShowNotifications, Mode=TwoWay}"
+                               automation:AutomationProperties.AutomationId="SettingsShowNotificationsToggle"
                                Checked="SettingsToggle_Changed" Unchecked="SettingsToggle_Changed"
                                VerticalAlignment="Center"/>
             </Grid>
@@ -226,6 +231,7 @@
               </StackPanel>
               <ui:ToggleSwitch Grid.Column="1"
                                IsChecked="{Binding Settings.RunAtStartup, Mode=TwoWay}"
+                               automation:AutomationProperties.AutomationId="SettingsRunAtStartupToggle"
                                Checked="RunAtStartup_Changed" Unchecked="RunAtStartup_Changed"
                                VerticalAlignment="Center"/>
             </Grid>
@@ -238,6 +244,7 @@
               </StackPanel>
               <ui:ToggleSwitch Grid.Column="1"
                                IsChecked="{Binding Settings.MinimizeToTray, Mode=TwoWay}"
+                               automation:AutomationProperties.AutomationId="SettingsMinimizeToTrayToggle"
                                Checked="SettingsToggle_Changed" Unchecked="SettingsToggle_Changed"
                                VerticalAlignment="Center"/>
             </Grid>
@@ -250,6 +257,7 @@
               </StackPanel>
               <ui:ToggleSwitch Grid.Column="1"
                                IsChecked="{Binding Settings.ShowTrayBalloons, Mode=TwoWay}"
+                               automation:AutomationProperties.AutomationId="SettingsShowTrayBalloonsToggle"
                                Checked="SettingsToggle_Changed" Unchecked="SettingsToggle_Changed"
                                VerticalAlignment="Center"/>
             </Grid>

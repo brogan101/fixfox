@@ -32,16 +32,16 @@ public partial class SettingsPage : Page
     }
 
     private void SettingsToggle_Changed(object sender, RoutedEventArgs e)
-        => _vm.SaveSettings();
+        => _vm.SaveSettingsLight();
 
     private void BehaviorProfile_Changed(object sender, SelectionChangedEventArgs e)
-        => _vm.SaveSettings();
+    { }
 
     private void LandingPage_Changed(object sender, SelectionChangedEventArgs e)
-        => _vm.SaveSettings();
+    { }
 
     private void SettingsCombo_Changed(object sender, SelectionChangedEventArgs e)
-        => _vm.SaveSettings();
+    { }
 
     private void ResetSuppressed_Click(object sender, RoutedEventArgs e)
         => _vm.ResetSuppressedItems();
@@ -52,7 +52,7 @@ public partial class SettingsPage : Page
         var enable = ts.IsChecked == true;
         SetRunAtStartupForShell(enable, _vm.ProductDisplayName);
         _vm.Settings.RunAtStartup = enable;
-        _vm.SaveSettings();
+        _vm.SaveSettingsLight();
     }
 
     public static void SetRunAtStartupForShell(bool enable, string? valueName = null)
@@ -115,8 +115,9 @@ public partial class SettingsPage : Page
 
     private void OpenAutomationCenter_Click(object sender, RoutedEventArgs e)
     {
-        if (Window.GetWindow(this) is MainWindow shell)
-            shell.NavigateToPage(Domain.Enums.Page.Bundles);
+        var shell = Window.GetWindow(this) as MainWindow
+            ?? System.Windows.Application.Current?.MainWindow as MainWindow;
+        shell?.NavigateToPage(Domain.Enums.Page.Bundles);
     }
 
     private void RestoreDefaults_Click(object sender, RoutedEventArgs e)
