@@ -22,8 +22,19 @@
       </Grid.RowDefinitions>
 
       <StackPanel Grid.Row="0" Margin="0,0,0,20">
-        <TextBlock Text="Guided Diagnosis" Style="{DynamicResource PageTitle}"
-                   automation:AutomationProperties.AutomationId="SymptomCheckerPageMarker"/>
+        <WrapPanel>
+          <TextBlock Text="Guided Diagnosis" Style="{DynamicResource PageTitle}"
+                     automation:AutomationProperties.AutomationId="SymptomCheckerPageMarker"/>
+          <Button Content="?"
+                  Click="GuidedDiagnosisHelp_Click"
+                  Width="28"
+                  Height="28"
+                  Margin="8,0,0,0"
+                  VerticalAlignment="Center"
+                  Style="{DynamicResource SecondaryButton}"
+                  Visibility="{Binding ShowSimpleHelp, Converter={StaticResource BoolVis}}"
+                  automation:AutomationProperties.AutomationId="Help_GuidedDiagnosis_Trigger"/>
+        </WrapPanel>
         <TextBlock Text="Describe what the user is seeing, what changed, and what already failed. FixFox will rank the most likely problem areas, suggest the safest first move, and surface the strongest matching fixes."
                    Style="{DynamicResource PageSubtitle}" TextWrapping="Wrap"/>
       </StackPanel>
@@ -123,74 +134,132 @@
           </StackPanel>
 
           <Border Style="{DynamicResource InfoCard}"
-                  Visibility="{Binding HasTriageCandidates, Converter={StaticResource BoolVis}}">
+                  Visibility="{Binding HasTopTriageCandidate, Converter={StaticResource BoolVis}}">
             <StackPanel>
-              <TextBlock Text="What FixFox thinks is happening" Style="{DynamicResource PanelTitle}"/>
-              <TextBlock Text="These ranked issue areas explain why FixFox is steering you toward certain fixes instead of blindly running the whole catalog."
+              <TextBlock Text="Top Diagnosis" Style="{DynamicResource PanelTitle}"/>
+              <TextBlock Text="FixFox shows the strongest match first, explains why it ranked highest, and keeps the next safe actions close by."
                          Style="{DynamicResource CardSub}" Margin="0,6,0,14" TextWrapping="Wrap"/>
 
-              <ItemsControl ItemsSource="{Binding TriageCandidates}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate DataType="{x:Type m:TriageCandidate}">
-                    <Border Style="{DynamicResource FixCard}" Padding="14" Margin="0,0,0,10">
+              <Border Style="{DynamicResource FixCard}" Padding="16" Margin="0,0,0,12"
+                      automation:AutomationProperties.AutomationId="Diagnosis_TopResult">
+                <StackPanel>
+                  <DockPanel Margin="0,0,0,8">
+                    <StackPanel DockPanel.Dock="Left">
+                      <TextBlock Text="{Binding TopTriageCandidate.CategoryName}"
+                                 Style="{DynamicResource PanelTitle}"
+                                 TextTrimming="CharacterEllipsis"
+                                 automation:AutomationProperties.AutomationId="Diagnosis_TopResult"/>
+                      <TextBlock Text="{Binding TopTriageCandidate.ProbableSubIssue}" Style="{DynamicResource MetaText}"
+                                 Visibility="{Binding TopTriageCandidate.ProbableSubIssue, Converter={StaticResource NullCollapsed}}"/>
+                    </StackPanel>
+                    <Border DockPanel.Dock="Right"
+                            Background="{DynamicResource BgCard2Brush}"
+                            CornerRadius="12"
+                            Padding="10,4"
+                            Margin="12,0,0,0"
+                            automation:AutomationProperties.AutomationId="Diagnosis_Confidence_Badge">
+                      <TextBlock Text="{Binding TopTriageCandidate.ConfidenceLabel}" Style="{DynamicResource MetaText}"/>
+                    </Border>
+                  </DockPanel>
+
+                  <TextBlock Text="{Binding TopTriageCandidate.WhatIThinkIsWrong}" FontWeight="SemiBold" FontSize="14" TextWrapping="Wrap"/>
+                  <TextBlock Text="{Binding TopTriageCandidate.RankingReason}" Style="{DynamicResource CardSub}" Margin="0,8,0,0" TextWrapping="Wrap"/>
+
+                  <Grid Margin="0,12,0,0">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*"/>
+                      <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0" Background="{DynamicResource BgCard2Brush}" CornerRadius="8" Padding="12,10" Margin="0,0,8,0">
                       <StackPanel>
-                        <DockPanel Margin="0,0,0,8">
-                          <StackPanel DockPanel.Dock="Left">
-                            <TextBlock Text="{Binding CategoryName}" Style="{DynamicResource PanelTitle}"/>
-                            <TextBlock Text="{Binding ProbableSubIssue}" Style="{DynamicResource MetaText}"
-                                       Visibility="{Binding ProbableSubIssue, Converter={StaticResource NullCollapsed}}"/>
-                          </StackPanel>
-                          <Border DockPanel.Dock="Right" Background="{DynamicResource BgCard2Brush}" CornerRadius="12" Padding="10,4" Margin="12,0,0,0">
-                            <TextBlock Text="{Binding ConfidenceLabel}" Style="{DynamicResource MetaText}"/>
-                          </Border>
-                        </DockPanel>
-
-                        <TextBlock Text="{Binding WhatIThinkIsWrong}" FontWeight="SemiBold" FontSize="13" TextWrapping="Wrap"/>
-                        <TextBlock Text="{Binding WhyIThinkThat}" Style="{DynamicResource CardSub}" Margin="0,6,0,0" TextWrapping="Wrap"/>
-
-                        <Grid Margin="0,12,0,0">
-                          <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="*"/>
-                          </Grid.ColumnDefinitions>
-
-                          <Border Grid.Column="0" Background="{DynamicResource BgCard2Brush}" CornerRadius="8" Padding="12,10" Margin="0,0,8,0">
-                            <StackPanel>
-                              <TextBlock Text="Safest first action" Style="{DynamicResource CardLabel}"/>
-                              <TextBlock Text="{Binding SafestFirstAction}" Style="{DynamicResource CardSub}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                            </StackPanel>
-                          </Border>
-
-                          <Border Grid.Column="1" Background="{DynamicResource BgCard2Brush}" CornerRadius="8" Padding="12,10" Margin="8,0,0,0">
-                            <StackPanel>
-                              <TextBlock Text="Stronger next action" Style="{DynamicResource CardLabel}"/>
-                              <TextBlock Text="{Binding StrongerNextAction}" Style="{DynamicResource CardSub}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                            </StackPanel>
-                          </Border>
-                        </Grid>
-
-                        <Border Background="{DynamicResource BgCard2Brush}" CornerRadius="8" Padding="12,10" Margin="0,10,0,0"
-                                Visibility="{Binding EscalationSignal, Converter={StaticResource NullCollapsed}}">
-                          <StackPanel>
-                            <TextBlock Text="Escalate when" Style="{DynamicResource CardLabel}"/>
-                            <TextBlock Text="{Binding EscalationSignal}" Style="{DynamicResource CardSub}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                          </StackPanel>
-                        </Border>
-
-                        <Border Background="{DynamicResource BgCard2Brush}" CornerRadius="8" Padding="12,10" Margin="0,10,0,0"
-                                Visibility="{Binding DataContext.AdvancedModeEnabled, RelativeSource={RelativeSource AncestorType=Page}, Converter={StaticResource BoolVis}}">
-                          <StackPanel>
-                            <TextBlock Text="Advanced detail" Style="{DynamicResource CardLabel}"/>
-                            <TextBlock Text="{Binding AdvancedDetails}" Style="{DynamicResource CardSub}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                          </StackPanel>
-                        </Border>
-
-                        <TextBlock Text="{Binding WhatWillHappen}" Style="{DynamicResource CardSub}" Margin="0,10,0,0" TextWrapping="Wrap"/>
+                        <TextBlock Text="Safest first action" Style="{DynamicResource CardLabel}"/>
+                        <TextBlock Text="{Binding TopTriageCandidate.SafestFirstAction}" Style="{DynamicResource CardSub}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                       </StackPanel>
                     </Border>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
+
+                    <Border Grid.Column="1" Background="{DynamicResource BgCard2Brush}" CornerRadius="8" Padding="12,10" Margin="8,0,0,0">
+                      <StackPanel>
+                        <TextBlock Text="Why this ranked highest" Style="{DynamicResource CardLabel}"/>
+                        <TextBlock Text="{Binding TopTriageCandidate.WhyIThinkThat}" Style="{DynamicResource CardSub}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                      </StackPanel>
+                    </Border>
+                  </Grid>
+
+                  <Border Background="{DynamicResource BgCard2Brush}" CornerRadius="8" Padding="12,10" Margin="0,10,0,0"
+                          Visibility="{Binding TopTriageCandidate.EscalationSignal, Converter={StaticResource NullCollapsed}}">
+                    <StackPanel>
+                      <TextBlock Text="Escalate when" Style="{DynamicResource CardLabel}"/>
+                      <TextBlock Text="{Binding TopTriageCandidate.EscalationSignal}" Style="{DynamicResource CardSub}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                    </StackPanel>
+                  </Border>
+
+                  <WrapPanel Margin="0,14,0,0">
+                    <Button Content="Run this fix"
+                            Click="DiagnosisRunFix_Click"
+                            Style="{DynamicResource AccentButtonStyle}"
+                            Margin="0,0,8,8"
+                            Visibility="{Binding ShowDiagnosisFixActions, Converter={StaticResource BoolVis}}"
+                            automation:AutomationProperties.AutomationId="Diagnosis_NextStep_RunFix"/>
+                    <Button Content="Run this flow"
+                            Click="DiagnosisRunFlow_Click"
+                            Style="{DynamicResource AccentButtonStyle}"
+                            Margin="0,0,8,8"
+                            Visibility="{Binding ShowDiagnosisRunbookActions, Converter={StaticResource BoolVis}}"
+                            automation:AutomationProperties.AutomationId="Diagnosis_NextStep_RunFlow"/>
+                    <Button Content="Run guided check"
+                            Click="DiagnosisGuidedCheck_Click"
+                            Style="{DynamicResource SecondaryButton}"
+                            Margin="0,0,8,8"
+                            Visibility="{Binding ShowDiagnosisGuidedCheckAction, Converter={StaticResource BoolVis}}"
+                            automation:AutomationProperties.AutomationId="Diagnosis_NextStep_GuidedCheck"/>
+                    <Button Content="View steps first"
+                            Click="DiagnosisViewStepsFirst_Click"
+                            Style="{DynamicResource SecondaryButton}"
+                            Margin="0,0,8,8"
+                            Visibility="{Binding ShowDiagnosisRunbookActions, Converter={StaticResource BoolVis}}"
+                            automation:AutomationProperties.AutomationId="Diagnosis_NextStep_ViewSteps"/>
+                    <Button Content="Escalate"
+                            Click="DiagnosisEscalate_Click"
+                            Style="{DynamicResource SecondaryButton}"
+                            Margin="0,0,0,8"
+                            Visibility="{Binding ShowDiagnosisEscalateAction, Converter={StaticResource BoolVis}}"
+                            automation:AutomationProperties.AutomationId="Diagnosis_NextStep_Escalate"/>
+                  </WrapPanel>
+                </StackPanel>
+              </Border>
+
+              <StackPanel Visibility="{Binding HasRunnerUpTriageCandidates, Converter={StaticResource BoolVis}}">
+                <TextBlock Text="Also Considered" Style="{DynamicResource PanelTitle}" Margin="0,0,0,8"/>
+                <ItemsControl ItemsSource="{Binding RunnerUpTriageCandidates}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type m:TriageCandidate}">
+                      <Border Style="{DynamicResource FixCard}"
+                              Padding="14"
+                              Margin="0,0,0,10"
+                              automation:AutomationProperties.AutomationId="{Binding DisplayIndex, StringFormat=Diagnosis_RunnerUp_{0}}">
+                        <StackPanel>
+                          <DockPanel Margin="0,0,0,8">
+                            <TextBlock Text="{Binding CategoryName}"
+                                       FontWeight="SemiBold"
+                                       FontSize="13"
+                                       automation:AutomationProperties.AutomationId="{Binding DisplayIndex, StringFormat=Diagnosis_RunnerUp_{0}}"/>
+                            <Border DockPanel.Dock="Right" Background="{DynamicResource BgCard2Brush}" CornerRadius="12" Padding="10,4" Margin="12,0,0,0">
+                              <TextBlock Text="{Binding ConfidenceLabel}" Style="{DynamicResource MetaText}"/>
+                            </Border>
+                          </DockPanel>
+                          <TextBlock Text="{Binding WhatIThinkIsWrong}" Style="{DynamicResource CardSub}" TextWrapping="Wrap"/>
+                          <Expander Header="Why not this one?"
+                                    Margin="0,10,0,0"
+                                    automation:AutomationProperties.AutomationId="{Binding DisplayIndex, StringFormat=Diagnosis_WhyNot_{0}_Toggle}">
+                            <TextBlock Text="{Binding RankingReason}" Style="{DynamicResource CardSub}" Margin="0,8,0,0" TextWrapping="Wrap"/>
+                          </Expander>
+                        </StackPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
             </StackPanel>
           </Border>
 
@@ -219,16 +288,24 @@
                             Tag="{Binding}"
                             MouseLeftButtonDown="ResultCard_MouseLeftButtonDown">
                       <Border.ContextMenu>
-                        <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
-                          <MenuItem Header="Run Best Action" Click="RunBestAction_Click" CommandParameter="{Binding}"/>
-                          <MenuItem Header="Start Guided Repair" Click="GuidedMenu_Click" CommandParameter="{Binding}"/>
-                          <MenuItem Header="Run Repair" Click="RunMenu_Click" CommandParameter="{Binding}"/>
+                        <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}"
+                                     automation:AutomationProperties.AutomationId="ContextMenu_Fix">
+                          <MenuItem Header="Run Best Action" Click="RunBestAction_Click" CommandParameter="{Binding}"
+                                    automation:AutomationProperties.AutomationId="Card_Fix_RunBestAction"/>
+                          <MenuItem Header="Start Guided Repair" Click="GuidedMenu_Click" CommandParameter="{Binding}"
+                                    automation:AutomationProperties.AutomationId="Card_Fix_StartGuidedRepair"/>
+                          <MenuItem Header="Run Repair" Click="RunMenu_Click" CommandParameter="{Binding}"
+                                    automation:AutomationProperties.AutomationId="Card_Fix_Run"/>
                           <Separator/>
-                          <MenuItem Header="View Details" Click="FixDetails_Click" CommandParameter="{Binding}"/>
-                          <MenuItem Header="Copy Technical Detail" Click="CopyFixDetails_Click" CommandParameter="{Binding}"/>
-                          <MenuItem Header="Open Related Workflow" Click="OpenRelatedWorkflow_Click" CommandParameter="{Binding}"/>
+                          <MenuItem Header="View Details" Click="FixDetails_Click" CommandParameter="{Binding}"
+                                    automation:AutomationProperties.AutomationId="Card_Fix_Details"/>
+                          <MenuItem Header="Copy Technical Detail" Click="CopyFixDetails_Click" CommandParameter="{Binding}"
+                                    automation:AutomationProperties.AutomationId="Card_Fix_CopyDetails"/>
+                          <MenuItem Header="Open Related Workflow" Click="OpenRelatedWorkflow_Click" CommandParameter="{Binding}"
+                                    automation:AutomationProperties.AutomationId="Card_Fix_OpenRelatedWorkflow"/>
                           <Separator/>
-                          <MenuItem Header="Copy Repair Name" Click="CopyFixTitle_Click" CommandParameter="{Binding}"/>
+                          <MenuItem Header="Copy Repair Name" Click="CopyFixTitle_Click" CommandParameter="{Binding}"
+                                    automation:AutomationProperties.AutomationId="Card_Fix_CopyTitle"/>
                         </ContextMenu>
                       </Border.ContextMenu>
                       <DockPanel LastChildFill="True">
@@ -236,13 +313,15 @@
                           <Button Content="Guide" Tag="{Binding}" Click="GuidedButton_Click"
                                   Style="{DynamicResource SecondaryButton}"
                                   Visibility="{Binding HasSteps, Converter={StaticResource BoolVis}}"
-                                  Margin="0,0,8,8"/>
+                                  Margin="0,0,8,8"
+                                  automation:AutomationProperties.AutomationId="Card_Fix_StartGuidedRepair"/>
                           <Button Content="Run" Tag="{Binding}" Click="FixButton_Click"
                                   Style="{DynamicResource PrimaryButton}"
                                   Visibility="{Binding HasScript, Converter={StaticResource BoolVis}}"
-                                  Margin="0,0,0,8"/>
+                                  Margin="0,0,0,8"
+                                  automation:AutomationProperties.AutomationId="Card_Fix_Run"/>
                           <Button Content="Details" Tag="{Binding}" Click="FixDetailsButton_Click"
-                                  automation:AutomationProperties.AutomationId="SymptomResultDetailsButton"
+                                  automation:AutomationProperties.AutomationId="Card_Fix_Details"
                                   Style="{DynamicResource SecondaryButton}"
                                   Margin="0,0,0,8"/>
                         </WrapPanel>

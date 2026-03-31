@@ -153,6 +153,12 @@ public sealed class AutomationCoordinatorService : IAutomationCoordinatorService
             reasons.Add($"{rule.Title} is paused until {rule.PausedUntilUtc.Value.ToLocalTime():g}.");
         }
 
+        if (rule.SkipNextRun && !rule.IsWatcher)
+        {
+            skipped = true;
+            reasons.Add("Skipped because you asked FixFox to skip the next scheduled run once.");
+        }
+
         if (rule.SkipDuringQuietHours
             && TimeSpan.TryParse(settings.AutomationQuietHoursStart, out var quietStart)
             && TimeSpan.TryParse(settings.AutomationQuietHoursEnd, out var quietEnd)
@@ -217,6 +223,9 @@ public sealed class AutomationCoordinatorService : IAutomationCoordinatorService
 
         return rule.ScheduleKind switch
         {
+            AutomationScheduleKind.EveryXDays => NextEveryXDays(rule, now),
+            AutomationScheduleKind.WeekdaysOnly => NextWeekday(rule, now),
+            AutomationScheduleKind.StartupDelay => now.AddMinutes(Math.Max(1, rule.StartupDelayMinutes)),
             AutomationScheduleKind.Daily => NextDaily(rule, now),
             AutomationScheduleKind.Weekly => NextWeekly(rule, now),
             AutomationScheduleKind.Startup => now.AddMinutes(Math.Max(1, rule.StartupDelayMinutes)),
@@ -282,6 +291,12 @@ public sealed class AutomationCoordinatorService : IAutomationCoordinatorService
 
         if (!manualOverride && !evaluation.CanRun)
         {
+            if (rule.SkipNextRun)
+            {
+                rule.SkipNextRun = false;
+                _settingsService.Save(settings);
+            }
+
             var skipped = new AutomationRunReceipt
             {
                 RuleId = rule.Id,
@@ -340,7 +355,13 @@ public sealed class AutomationCoordinatorService : IAutomationCoordinatorService
         IsWatcher = defaults.IsWatcher,
         SupportsScheduling = defaults.SupportsScheduling,
         SupportsScanOnly = defaults.SupportsScanOnly,
-        ScheduleKind = saved.ScheduleKind,
+        ScheduleKind = saved.ScheduleKind switch
+        {
+            AutomationScheduleKind.Daily => AutomationScheduleKind.EveryXDays,
+            AutomationScheduleKind.Startup => AutomationScheduleKind.StartupDelay,
+            _ => saved.ScheduleKind
+        },
+        IntervalDays = saved.IntervalDays <= 0 ? defaults.IntervalDays : saved.IntervalDays,
         ScheduleDay = string.IsNullOrWhiteSpace(saved.ScheduleDay) ? defaults.ScheduleDay : saved.ScheduleDay,
         ScheduleTime = string.IsNullOrWhiteSpace(saved.ScheduleTime) ? defaults.ScheduleTime : saved.ScheduleTime,
         RunOnlyWhenIdle = saved.RunOnlyWhenIdle,
@@ -355,6 +376,9 @@ public sealed class AutomationCoordinatorService : IAutomationCoordinatorService
         StartupDelayMinutes = saved.StartupDelayMinutes <= 0 ? defaults.StartupDelayMinutes : saved.StartupDelayMinutes,
         ScanOnly = saved.ScanOnly,
         PausedUntilUtc = saved.PausedUntilUtc,
+        SkipNextRun = saved.SkipNextRun,
+        IsPinnedToTray = saved.IsPinnedToTray,
+        LastPinnedAtUtc = saved.LastPinnedAtUtc,
         IncludedTasks = defaults.IncludedTasks,
         PrimaryAction = defaults.PrimaryAction,
         SecondaryAction = defaults.SecondaryAction
@@ -368,12 +392,12 @@ public sealed class AutomationCoordinatorService : IAutomationCoordinatorService
 
         return
         [
-            Rule("quick-health-check", "Scheduled Quick Health Check", "Run a low-noise health scan and only surface meaningful issues.", AutomationRuleKind.QuickHealthCheck, isPowerUser || isWorkLaptop ? AutomationScheduleKind.Daily : isQuiet ? AutomationScheduleKind.Disabled : AutomationScheduleKind.Weekly, !isQuiet, "Monday", isWorkLaptop ? "08:15" : "09:00", false, isWorkLaptop, true, true, Action("Run Quick Scan", "Run the health scan now.", SupportActionKind.None, ""), Action("Open Home", "Review findings on Home.", SupportActionKind.Uri, "fixfox://page/home"), ["Run quick scan", "Check if issues need attention", "Keep quiet if nothing changed"]),
+            Rule("quick-health-check", "Scheduled Quick Health Check", "Run a low-noise health scan and only surface meaningful issues.", AutomationRuleKind.QuickHealthCheck, isPowerUser || isWorkLaptop ? AutomationScheduleKind.EveryXDays : isQuiet ? AutomationScheduleKind.Disabled : AutomationScheduleKind.Weekly, !isQuiet, "Monday", isWorkLaptop ? "08:15" : "09:00", false, isWorkLaptop, true, true, Action("Run Quick Scan", "Run the health scan now.", SupportActionKind.None, ""), Action("Open Home", "Review findings on Home.", SupportActionKind.Uri, "fixfox://page/home"), ["Run quick scan", "Check if issues need attention", "Keep quiet if nothing changed"], intervalDays: isPowerUser || isWorkLaptop ? 1 : 7),
             Rule("safe-maintenance", "Scheduled Safe Maintenance", "Run the conservative cleanup workflow with receipts and verification.", AutomationRuleKind.SafeMaintenance, isQuiet ? AutomationScheduleKind.Disabled : AutomationScheduleKind.Weekly, !isQuiet, "Sunday", isWorkLaptop ? "18:30" : "10:00", true, true, true, false, Action("Run Safe Maintenance", "Run the maintenance workflow now.", SupportActionKind.Runbook, "safe-maintenance-runbook"), Action("Open Automation", "Review the workflow and history.", SupportActionKind.Uri, "fixfox://page/automation"), ["Clear temp files", "Empty Recycle Bin", "Check Defender", "Check firewall", "Verify cleanup state"]),
-            Rule("startup-quick-check", "Startup Quick Check", "Take a lightweight health snapshot shortly after sign-in so FixFox can surface real issues without dragging startup.", AutomationRuleKind.StartupQuickCheck, isQuiet ? AutomationScheduleKind.Disabled : AutomationScheduleKind.Startup, !isQuiet, "Sunday", "09:00", false, false, true, true, Action("Run Startup Check", "Run the startup check now.", SupportActionKind.None, ""), Action("Open Home", "Review startup findings on Home.", SupportActionKind.Uri, "fixfox://page/home"), ["Delay until startup settles", "Run quick scan", "Surface only meaningful issues"], startupDelayMinutes: isPowerUser ? 2 : 3),
+            Rule("startup-quick-check", "Startup Quick Check", "Take a lightweight health snapshot shortly after sign-in so FixFox can surface real issues without dragging startup.", AutomationRuleKind.StartupQuickCheck, isQuiet ? AutomationScheduleKind.Disabled : AutomationScheduleKind.StartupDelay, !isQuiet, "Sunday", "09:00", false, false, true, true, Action("Run Startup Check", "Run the startup check now.", SupportActionKind.None, ""), Action("Open Home", "Review startup findings on Home.", SupportActionKind.Uri, "fixfox://page/home"), ["Delay until startup settles", "Run quick scan", "Surface only meaningful issues"], startupDelayMinutes: isPowerUser ? 2 : 3),
             Rule("browser-cleanup-automation", "Browser Cleanup", "Clear stale browser state when web apps are the problem without broad network resets.", AutomationRuleKind.BrowserCleanup, AutomationScheduleKind.Manual, !isQuiet, "Wednesday", "18:00", false, false, true, false, Action("Run Browser Rescue", "Start the browser cleanup workflow.", SupportActionKind.Runbook, "browser-problem-runbook"), Action("Open Browser Center", "Review browser support paths.", SupportActionKind.Uri, "fixfox://page/device-health"), ["Confirm browser-only scope", "Clear browser caches", "Flush DNS", "Verify browsing"]),
             Rule("work-from-home-readiness", "Work-From-Home Readiness", "Check the basics that usually block remote work before the morning gets noisy.", AutomationRuleKind.WorkFromHomeReadiness, isWorkLaptop ? AutomationScheduleKind.Weekly : AutomationScheduleKind.Manual, isWorkLaptop || isPowerUser, "Monday", "08:00", false, isWorkLaptop, false, false, Action("Run Work-From-Home Rescue", "Start the remote-work workflow.", SupportActionKind.Runbook, "work-from-home-runbook"), Action("Open Network Center", "Jump to the remote-work support center.", SupportActionKind.Uri, "fixfox://page/device-health"), ["Validate internet", "Check VPN path", "Review internal resource access", "Verify remote-work basics"]),
-            Rule("meeting-readiness", "Meeting Readiness Check", "Confirm microphone, camera, and speaker paths before you need them.", AutomationRuleKind.MeetingReadiness, AutomationScheduleKind.Manual, !isQuiet, "Friday", "08:30", false, false, false, false, Action("Run Meeting Readiness", "Start the meeting-device workflow.", SupportActionKind.Runbook, "meeting-device-runbook"), Action("Open Devices Center", "Review meeting-device paths.", SupportActionKind.Uri, "fixfox://page/device-health"), ["Check microphone access", "Check camera access", "Confirm device visibility", "Verify meeting devices"]),
+            Rule("meeting-readiness", "Meeting Readiness Check", "Confirm microphone, camera, and speaker paths before you need them.", AutomationRuleKind.MeetingReadiness, isWorkLaptop ? AutomationScheduleKind.WeekdaysOnly : AutomationScheduleKind.Manual, !isQuiet, "Friday", "08:30", false, false, false, false, Action("Run Meeting Readiness", "Start the meeting-device workflow.", SupportActionKind.Runbook, "meeting-device-runbook"), Action("Open Devices Center", "Review meeting-device paths.", SupportActionKind.Uri, "fixfox://page/device-health"), ["Check microphone access", "Check camera access", "Confirm device visibility", "Verify meeting devices"]),
             Watcher("low-disk-watcher", "Low Disk Watcher", "Watch for storage pressure and route straight into cleanup when it matters.", AutomationRuleKind.LowDiskWatcher, !isQuiet, Action("Open Storage Center", "Review cleanup paths.", SupportActionKind.Uri, "fixfox://page/device-health"), Action("Run Cleanup Now", "Run the disk-full rescue workflow.", SupportActionKind.Runbook, "disk-full-rescue-runbook")),
             Watcher("pending-reboot-watcher", "Pending Reboot Watcher", "Watch for reboot-needed states that keep repairs from finishing cleanly.", AutomationRuleKind.PendingRebootWatcher, true, Action("Open Windows Repair", "Review reboot and update repair paths.", SupportActionKind.Uri, "fixfox://page/device-health"), Action("Open Recovery Options", "Jump into Windows recovery.", SupportActionKind.Toolbox, "Recovery Options")),
             Watcher("defender-firewall-watcher", "Defender / Firewall Watcher", "Watch for security basics that need attention before deeper cleanup or repair.", AutomationRuleKind.DefenderFirewallWatcher, !isQuiet, Action("Check Security", "Route into the security path.", SupportActionKind.Fix, "check-defender-status"), Action("Open Device Health", "Review the security summary.", SupportActionKind.Uri, "fixfox://page/device-health")),
@@ -401,7 +425,8 @@ public sealed class AutomationCoordinatorService : IAutomationCoordinatorService
         SupportAction primaryAction,
         SupportAction secondaryAction,
         List<string> includedTasks,
-        int startupDelayMinutes = 3) => new()
+        int startupDelayMinutes = 3,
+        int intervalDays = 1) => new()
     {
         Id = id,
         Title = title,
@@ -412,6 +437,7 @@ public sealed class AutomationCoordinatorService : IAutomationCoordinatorService
         SupportsScheduling = true,
         SupportsScanOnly = supportsScanOnly,
         ScheduleKind = scheduleKind,
+        IntervalDays = intervalDays,
         ScheduleDay = scheduleDay,
         ScheduleTime = scheduleTime,
         RunOnlyWhenIdle = runOnlyWhenIdle,
@@ -476,6 +502,23 @@ public sealed class AutomationCoordinatorService : IAutomationCoordinatorService
 
         var next = now.Date.Add(time);
         return next <= now ? next.AddDays(1) : next;
+    }
+
+    private static DateTime? NextEveryXDays(AutomationRuleSettings rule, DateTime now)
+    {
+        var next = NextDaily(rule, now) ?? now.AddDays(Math.Max(1, rule.IntervalDays));
+        var interval = Math.Max(1, rule.IntervalDays);
+        while (next <= now)
+            next = next.AddDays(interval);
+        return next;
+    }
+
+    private static DateTime? NextWeekday(AutomationRuleSettings rule, DateTime now)
+    {
+        var next = NextDaily(rule, now) ?? now.AddDays(1);
+        while (next.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+            next = next.AddDays(1);
+        return next;
     }
 
     private static DateTime? NextWeekly(AutomationRuleSettings rule, DateTime now)

@@ -5,9 +5,9 @@ namespace HelpDesk.Infrastructure.Fixes;
 
 public sealed partial class FixCatalogService
 {
-    // ══════════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  WINDOWS TWEAKS & CUSTOMIZATION
-    // ══════════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     private static FixCategory WindowsTweaksAndCustomization() => new()
     {
         Id="windows-tweaks", Icon="\uE70F", Title="Windows Tweaks",
@@ -38,7 +38,7 @@ public sealed partial class FixCatalogService
                     $adPath = "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\AdvertisingInfo"
                     if (!(Test-Path $adPath)) { New-Item -Path $adPath -Force | Out-Null }
                     Set-ItemProperty -Path $adPath -Name Enabled -Value 0 -Type DWord
-                    Write-Output "✓ Windows ads, tips, and lock screen suggestions disabled."
+                    Write-Output "âœ“ Windows ads, tips, and lock screen suggestions disabled."
                     """ },
 
             new() { Id="disable-advertising-id", Title="Disable advertising tracking ID",
@@ -49,7 +49,7 @@ public sealed partial class FixCatalogService
                     $path = "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\AdvertisingInfo"
                     if (!(Test-Path $path)) { New-Item -Path $path -Force | Out-Null }
                     Set-ItemProperty -Path $path -Name Enabled -Value 0 -Type DWord
-                    Write-Output "✓ Advertising ID disabled."
+                    Write-Output "âœ“ Advertising ID disabled."
                     """ },
 
             new() { Id="fix-right-click-menu", Title="Restore classic right-click menu (Win 11)",
@@ -65,7 +65,7 @@ public sealed partial class FixCatalogService
                     Stop-Process -Name explorer -Force -EA SilentlyContinue
                     Start-Sleep 1
                     Start-Process explorer
-                    Write-Output "✓ Classic right-click menu restored. To undo, delete the registry key and restart Explorer."
+                    Write-Output "âœ“ Classic right-click menu restored. To undo, delete the registry key and restart Explorer."
                     """ },
 
             new() { Id="fix-taskbar-restart", Title="Restart Windows Explorer (fix taskbar)",
@@ -77,7 +77,7 @@ public sealed partial class FixCatalogService
                     Stop-Process -Name explorer -Force -EA SilentlyContinue
                     Start-Sleep 2
                     Start-Process explorer
-                    Write-Output "✓ Explorer restarted. Taskbar and Start menu should be responsive."
+                    Write-Output "âœ“ Explorer restarted. Taskbar and Start menu should be responsive."
                     """ },
 
             new() { Id="empty-recycle-bin", Title="Empty Recycle Bin (all drives)",
@@ -87,7 +87,7 @@ public sealed partial class FixCatalogService
                 Script="""
                     $before = (Get-ChildItem -Path "C:\`$Recycle.Bin" -Recurse -Force -EA SilentlyContinue | Measure-Object -Property Length -Sum -EA SilentlyContinue).Sum
                     Clear-RecycleBin -Force -EA SilentlyContinue
-                    Write-Output "✓ Recycle Bin emptied ($([math]::Round($before/1MB,1)) MB freed)."
+                    Write-Output "âœ“ Recycle Bin emptied ($([math]::Round($before/1MB,1)) MB freed)."
                     """ },
 
             new() { Id="fix-windows-hello-signin", Title="Fix Windows Hello PIN / fingerprint",
@@ -95,19 +95,19 @@ public sealed partial class FixCatalogService
                 Type=FixType.Guided, Keywords=["windows hello","pin not working","fingerprint not working","face recognition broken","sign in broken"],
                 Steps=[
                     new() { Title="Open Sign-in options",  Instruction="Settings will open on Sign-in options.", Script="Start-Process ms-settings:signinoptions" },
-                    new() { Title="Remove PIN",             Instruction="Click 'Windows Hello PIN' → 'Remove' → confirm removal." },
-                    new() { Title="Re-add PIN",             Instruction="Click 'Windows Hello PIN' → 'Set up' → follow the wizard to create a new PIN." }
+                    new() { Title="Remove PIN",             Instruction="Click 'Windows Hello PIN' â†’ 'Remove' â†’ confirm removal." },
+                    new() { Title="Re-add PIN",             Instruction="Click 'Windows Hello PIN' â†’ 'Set up' â†’ follow the wizard to create a new PIN." }
                 ]},
 
             new() { Id="disable-fast-startup", Title="Disable Fast Startup",
-                Description="Disables Fast Startup — fixes issues where PC doesn't properly shut down or USB devices lose settings.",
+                Description="Disables Fast Startup â€” fixes issues where PC doesn't properly shut down or USB devices lose settings.",
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["fast startup","shutdown issues","pc not fully shutting down","usb reset on boot","hibernate boot"],
                 Script="""
                     powercfg /hibernate off 2>&1 | Out-Null
                     $path = "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Power"
                     Set-ItemProperty -Path $path -Name HiberbootEnabled -Value 0 -Type DWord -EA SilentlyContinue
-                    Write-Output "✓ Fast Startup disabled. PC will now perform a full shutdown."
+                    Write-Output "âœ“ Fast Startup disabled. PC will now perform a full shutdown."
                     """ },
 
             new() { Id="fix-explorer-settings", Title="Fix Explorer folder view settings",
@@ -124,25 +124,25 @@ public sealed partial class FixCatalogService
                     Stop-Process -Name explorer -Force -EA SilentlyContinue
                     Start-Sleep 1
                     Start-Process explorer
-                    Write-Output "✓ Explorer now shows: file extensions, hidden files, system files."
+                    Write-Output "âœ“ Explorer now shows: file extensions, hidden files, system files."
                     """ },
 
             new() { Id="fix-dpi-scaling", Title="Fix DPI scaling for specific app",
                 Description="Walks through overriding DPI scaling for a specific blurry application.",
                 Type=FixType.Guided, Keywords=["blurry app","app looks blurry","dpi scaling","high dpi issue","program blurry on 4k"],
                 Steps=[
-                    new() { Title="Find the executable",  Instruction="Right-click the blurry app's shortcut → 'Open file location' to find its .exe file." },
-                    new() { Title="Open Properties",       Instruction="Right-click the .exe file → Properties → Compatibility tab." },
-                    new() { Title="Override DPI",          Instruction="Click 'Change high DPI settings' → check 'Override high DPI scaling behavior' → set dropdown to 'Application' → OK." }
+                    new() { Title="Find the executable",  Instruction="Right-click the blurry app's shortcut â†’ 'Open file location' to find its .exe file." },
+                    new() { Title="Open Properties",       Instruction="Right-click the .exe file â†’ Properties â†’ Compatibility tab." },
+                    new() { Title="Override DPI",          Instruction="Click 'Change high DPI settings' â†’ check 'Override high DPI scaling behavior' â†’ set dropdown to 'Application' â†’ OK." }
                 ]},
 
             new() { Id="fix-screen-tearing", Title="Fix screen tearing",
                 Description="Configures VSync and NVIDIA/AMD settings to eliminate screen tearing.",
                 Type=FixType.Guided, Keywords=["screen tearing","tearing display","fps tearing","game tearing","monitor tearing"],
                 Steps=[
-                    new() { Title="Enable VSync globally",  Instruction="For NVIDIA: open NVIDIA Control Panel → Manage 3D settings → Vertical sync → Force on.\nFor AMD: open Radeon Software → Gaming → Global Settings → Wait for Vertical Refresh → Always on." },
-                    new() { Title="Or enable FreeSync/GSync", Instruction="If your monitor supports it: Settings → Display → Advanced display → Toggle on G-Sync or FreeSync." },
-                    new() { Title="Check refresh rate",     Instruction="Settings → System → Display → Advanced display settings → make sure refresh rate is at maximum for your monitor." }
+                    new() { Title="Enable VSync globally",  Instruction="For NVIDIA: open NVIDIA Control Panel â†’ Manage 3D settings â†’ Vertical sync â†’ Force on.\nFor AMD: open Radeon Software â†’ Gaming â†’ Global Settings â†’ Wait for Vertical Refresh â†’ Always on." },
+                    new() { Title="Or enable FreeSync/GSync", Instruction="If your monitor supports it: Settings â†’ Display â†’ Advanced display â†’ Toggle on G-Sync or FreeSync." },
+                    new() { Title="Check refresh rate",     Instruction="Settings â†’ System â†’ Display â†’ Advanced display settings â†’ make sure refresh rate is at maximum for your monitor." }
                 ]},
 
             new() { Id="fix-packet-loss", Title="Diagnose and fix packet loss",
@@ -161,11 +161,11 @@ public sealed partial class FixCatalogService
                     Write-Output "Avg latency: ${avg}ms   Max: ${max}ms"
                     if ($loss -gt 5) {
                         Write-Output ""
-                        Write-Output "✗ Significant packet loss detected ($loss%)."
+                        Write-Output "âœ— Significant packet loss detected ($loss%)."
                         Write-Output "  Try: run 'Full network stack reset', disable USB selective suspend,"
                         Write-Output "       or connect via ethernet instead of Wi-Fi."
                     } else {
-                        Write-Output "✓ Packet loss is acceptable."
+                        Write-Output "âœ“ Packet loss is acceptable."
                     }
                     """ },
 
@@ -187,15 +187,15 @@ public sealed partial class FixCatalogService
                             }
                         }
                     }
-                    Write-Output "✓ Wake-on-LAN enabled. Also enable WoL in your BIOS/UEFI settings."
+                    Write-Output "âœ“ Wake-on-LAN enabled. Also enable WoL in your BIOS/UEFI settings."
                     """ },
 
             new() { Id="fix-ethernet-autoneg", Title="Fix Ethernet auto-negotiation issues",
-                Description="Forces Ethernet to 1Gbps full-duplex — fixes slow speeds and half-duplex fallback.",
+                Description="Forces Ethernet to 1Gbps full-duplex â€” fixes slow speeds and half-duplex fallback.",
                 Type=FixType.Guided, Keywords=["ethernet slow","ethernet not 1gbps","ethernet speed issue","gigabit not working","1000mbps not connecting"],
                 Steps=[
                     new() { Title="Open adapter settings",  Instruction="Device Manager will open.", Script="devmgmt.msc" },
-                    new() { Title="Open Properties",         Instruction="Expand 'Network adapters', right-click your Ethernet adapter → Properties → Advanced tab." },
+                    new() { Title="Open Properties",         Instruction="Expand 'Network adapters', right-click your Ethernet adapter â†’ Properties â†’ Advanced tab." },
                     new() { Title="Set speed",               Instruction="Find 'Speed & Duplex' in the property list. Change from 'Auto Negotiation' to '1.0 Gbps Full Duplex'. Click OK." }
                 ]},
 
@@ -211,20 +211,20 @@ public sealed partial class FixCatalogService
                     """ },
 
             new() { Id="dism-component-cleanup", Title="DISM component store cleanup",
-                Description="Cleans up superseded components from the Windows component store — frees several GBs.",
+                Description="Cleans up superseded components from the Windows component store â€” frees several GBs.",
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["dism cleanup","component store large","winsxs folder large","free up windows space","c drive space"],
                 Script="""
                     Write-Output "Analyzing component store..."
                     DISM /Online /Cleanup-Image /AnalyzeComponentStore
                     Write-Output ""
-                    Write-Output "Running cleanup (this may take 5–15 minutes)..."
+                    Write-Output "Running cleanup (this may take 5â€“15 minutes)..."
                     DISM /Online /Cleanup-Image /StartComponentCleanup /ResetBase
-                    Write-Output "✓ Component store cleaned. Restart recommended."
+                    Write-Output "âœ“ Component store cleaned. Restart recommended."
                     """ },
 
             new() { Id="fix-stuck-windows-update", Title="Fix a stuck Windows Update",
-                Description="Forces a stuck update to restart — stops the update services, renames the cache folder, and restarts.",
+                Description="Forces a stuck update to restart â€” stops the update services, renames the cache folder, and restarts.",
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["windows update stuck","update stuck 0%","windows update frozen","update not installing","update hanging"],
                 Script="""
@@ -241,7 +241,7 @@ public sealed partial class FixCatalogService
                     foreach ($s in @('cryptSvc','bits','wuauserv')) {
                         Start-Service $s -EA SilentlyContinue
                     }
-                    Write-Output "✓ Windows Update reset. Open Windows Update and check for updates again."
+                    Write-Output "âœ“ Windows Update reset. Open Windows Update and check for updates again."
                     """ },
 
             new() { Id="disable-game-bar-notifications", Title="Disable Game Bar notifications only",
@@ -253,7 +253,7 @@ public sealed partial class FixCatalogService
                     if (!(Test-Path $path)) { New-Item -Path $path -Force | Out-Null }
                     Set-ItemProperty -Path $path -Name ShowStartupPanel -Value 0 -Type DWord -EA SilentlyContinue
                     Set-ItemProperty -Path $path -Name UseNexusForGameBarEnabled -Value 0 -Type DWord -EA SilentlyContinue
-                    Write-Output "✓ Game Bar startup notification disabled."
+                    Write-Output "âœ“ Game Bar startup notification disabled."
                     Write-Output "  Game Mode and Game DVR are still active."
                     """ },
 
@@ -277,7 +277,7 @@ public sealed partial class FixCatalogService
                             Get-ChildItem $p -Recurse -Force -EA SilentlyContinue | Remove-Item -Force -Recurse -EA SilentlyContinue
                         }
                     }
-                    Write-Output "✓ Cleared $([math]::Round($freed/1MB,1)) MB of Edge cache. Restart Edge."
+                    Write-Output "âœ“ Cleared $([math]::Round($freed/1MB,1)) MB of Edge cache. Restart Edge."
                     """ },
 
             new() { Id="clear-browser-cache-all", Title="Clear all browser caches",
@@ -304,7 +304,7 @@ public sealed partial class FixCatalogService
                             }
                         }
                     }
-                    Write-Output "✓ Cleared $([math]::Round($freed/1MB,1)) MB of browser caches."
+                    Write-Output "âœ“ Cleared $([math]::Round($freed/1MB,1)) MB of browser caches."
                     """ },
 
             new() { Id="fix-slow-file-copy", Title="Fix slow file copy speed",
@@ -319,12 +319,12 @@ public sealed partial class FixCatalogService
                     foreach ($a in $adapters) {
                         Disable-NetAdapterLso -Name $a.Name -EA SilentlyContinue
                     }
-                    Write-Output "✓ RDC disabled, LSO disabled. File transfers should be faster."
+                    Write-Output "âœ“ RDC disabled, LSO disabled. File transfers should be faster."
                     Write-Output "  Also ensure your USB port is USB 3.0+ (blue port) for fast transfers."
                     """ },
 
             new() { Id="fix-dll-errors", Title="Fix missing DLL errors",
-                Description="Runs SFC and re-registers common system DLLs — fixes 'DLL not found' app errors.",
+                Description="Runs SFC and re-registers common system DLLs â€” fixes 'DLL not found' app errors.",
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["dll error","dll not found","missing dll","msvcrt dll","vcruntime dll","program won't start dll"],
                 Script="""
@@ -339,7 +339,7 @@ public sealed partial class FixCatalogService
                             regsvr32.exe /s $path 2>&1 | Out-Null
                         }
                     }
-                    Write-Output "✓ SFC scan and DLL re-registration complete."
+                    Write-Output "âœ“ SFC scan and DLL re-registration complete."
                     Write-Output "  If errors persist, try installing Visual C++ Redistributables from Microsoft."
                     """ },
 
@@ -354,17 +354,17 @@ public sealed partial class FixCatalogService
                     Write-Output "TRIM status: $trim"
                     if ($trim -match "= 1") {
                         fsutil behavior set DisableDeleteNotify 0
-                        Write-Output "✓ TRIM enabled."
+                        Write-Output "âœ“ TRIM enabled."
                     } else {
-                        Write-Output "✓ TRIM is already enabled."
+                        Write-Output "âœ“ TRIM is already enabled."
                     }
                     # Disable scheduled defrag for SSDs via Task Scheduler
                     Disable-ScheduledTask -TaskName "Microsoft\Windows\Defrag\ScheduledDefrag" -EA SilentlyContinue | Out-Null
-                    Write-Output "✓ Scheduled defragmentation disabled (not needed for SSDs)."
+                    Write-Output "âœ“ Scheduled defragmentation disabled (not needed for SSDs)."
                     # Run TRIM once
                     Write-Output "Running optimization (TRIM)..."
                     defrag C: /L /U 2>&1 | Out-Null
-                    Write-Output "✓ SSD optimization complete."
+                    Write-Output "âœ“ SSD optimization complete."
                     """ },
 
             new() { Id="fix-duplicate-drives", Title="Fix duplicate drive letters in Explorer",
@@ -377,17 +377,17 @@ public sealed partial class FixCatalogService
                     Write-Output ""
                     Write-Output "Current volumes:"
                     Get-Volume | Where-Object {$_.DriveLetter} | ForEach-Object {
-                        Write-Output "  $($_.DriveLetter): — $($_.FileSystemLabel) — $([math]::Round($_.Size/1GB,1)) GB — Type: $($_.DriveType)"
+                        Write-Output "  $($_.DriveLetter): â€” $($_.FileSystemLabel) â€” $([math]::Round($_.Size/1GB,1)) GB â€” Type: $($_.DriveType)"
                     }
                     Write-Output ""
-                    Write-Output "✓ Disk rescan complete. Restart Explorer if duplicates persist."
+                    Write-Output "âœ“ Disk rescan complete. Restart Explorer if duplicates persist."
                     Stop-Process -Name explorer -Force -EA SilentlyContinue
                     Start-Sleep 1
                     Start-Process explorer
                     """ },
 
             new() { Id="manage-startup-programs", Title="Audit startup programs",
-                Description="Lists all startup programs with their registry location — identify and disable slow boot culprits.",
+                Description="Lists all startup programs with their registry location â€” identify and disable slow boot culprits.",
                 Type=FixType.Silent, RequiresAdmin=false,
                 Keywords=["startup programs list","what starts on boot","slow startup","too many startup apps","boot audit"],
                 Script="""
@@ -425,7 +425,7 @@ public sealed partial class FixCatalogService
                     try {
                         Get-MpThreatDetection -EA SilentlyContinue | Sort-Object InitialDetectionTime -Descending | Select-Object -First 20 |
                         ForEach-Object {
-                            Write-Output "$($_.InitialDetectionTime.ToString('yyyy-MM-dd HH:mm'))  $($_.ThreatName)  — Action: $($_.ActionSuccess)"
+                            Write-Output "$($_.InitialDetectionTime.ToString('yyyy-MM-dd HH:mm'))  $($_.ThreatName)  â€” Action: $($_.ActionSuccess)"
                         }
                     } catch {
                         Write-Output "Could not retrieve threat history. Run as administrator."
@@ -459,7 +459,7 @@ public sealed partial class FixCatalogService
                 Steps=[
                     new() { Title="Reset OneDrive",     Instruction="OneDrive will be reset (this doesn't delete your files).", Script="""& "$env:LOCALAPPDATA\Microsoft\OneDrive\onedrive.exe" /reset""" },
                     new() { Title="Wait 2 minutes",     Instruction="Wait for OneDrive to restart automatically. If it doesn't start, open it manually from the Start menu." },
-                    new() { Title="Check sync status",  Instruction="Click the OneDrive cloud icon in the taskbar. If files are still stuck, right-click → 'View sync issues' for details." }
+                    new() { Title="Check sync status",  Instruction="Click the OneDrive cloud icon in the taskbar. If files are still stuck, right-click â†’ 'View sync issues' for details." }
                 ]},
         ]
     };

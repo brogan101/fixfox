@@ -10,6 +10,117 @@
     <h:BoolToVisConverter x:Key="BoolVis"/>
     <h:NullToCollapsedConverter x:Key="NullCollapsed"/>
     <h:RelativeDateConverter x:Key="RelDate"/>
+
+    <DataTemplate x:Key="ToolboxCardTemplate" DataType="{x:Type m:ToolboxEntry}">
+      <Border Style="{DynamicResource InfoCard}"
+              Width="300"
+              Margin="0,0,12,12"
+              Tag="{Binding}"
+              MouseLeftButtonDown="ToolCard_MouseLeftButtonDown">
+        <Border.ContextMenu>
+          <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}"
+                       automation:AutomationProperties.AutomationId="ContextMenu_Tool">
+            <MenuItem Header="Open"
+                      Click="OpenToolMenu_Click"
+                      CommandParameter="{Binding}"
+                      automation:AutomationProperties.AutomationId="Card_Tool_Open"/>
+            <MenuItem Header="Copy Launch Target"
+                      Click="CopyToolTarget_Click"
+                      CommandParameter="{Binding}"
+                      automation:AutomationProperties.AutomationId="Card_Tool_CopyTarget"/>
+            <MenuItem Click="TogglePinMenu_Click"
+                      CommandParameter="{Binding}"
+                      automation:AutomationProperties.AutomationId="Card_Tool_TogglePin">
+              <MenuItem.Style>
+                <Style TargetType="MenuItem">
+                  <Setter Property="Header" Value="Pin"/>
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsPinned}" Value="True">
+                      <Setter Property="Header" Value="Unpin"/>
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </MenuItem.Style>
+            </MenuItem>
+          </ContextMenu>
+        </Border.ContextMenu>
+        <DockPanel>
+          <WrapPanel DockPanel.Dock="Bottom" Margin="0,14,0,0">
+            <Button Content="Open"
+                    Tag="{Binding}"
+                    Click="OpenTool_Click"
+                    Style="{DynamicResource SecondaryButton}"
+                    Margin="0,0,8,8"
+                    automation:AutomationProperties.AutomationId="Card_Tool_Open"/>
+            <Button Content="Copy Target"
+                    Tag="{Binding}"
+                    Click="CopyToolTargetButton_Click"
+                    Style="{DynamicResource SecondaryButton}"
+                    Margin="0,0,8,8"
+                    automation:AutomationProperties.AutomationId="Card_Tool_CopyTarget"/>
+            <Button Tag="{Binding}"
+                    Click="TogglePinButton_Click"
+                    Style="{DynamicResource SecondaryButton}"
+                    Margin="0,0,0,8"
+                    automation:AutomationProperties.AutomationId="{Binding ToolKey, StringFormat=Toolbox_Tool_{0}_Pin}">
+              <StackPanel Orientation="Horizontal">
+                <TextBlock FontFamily="{DynamicResource IconFont}" Margin="0,0,6,0">
+                  <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                      <Setter Property="Text" Value="&#xE718;"/>
+                      <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsPinned}" Value="True">
+                          <Setter Property="Text" Value="&#xE77A;"/>
+                        </DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </TextBlock.Style>
+                </TextBlock>
+                <TextBlock>
+                  <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                      <Setter Property="Text" Value="Pin"/>
+                      <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsPinned}" Value="True">
+                          <Setter Property="Text" Value="Unpin"/>
+                        </DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </TextBlock.Style>
+                </TextBlock>
+              </StackPanel>
+            </Button>
+          </WrapPanel>
+
+          <StackPanel>
+            <WrapPanel>
+              <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13"/>
+              <Border Style="{DynamicResource CompactStatusBadge}"
+                      Margin="8,0,0,0"
+                      VerticalAlignment="Center"
+                      Visibility="{Binding HasStatusIndicator, Converter={StaticResource BoolVis}}">
+                <StackPanel Orientation="Horizontal">
+                  <Ellipse Style="{DynamicResource CompactStatusDot}" VerticalAlignment="Center"/>
+                  <TextBlock Text="{Binding StatusSummary}" Style="{DynamicResource CompactStatusText}" Margin="6,0,0,0"/>
+                </StackPanel>
+              </Border>
+            </WrapPanel>
+            <TextBlock Text="{Binding Description}" Style="{DynamicResource CardSub}" Margin="0,6,0,0" TextWrapping="Wrap"/>
+            <TextBlock Text="{Binding SupportNote}" Style="{DynamicResource MetaText}" Margin="0,6,0,0"
+                       Visibility="{Binding SupportNote, Converter={StaticResource NullCollapsed}}"
+                       TextWrapping="Wrap"/>
+            <TextBlock Text="{Binding LaunchSummary}" Style="{DynamicResource MetaText}" Margin="0,8,0,0"
+                       Visibility="{Binding LaunchSummary, Converter={StaticResource NullCollapsed}}"
+                       TextWrapping="Wrap"/>
+            <TextBlock Text="{Binding LastLaunchedAt, Converter={StaticResource RelDate}}" Style="{DynamicResource MetaText}" Margin="0,4,0,0"
+                       Visibility="{Binding LastLaunchedAt, Converter={StaticResource NullCollapsed}}"/>
+            <ProgressBar Style="{DynamicResource IndeterminateBar}"
+                         Margin="0,8,0,0"
+                         Visibility="{Binding IsRunning, Converter={StaticResource BoolVis}}"/>
+          </StackPanel>
+        </DockPanel>
+      </Border>
+    </DataTemplate>
   </Page.Resources>
 
   <ScrollViewer>
@@ -20,83 +131,98 @@
       </Grid.RowDefinitions>
 
       <StackPanel Grid.Row="0" Margin="0,0,0,20">
-        <TextBlock Text="Windows Tools" Style="{DynamicResource PageTitle}"
+        <TextBlock Text="Windows Tools"
+                   Style="{DynamicResource PageTitle}"
                    automation:AutomationProperties.AutomationId="ToolboxPageMarker"/>
         <TextBlock Text="Open the native utilities and settings pages most support sessions actually need, without hunting through Windows."
                    Style="{DynamicResource PageSubtitle}"/>
       </StackPanel>
 
-      <ItemsControl Grid.Row="1" ItemsSource="{Binding ToolboxGroups}">
-        <ItemsControl.ItemTemplate>
-          <DataTemplate DataType="{x:Type m:ToolboxGroup}">
-            <StackPanel Margin="0,0,0,20">
-              <TextBlock Text="{Binding Title}" Style="{DynamicResource PanelTitle}"/>
-              <TextBlock Text="{Binding Description}" Style="{DynamicResource CardSub}" Margin="0,4,0,12"/>
-              <ItemsControl ItemsSource="{Binding Entries}">
-                <ItemsControl.ItemsPanel>
-                  <ItemsPanelTemplate>
-                    <WrapPanel/>
-                  </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate DataType="{x:Type m:ToolboxEntry}">
-                    <Border Style="{DynamicResource InfoCard}" Width="300" Margin="0,0,12,12"
-                            Tag="{Binding}"
-                            MouseLeftButtonDown="ToolCard_MouseLeftButtonDown">
-                      <Border.ContextMenu>
-                        <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
-                          <MenuItem Header="Open" Click="OpenToolMenu_Click" CommandParameter="{Binding}"/>
-                          <MenuItem Header="Copy Launch Target" Click="CopyToolTarget_Click" CommandParameter="{Binding}"/>
-                        </ContextMenu>
-                      </Border.ContextMenu>
-                      <DockPanel>
-                        <WrapPanel DockPanel.Dock="Bottom" Margin="0,14,0,0">
-                          <Button Content="Open"
-                                  Tag="{Binding}"
-                                  Click="OpenTool_Click"
-                                  Style="{DynamicResource SecondaryButton}"
-                                  Margin="0,0,8,8"/>
-                          <Button Content="Copy Target"
-                                  Tag="{Binding}"
-                                  Click="CopyToolTargetButton_Click"
-                                  Style="{DynamicResource SecondaryButton}"
-                                  Margin="0,0,0,8"/>
-                        </WrapPanel>
-                        <StackPanel>
-                          <WrapPanel>
-                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13"/>
-                            <Border Style="{DynamicResource CompactStatusBadge}"
-                                    Margin="8,0,0,0"
-                                    VerticalAlignment="Center"
-                                    Visibility="{Binding HasStatusIndicator, Converter={StaticResource BoolVis}}">
-                              <StackPanel Orientation="Horizontal">
-                                <Ellipse Style="{DynamicResource CompactStatusDot}" VerticalAlignment="Center"/>
-                                <TextBlock Text="{Binding StatusSummary}" Style="{DynamicResource CompactStatusText}" Margin="6,0,0,0"/>
-                              </StackPanel>
-                            </Border>
-                          </WrapPanel>
-                          <TextBlock Text="{Binding Description}" Style="{DynamicResource CardSub}" Margin="0,6,0,0" TextWrapping="Wrap"/>
-                          <TextBlock Text="{Binding SupportNote}" Style="{DynamicResource MetaText}" Margin="0,6,0,0"
-                                     Visibility="{Binding SupportNote, Converter={StaticResource NullCollapsed}}"
-                                     TextWrapping="Wrap"/>
-                          <TextBlock Text="{Binding LaunchSummary}" Style="{DynamicResource MetaText}" Margin="0,8,0,0"
-                                     Visibility="{Binding LaunchSummary, Converter={StaticResource NullCollapsed}}"
-                                     TextWrapping="Wrap"/>
-                          <TextBlock Text="{Binding LastLaunchedAt, Converter={StaticResource RelDate}}" Style="{DynamicResource MetaText}" Margin="0,4,0,0"
-                                     Visibility="{Binding LastLaunchedAt, Converter={StaticResource NullCollapsed}}"/>
-                          <ProgressBar Style="{DynamicResource IndeterminateBar}"
-                                       Margin="0,8,0,0"
-                                       Visibility="{Binding IsRunning, Converter={StaticResource BoolVis}}"/>
-                        </StackPanel>
-                      </DockPanel>
-                    </Border>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-            </StackPanel>
-          </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
+      <StackPanel Grid.Row="1">
+        <Border Style="{DynamicResource InfoCard}"
+                Margin="0,0,0,20"
+                Visibility="{Binding HasFavoriteToolboxEntries, Converter={StaticResource BoolVis}}"
+                automation:AutomationProperties.AutomationId="Toolbox_Favorites_Section">
+          <StackPanel>
+            <TextBlock Text="Favorites" Style="{DynamicResource PanelTitle}"/>
+            <TextBlock Text="Pin the Windows tools you reach for most so they stay at the top."
+                       Style="{DynamicResource CardSub}" Margin="0,4,0,12"/>
+            <ItemsControl ItemsSource="{Binding FavoriteToolboxEntries}" ItemTemplate="{StaticResource ToolboxCardTemplate}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <WrapPanel/>
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+
+        <Border Style="{DynamicResource InfoCard}"
+                Margin="0,0,0,20"
+                Visibility="{Binding HasRecentToolboxEntries, Converter={StaticResource BoolVis}}"
+                automation:AutomationProperties.AutomationId="Toolbox_RecentTools_Section">
+          <StackPanel>
+            <TextBlock Text="Recently Used" Style="{DynamicResource PanelTitle}"/>
+            <TextBlock Text="The last five tools opened in this session stay here for quick repeat access."
+                       Style="{DynamicResource CardSub}" Margin="0,4,0,12"/>
+            <ItemsControl ItemsSource="{Binding RecentToolboxEntries}" AlternationCount="16">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="{x:Type m:ToolboxEntry}">
+                  <Border Style="{DynamicResource FixCard}"
+                          Padding="12,10"
+                          Margin="0,0,0,8"
+                          Tag="{Binding}"
+                          MouseLeftButtonDown="ToolCard_MouseLeftButtonDown"
+                          automation:AutomationProperties.AutomationId="{Binding RelativeSource={RelativeSource AncestorType=ContentPresenter}, Path=(ItemsControl.AlternationIndex), StringFormat=Toolbox_RecentTool_{0}}">
+                    <DockPanel>
+                      <Button DockPanel.Dock="Right"
+                              Content="Open"
+                              Tag="{Binding}"
+                              Click="OpenTool_Click"
+                              Style="{DynamicResource SecondaryButton}"
+                              Margin="12,0,0,0"
+                              automation:AutomationProperties.AutomationId="Card_Tool_Open"/>
+                      <StackPanel>
+                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13"/>
+                        <TextBlock Text="{Binding LastLaunchedAt, Converter={StaticResource RelDate}}"
+                                   Style="{DynamicResource CardSub}"
+                                   Margin="0,4,0,0"/>
+                      </StackPanel>
+                    </DockPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+
+        <Border Style="{DynamicResource InfoCard}"
+                Margin="0,0,0,20"
+                Visibility="{Binding HasToolboxPinWarning, Converter={StaticResource BoolVis}}">
+          <TextBlock Text="{Binding ToolboxPinWarningMessage}"
+                     Style="{DynamicResource CardSub}"
+                     Foreground="{DynamicResource AccentAmberBrush}"
+                     TextWrapping="Wrap"/>
+        </Border>
+
+        <ItemsControl ItemsSource="{Binding ToolboxGroups}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate DataType="{x:Type m:ToolboxGroup}">
+              <StackPanel Margin="0,0,0,20">
+                <TextBlock Text="{Binding Title}" Style="{DynamicResource PanelTitle}"/>
+                <TextBlock Text="{Binding Description}" Style="{DynamicResource CardSub}" Margin="0,4,0,12"/>
+                <ItemsControl ItemsSource="{Binding Entries}" ItemTemplate="{StaticResource ToolboxCardTemplate}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <WrapPanel/>
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                </ItemsControl>
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
     </Grid>
   </ScrollViewer>
 </Page>

@@ -1,0 +1,110 @@
+{
+  "RiskLevel_Safe": {
+    "technical": "Safe",
+    "simple": "Safe to run"
+  },
+  "RiskLevel_NeedsAdmin": {
+    "technical": "Needs Admin",
+    "simple": "Needs permission"
+  },
+  "RiskLevel_MayRestart": {
+    "technical": "May Restart",
+    "simple": "Will restart your PC"
+  },
+  "RiskLevel_Advanced": {
+    "technical": "Advanced",
+    "simple": "For experienced users"
+  },
+  "FixCenter_Title": {
+    "technical": "Repair Library",
+    "simple": "Fix My PC"
+  },
+  "FixCenter_SearchPlaceholder": {
+    "technical": "Search fixes...",
+    "simple": "Search for a problem..."
+  },
+  "FixCenter_Filter_Risk": {
+    "technical": "Risk level",
+    "simple": "How much it changes"
+  },
+  "FixCenter_Filter_Admin": {
+    "technical": "Requires admin",
+    "simple": "Needs permission"
+  },
+  "FixCenter_Filter_Guided": {
+    "technical": "Guided",
+    "simple": "Walk me through it"
+  },
+  "FixCenter_Filter_Scripted": {
+    "technical": "Scripted",
+    "simple": "Run it automatically"
+  },
+  "FixCenter_Filter_Recent": {
+    "technical": "Recently used",
+    "simple": "Used recently"
+  },
+  "Automation_Recurrence_EveryXDays": {
+    "technical": "Every X days",
+    "simple": "Every few days"
+  },
+  "Automation_Recurrence_WeekdaysOnly": {
+    "technical": "Weekdays only",
+    "simple": "Weekdays only"
+  },
+  "Automation_Recurrence_StartupDelay": {
+    "technical": "Startup + delay",
+    "simple": "After your PC starts"
+  },
+  "Automation_Recurrence_Weekly": {
+    "technical": "Weekly",
+    "simple": "Once a week"
+  },
+  "Automation_Recurrence_ManualOnly": {
+    "technical": "Manual only",
+    "simple": "Only when I ask"
+  },
+  "History_Header_Title": {
+    "technical": "Activity",
+    "simple": "What FixFox Did"
+  },
+  "History_Header_Date": {
+    "technical": "Run date",
+    "simple": "When it ran"
+  },
+  "History_Header_Outcome": {
+    "technical": "Outcome",
+    "simple": "Result"
+  },
+  "History_Header_Receipt": {
+    "technical": "Receipt",
+    "simple": "Record"
+  },
+  "Settings_SimpleView": {
+    "technical": "Simplified Mode",
+    "simple": "Simple view"
+  },
+  "Settings_SupportPackage": {
+    "technical": "Support Package",
+    "simple": "Help file"
+  },
+  "Settings_AdvancedMode": {
+    "technical": "Advanced Mode",
+    "simple": "Show expert tools"
+  },
+  "Nav_Dashboard": {
+    "technical": "Home",
+    "simple": "Dashboard"
+  },
+  "Nav_Fixes": {
+    "technical": "Repair Library",
+    "simple": "Fix My PC"
+  },
+  "Nav_Settings": {
+    "technical": "Settings",
+    "simple": "Settings"
+  },
+  "WeeklySummary_Title": {
+    "technical": "Weekly Health Summary",
+    "simple": "Your Weekly PC Checkup"
+  }
+}

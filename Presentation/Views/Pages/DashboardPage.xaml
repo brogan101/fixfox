@@ -11,9 +11,15 @@
     <h:BoolToVisConverter x:Key="BoolVis"/>
     <h:InverseBoolConverter x:Key="InvBool"/>
     <h:InverseBoolToVisConverter x:Key="InvBoolVis"/>
+    <h:RelativeDateConverter x:Key="RelDate"/>
     <h:SeverityColorConverter x:Key="SevColor"/>
     <h:SeverityIconConverter x:Key="SeverityIcon"/>
     <h:NullToCollapsedConverter x:Key="NullCollapsed"/>
+    <Style x:Key="DashboardStatusBarCardButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="Padding" Value="12,10"/>
+      <Setter Property="MinHeight" Value="44"/>
+    </Style>
   </Page.Resources>
 
   <ScrollViewer>
@@ -22,23 +28,103 @@
         <RowDefinition Height="Auto"/>
         <RowDefinition Height="Auto"/>
         <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
         <RowDefinition Height="*"/>
       </Grid.RowDefinitions>
 
-      <StackPanel Grid.Row="0" Margin="0,0,0,20">
+      <Border x:Name="StatusBarHost"
+              Grid.Row="0"
+              automation:AutomationProperties.AutomationId="Dashboard_StatusBar"
+              ClipToBounds="True"
+              Height="0"
+              Opacity="0"
+              Margin="0,0,0,16">
+        <Border Background="{DynamicResource BgSurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12,10">
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="2.1*"/>
+              <ColumnDefinition Width="1.6*"/>
+              <ColumnDefinition Width="2.3*"/>
+            </Grid.ColumnDefinitions>
+
+            <Button Grid.Column="0"
+                    Click="OpenAutomationAttention_Click"
+                    Style="{StaticResource DashboardStatusBarCardButton}"
+                    automation:AutomationProperties.AutomationId="Dashboard_AttentionCount">
+              <DockPanel LastChildFill="True">
+                <Ellipse Width="9" Height="9" Margin="0,0,10,0" VerticalAlignment="Center">
+                  <Ellipse.Style>
+                    <Style TargetType="Ellipse">
+                      <Setter Property="Fill" Value="{DynamicResource AccentGreenBrush}"/>
+                      <Style.Triggers>
+                        <DataTrigger Binding="{Binding HasAutomationAttention}" Value="True">
+                          <Setter Property="Fill" Value="{DynamicResource AccentAmberBrush}"/>
+                        </DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </Ellipse.Style>
+                </Ellipse>
+                <StackPanel>
+                  <TextBlock Text="{Binding DashboardAutomationAttentionText}" FontWeight="SemiBold"/>
+                  <TextBlock Text="{Binding DashboardAutomationAttentionSubtext}" Style="{DynamicResource MetaText}" TextWrapping="Wrap"/>
+                </StackPanel>
+              </DockPanel>
+            </Button>
+
+            <Border Grid.Column="1"
+                    Background="{DynamicResource BgCard2Brush}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="12,10"
+                    Margin="12,0"
+                    Visibility="{Binding HasDashboardActiveOperation, Converter={StaticResource BoolVis}}">
+              <DockPanel automation:AutomationProperties.AutomationId="Dashboard_ActiveRunLabel">
+                <ui:ProgressRing Width="18" Height="18" Margin="0,0,10,0" IsIndeterminate="True"/>
+                <TextBlock Text="{Binding DashboardActiveRunLabel}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+              </DockPanel>
+            </Border>
+
+            <Border Grid.Column="2"
+                    Background="{DynamicResource BgCard2Brush}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="12,10"
+                    Visibility="{Binding HasDashboardLastReceipt, Converter={StaticResource BoolVis}}"
+                    automation:AutomationProperties.AutomationId="Dashboard_LastReceiptSummary">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                  <TextBlock Text="{Binding DashboardLastReceiptTitle}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                  <TextBlock Text="{Binding DashboardLastReceiptRelativeText}" Style="{DynamicResource MetaText}" Margin="0,4,0,0"/>
+                </StackPanel>
+                <Border Grid.Column="1" Style="{DynamicResource CompactStatusBadge}" VerticalAlignment="Center">
+                  <TextBlock Text="{Binding DashboardLastReceiptOutcomeLabel}" Style="{DynamicResource CompactStatusText}"/>
+                </Border>
+              </Grid>
+            </Border>
+          </Grid>
+        </Border>
+      </Border>
+
+      <StackPanel Grid.Row="1" Margin="0,0,0,20">
         <TextBlock Text="Home" Style="{DynamicResource PageTitle}"
                    automation:AutomationProperties.AutomationId="DashboardPageMarker"/>
         <TextBlock Text="See what needs attention, take the next safe action, and jump directly into the Windows tools and workflows that matter."
                    Style="{DynamicResource PageSubtitle}"/>
       </StackPanel>
 
-      <ProgressBar Grid.Row="1" IsIndeterminate="True" Height="3"
+      <ProgressBar Grid.Row="2" IsIndeterminate="True" Height="3"
                    Foreground="{DynamicResource FoxOrangeBrush}"
                    Background="Transparent" BorderThickness="0"
                    Visibility="{Binding ScanRunning, Converter={StaticResource BoolVis}}"
                    Margin="0,0,0,8"/>
 
-      <WrapPanel Grid.Row="2" Margin="0,0,0,20">
+      <WrapPanel Grid.Row="3" Margin="0,0,0,20">
         <Border Style="{DynamicResource StatPill}">
           <StackPanel>
             <TextBlock Text="Health" Style="{DynamicResource CardLabel}"/>
@@ -73,102 +159,325 @@
         </Border>
       </WrapPanel>
 
-      <Grid Grid.Row="3">
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="*"/>
-          <ColumnDefinition Width="340"/>
-        </Grid.ColumnDefinitions>
+      <StackPanel Grid.Row="4">
+        <Border Style="{DynamicResource InfoCard}"
+                Margin="0,0,0,16"
+                Visibility="{Binding HasOnboardingChecklist, Converter={StaticResource BoolVis}}"
+                automation:AutomationProperties.AutomationId="Onboarding_Checklist">
+          <StackPanel>
+            <DockPanel Margin="0,0,0,10">
+              <StackPanel DockPanel.Dock="Left">
+                <TextBlock Text="What To Do First" Style="{DynamicResource PanelTitle}"/>
+                <TextBlock Text="These first steps help FixFox surface the right repairs and support paths quickly."
+                           Style="{DynamicResource CardSub}" Margin="0,4,0,0"/>
+              </StackPanel>
+              <Button DockPanel.Dock="Right"
+                      Content="Got it, don't show this again"
+                      Click="DismissOnboarding_Click"
+                      Style="{DynamicResource SecondaryButton}"
+                      automation:AutomationProperties.AutomationId="Onboarding_Dismiss"/>
+            </DockPanel>
+            <ItemsControl ItemsSource="{Binding OnboardingChecklistItems}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="{x:Type m:OnboardingChecklistItem}">
+                  <Border Background="{DynamicResource BgCard2Brush}" CornerRadius="8" Padding="12,10" Margin="0,0,0,8">
+                    <DockPanel>
+                      <CheckBox DockPanel.Dock="Left"
+                                Margin="0,0,10,0"
+                                IsChecked="{Binding IsCompleted, Mode=TwoWay}"
+                                Checked="OnboardingItem_Checked"
+                                Unchecked="OnboardingItem_Checked"
+                                Tag="{Binding Key}"
+                                automation:AutomationProperties.Name="{Binding Title}"
+                                automation:AutomationProperties.AutomationId="{Binding AutomationId}"/>
+                      <StackPanel>
+                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding Description}" Style="{DynamicResource MetaText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                      </StackPanel>
+                    </DockPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
 
-        <StackPanel Grid.Column="0">
-          <Border Style="{DynamicResource InfoCard}" Margin="0,0,16,12">
-            <StackPanel>
-              <TextBlock Text="Command center" Style="{DynamicResource PanelTitle}"/>
-              <TextBlock Text="{Binding MaintenanceSummaryText}" Style="{DynamicResource CardSub}" Margin="0,6,0,12" TextWrapping="Wrap"/>
-              <WrapPanel>
-                <Button Content="Run Quick Scan" Click="RunScan_Click" Style="{DynamicResource AccentButtonStyle}" Margin="0,0,8,8"
-                        automation:AutomationProperties.AutomationId="DashboardRunQuickScanButton"/>
-                <Button Content="Safe Maintenance Now" Click="RunMaintenance_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"
-                        automation:AutomationProperties.AutomationId="DashboardRunMaintenanceButton"/>
-                <Button Content="Open Device Health" Click="OpenDeviceHealth_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"
-                        automation:AutomationProperties.AutomationId="DashboardOpenDeviceHealthButton"/>
-                <Button Content="Open Windows Tools" Click="OpenToolbox_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"
-                        automation:AutomationProperties.AutomationId="DashboardOpenToolboxButton"/>
-                <Button Content="Open Support Package" Click="OpenSupport_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8"
-                        automation:AutomationProperties.AutomationId="DashboardOpenSupportButton"/>
-              </WrapPanel>
-            </StackPanel>
-          </Border>
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="340"/>
+          </Grid.ColumnDefinitions>
 
-          <Border Style="{DynamicResource InfoCard}" Margin="0,0,16,12"
-                  Visibility="{Binding HasProactiveRecommendations, Converter={StaticResource BoolVis}}">
-            <StackPanel>
-              <TextBlock Text="Recommended next steps" Style="{DynamicResource PanelTitle}" Margin="0,0,0,10"/>
-              <ItemsControl ItemsSource="{Binding ProactiveRecommendations}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate DataType="{x:Type m:ProactiveRecommendation}">
-                    <Border Style="{DynamicResource FixCard}" Padding="12" Margin="0,0,0,8">
-                      <DockPanel>
-                        <WrapPanel DockPanel.Dock="Right" Margin="12,0,0,0">
-                          <Button Content="Run" Tag="{Binding}" Click="RecommendationAction_Click"
-                                  Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"
-                                  Visibility="{Binding ActionFixId, Converter={StaticResource NullCollapsed}}"/>
-                          <Button Content="Ignore" Tag="{Binding}" Click="RecommendationIgnore_Click"
-                                  Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8"/>
-                        </WrapPanel>
-                        <StackPanel>
-                          <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
-                          <TextBlock Text="{Binding Summary}" Style="{DynamicResource CardSub}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                        </StackPanel>
-                      </DockPanel>
-                    </Border>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-            </StackPanel>
-          </Border>
+          <StackPanel Grid.Column="0">
+            <Border Style="{DynamicResource InfoCard}"
+                    Margin="0,0,16,12"
+                    Visibility="{Binding HasHealthAlerts, Converter={StaticResource BoolVis}}"
+                    automation:AutomationProperties.AutomationId="Dashboard_Alerts_Section">
+              <StackPanel>
+                <TextBlock Text="{Binding HealthAlertsHeaderText}" Style="{DynamicResource PanelTitle}"/>
+                <ItemsControl ItemsSource="{Binding HealthAlerts}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type m:HealthAlert}">
+                      <Border Padding="12"
+                              Margin="0,10,0,0"
+                              Tag="{Binding}"
+                              Opacity="1"
+                              Background="{DynamicResource BgCardBrush}"
+                              BorderBrush="{DynamicResource BorderBrush}"
+                              BorderThickness="1"
+                              CornerRadius="9"
+                              automation:AutomationProperties.AutomationId="{Binding Id, StringFormat=Dashboard_Alert_{0}_Card}">
+                        <Border.Style>
+                          <Style TargetType="Border">
+                            <Setter Property="Background" Value="{DynamicResource BgCardBrush}"/>
+                            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+                            <Setter Property="BorderThickness" Value="1"/>
+                            <Setter Property="CornerRadius" Value="9"/>
+                            <Setter Property="Padding" Value="12"/>
+                            <Setter Property="Margin" Value="0,10,0,0"/>
+                            <Style.Triggers>
+                              <DataTrigger Binding="{Binding IsHighlighted}" Value="True">
+                                <Setter Property="BorderBrush" Value="{DynamicResource FoxOrangeBrush}"/>
+                                <Setter Property="BorderThickness" Value="2"/>
+                              </DataTrigger>
+                            </Style.Triggers>
+                          </Style>
+                        </Border.Style>
+                        <Grid>
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                          </Grid.ColumnDefinitions>
+                          <Border Width="28"
+                                  Height="28"
+                                  CornerRadius="14"
+                                  Margin="0,0,12,0"
+                                  VerticalAlignment="Top">
+                            <Border.Style>
+                              <Style TargetType="Border">
+                                <Setter Property="Background" Value="{DynamicResource AccentBlueBrush}"/>
+                                <Style.Triggers>
+                                  <DataTrigger Binding="{Binding Severity}" Value="Warning">
+                                    <Setter Property="Background" Value="{DynamicResource AccentAmberBrush}"/>
+                                  </DataTrigger>
+                                  <DataTrigger Binding="{Binding Severity}" Value="Critical">
+                                    <Setter Property="Background" Value="{DynamicResource AccentRedBrush}"/>
+                                  </DataTrigger>
+                                </Style.Triggers>
+                              </Style>
+                            </Border.Style>
+                            <TextBlock HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       FontFamily="{DynamicResource IconFont}"
+                                       Foreground="White">
+                              <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                  <Setter Property="Text" Value="&#xE946;"/>
+                                  <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Severity}" Value="Warning">
+                                      <Setter Property="Text" Value="&#xE7BA;"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Severity}" Value="Critical">
+                                      <Setter Property="Text" Value="&#xE711;"/>
+                                    </DataTrigger>
+                                  </Style.Triggers>
+                                </Style>
+                              </TextBlock.Style>
+                            </TextBlock>
+                          </Border>
 
-          <Border Style="{DynamicResource InfoCard}" Margin="0,0,16,12"
-                  Visibility="{Binding HasDashboardAlerts, Converter={StaticResource BoolVis}}">
-            <StackPanel>
-              <TextBlock Text="Needs attention now" Style="{DynamicResource PanelTitle}" Margin="0,0,0,10"/>
-              <ItemsControl ItemsSource="{Binding DashboardAlerts}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate DataType="{x:Type m:DashboardAlert}">
-                    <Border Style="{DynamicResource FixCard}" Padding="12" Margin="0,0,0,8">
-                      <DockPanel>
-                        <WrapPanel DockPanel.Dock="Right" Margin="12,0,0,0">
-                          <Button Content="{Binding ActionLabel}"
-                                  Tag="{Binding}"
-                                  Click="AlertAction_Click"
-                                  Style="{DynamicResource SecondaryButton}"
-                                  Visibility="{Binding ActionLabel, Converter={StaticResource NullCollapsed}}"
-                                  Margin="0,0,8,8"/>
-                          <Button Content="Snooze"
-                                  Tag="{Binding}"
-                                  Click="AlertSnooze_Click"
-                                  Style="{DynamicResource SecondaryButton}"
-                                  Margin="0,0,0,8"/>
-                        </WrapPanel>
-                        <StackPanel>
-                          <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
-                          <TextBlock Text="{Binding Summary}" Style="{DynamicResource CardSub}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                        </StackPanel>
-                      </DockPanel>
-                    </Border>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-            </StackPanel>
-          </Border>
+                          <StackPanel Grid.Column="1" Margin="0,0,12,0">
+                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Text="{Binding Body}" Style="{DynamicResource CardSub}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                            <TextBlock Text="{Binding DetectedUtc, Converter={StaticResource RelDate}}" Style="{DynamicResource MetaText}" Margin="0,6,0,0"/>
+                          </StackPanel>
 
-          <Border Style="{DynamicResource InfoCard}" Margin="0,0,16,0">
+                          <WrapPanel Grid.Column="2" VerticalAlignment="Top">
+                            <Button Content="{Binding ActionLabel}"
+                                    Tag="{Binding}"
+                                    Click="HealthAlertAction_Click"
+                                    Style="{DynamicResource SecondaryButton}"
+                                    Margin="0,0,8,8"
+                                    Visibility="{Binding ActionLabel, Converter={StaticResource NullCollapsed}}"
+                                    automation:AutomationProperties.AutomationId="{Binding Id, StringFormat=Dashboard_Alert_{0}_Action}"/>
+                            <Button Content="Dismiss"
+                                    Tag="{Binding}"
+                                    Click="HealthAlertDismiss_Click"
+                                    Style="{DynamicResource SecondaryButton}"
+                                    Margin="0,0,0,8"
+                                    automation:AutomationProperties.AutomationId="{Binding Id, StringFormat=Dashboard_Alert_{0}_Dismiss}"/>
+                          </WrapPanel>
+                        </Grid>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+
+            <Border Style="{DynamicResource InfoCard}"
+                    Margin="0,0,16,12"
+                    automation:AutomationProperties.AutomationId="Dashboard_Suggestions_Section">
+              <StackPanel>
+                <TextBlock Text="Suggested for you" Style="{DynamicResource PanelTitle}"/>
+                <ItemsControl ItemsSource="{Binding DashboardSuggestions}"
+                              Visibility="{Binding HasDashboardSuggestions, Converter={StaticResource BoolVis}}"
+                              AlternationCount="8">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type m:DashboardSuggestion}">
+                      <Border Style="{DynamicResource FixCard}"
+                              Padding="12"
+                              Margin="0,10,0,0"
+                              automation:AutomationProperties.AutomationId="{Binding RelativeSource={RelativeSource AncestorType=ContentPresenter}, Path=(ItemsControl.AlternationIndex), StringFormat=Dashboard_Suggestion_{0}_Card}">
+                        <DockPanel>
+                          <WrapPanel DockPanel.Dock="Right" Margin="12,0,0,0">
+                            <Button Content="{Binding RunButtonLabel}"
+                                    Tag="{Binding}"
+                                    Click="DashboardSuggestionRun_Click"
+                                    Style="{DynamicResource AccentButtonStyle}"
+                                    Margin="0,0,8,8"
+                                    automation:AutomationProperties.AutomationId="{Binding RelativeSource={RelativeSource AncestorType=ContentPresenter}, Path=(ItemsControl.AlternationIndex), StringFormat=Dashboard_Suggestion_{0}_RunNow}"/>
+                            <Button Content="Dismiss"
+                                    Tag="{Binding}"
+                                    Click="DashboardSuggestionDismiss_Click"
+                                    Style="{DynamicResource SecondaryButton}"
+                                    Margin="0,0,0,8"
+                                    automation:AutomationProperties.AutomationId="{Binding RelativeSource={RelativeSource AncestorType=ContentPresenter}, Path=(ItemsControl.AlternationIndex), StringFormat=Dashboard_Suggestion_{0}_Dismiss}"/>
+                          </WrapPanel>
+                          <StackPanel>
+                            <WrapPanel>
+                              <TextBlock Text="{Binding Glyph}"
+                                         FontFamily="{DynamicResource IconFont}"
+                                         Margin="0,0,8,0"/>
+                              <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
+                            </WrapPanel>
+                            <TextBlock Text="{Binding Summary}"
+                                       Style="{DynamicResource CardSub}"
+                                       Margin="0,6,0,0"
+                                       TextWrapping="Wrap"/>
+                          </StackPanel>
+                        </DockPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Border Background="{DynamicResource BgCard2Brush}"
+                        CornerRadius="8"
+                        Padding="12,10"
+                        Margin="0,10,0,0"
+                        Visibility="{Binding HasDashboardSuggestions, Converter={StaticResource InvBoolVis}}">
+                  <WrapPanel>
+                    <Ellipse Width="10" Height="10" Fill="{DynamicResource AccentGreenBrush}" Margin="0,2,8,0"/>
+                    <TextBlock Text="{Binding DashboardSuggestionsEmptyText}" Style="{DynamicResource CardSub}" TextWrapping="Wrap"/>
+                  </WrapPanel>
+                </Border>
+              </StackPanel>
+            </Border>
+
+            <Border Style="{DynamicResource InfoCard}"
+                    Margin="0,0,16,12"
+                    Visibility="{Binding HasRecentQuickActions, Converter={StaticResource BoolVis}}"
+                    automation:AutomationProperties.AutomationId="Dashboard_RecentStrip">
+              <StackPanel>
+                <TextBlock Text="Recent" Style="{DynamicResource PanelTitle}"/>
+                <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                              VerticalScrollBarVisibility="Disabled"
+                              Margin="0,10,0,0">
+                  <ItemsControl ItemsSource="{Binding RecentQuickActions}" AlternationCount="8">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal"/>
+                      </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate DataType="{x:Type m:RecentQuickActionEntry}">
+                        <Border Background="{DynamicResource BgCard2Brush}" CornerRadius="999" Padding="12,8" Margin="0,0,10,0">
+                          <DockPanel>
+                            <Button DockPanel.Dock="Right"
+                                    Content="Run again →"
+                                    Tag="{Binding}"
+                                    Click="RecentQuickActionRun_Click"
+                                    Style="{DynamicResource SecondaryButton}"
+                                    Margin="12,0,0,0"
+                                    automation:AutomationProperties.AutomationId="{Binding RelativeSource={RelativeSource AncestorType=ContentPresenter}, Path=(ItemsControl.AlternationIndex), StringFormat=Dashboard_Recent_{0}_RunAgain}"/>
+                            <Button DockPanel.Dock="Left"
+                                    Tag="{Binding}"
+                                    Click="RecentQuickActionOpen_Click"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Padding="0"
+                                    HorizontalContentAlignment="Left">
+                              <WrapPanel>
+                                <TextBlock Text="{Binding Glyph}" FontFamily="{DynamicResource IconFont}" Margin="0,0,8,0"/>
+                                <TextBlock Text="{Binding DisplayTitle}" FontWeight="SemiBold"/>
+                              </WrapPanel>
+                            </Button>
+                          </DockPanel>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </ScrollViewer>
+              </StackPanel>
+            </Border>
+
+            <Border Style="{DynamicResource InfoCard}" Margin="0,0,16,12">
+              <StackPanel>
+                <TextBlock Text="Command center" Style="{DynamicResource PanelTitle}"/>
+                <TextBlock Text="{Binding MaintenanceSummaryText}" Style="{DynamicResource CardSub}" Margin="0,6,0,12" TextWrapping="Wrap"/>
+                <WrapPanel>
+                  <Button Content="Run Quick Scan" Click="RunScan_Click" Style="{DynamicResource AccentButtonStyle}" Margin="0,0,8,8"
+                          automation:AutomationProperties.AutomationId="DashboardRunQuickScanButton"/>
+                  <Button Content="Safe Maintenance Now" Click="RunMaintenance_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"
+                          automation:AutomationProperties.AutomationId="DashboardRunMaintenanceButton"/>
+                  <Button Content="Open Device Health" Click="OpenDeviceHealth_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"
+                          automation:AutomationProperties.AutomationId="DashboardOpenDeviceHealthButton"/>
+                  <Button Content="Open Windows Tools" Click="OpenToolbox_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"
+                          automation:AutomationProperties.AutomationId="DashboardOpenToolboxButton"/>
+                  <Button Content="Open Support Package" Click="OpenSupport_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8"
+                          automation:AutomationProperties.AutomationId="DashboardOpenSupportButton"/>
+                </WrapPanel>
+              </StackPanel>
+            </Border>
+
+            <Border Style="{DynamicResource InfoCard}" Margin="0,0,16,12"
+                    Visibility="{Binding HasProactiveRecommendations, Converter={StaticResource BoolVis}}">
+              <StackPanel>
+                <TextBlock Text="Recommended next steps" Style="{DynamicResource PanelTitle}" Margin="0,0,0,10"/>
+                <ItemsControl ItemsSource="{Binding ProactiveRecommendations}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type m:ProactiveRecommendation}">
+                      <Border Style="{DynamicResource FixCard}" Padding="12" Margin="0,0,0,8">
+                        <DockPanel>
+                          <WrapPanel DockPanel.Dock="Right" Margin="12,0,0,0">
+                            <Button Content="Run" Tag="{Binding}" Click="RecommendationAction_Click"
+                                    Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"
+                                    Visibility="{Binding ActionFixId, Converter={StaticResource NullCollapsed}}"/>
+                            <Button Content="Ignore" Tag="{Binding}" Click="RecommendationIgnore_Click"
+                                    Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8"/>
+                          </WrapPanel>
+                          <StackPanel>
+                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding Summary}" Style="{DynamicResource CardSub}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                          </StackPanel>
+                        </DockPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+
+            <Border Style="{DynamicResource InfoCard}" Margin="0,0,16,0">
             <DockPanel>
               <DockPanel DockPanel.Dock="Top" Margin="0,0,0,14">
                 <TextBlock Text="Quick scan findings" Style="{DynamicResource PanelTitle}" DockPanel.Dock="Left"/>
                 <Button Content="Run Quick Scan" Click="RunScan_Click"
                         Style="{DynamicResource AccentButtonStyle}"
                         DockPanel.Dock="Right" HorizontalAlignment="Right"
-                        IsEnabled="{Binding ScanRunning, Converter={StaticResource InvBool}}"/>
+                        IsEnabled="{Binding ScanRunning, Converter={StaticResource InvBool}}"
+                        automation:AutomationProperties.AutomationId="DashboardQuickScanHeroButton"/>
               </DockPanel>
 
               <TextBlock DockPanel.Dock="Top" Text="{Binding ScanStatusText}"
@@ -204,11 +513,11 @@
                 </ItemsControl>
               </ScrollViewer>
             </DockPanel>
-          </Border>
-        </StackPanel>
+            </Border>
+          </StackPanel>
 
-        <StackPanel Grid.Column="1">
-          <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,12">
+          <StackPanel Grid.Column="1">
+            <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,12">
             <StackPanel>
               <TextBlock Text="Automation" Style="{DynamicResource PanelTitle}" Margin="0,0,0,6"/>
               <TextBlock Text="{Binding AutomationOverviewText}" Style="{DynamicResource CardSub}" TextWrapping="Wrap"/>
@@ -225,7 +534,7 @@
             </StackPanel>
           </Border>
 
-          <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,12">
+            <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,12">
             <StackPanel>
               <TextBlock Text="Suggested workflows" Style="{DynamicResource PanelTitle}" Margin="0,0,0,10"/>
               <ItemsControl ItemsSource="{Binding SuggestedRunbooks}" Visibility="{Binding HasSuggestedRunbooks, Converter={StaticResource BoolVis}}">
@@ -235,14 +544,18 @@
                             Tag="{Binding}"
                             MouseLeftButtonDown="SuggestedRunbookCard_MouseLeftButtonDown">
                       <Border.ContextMenu>
-                        <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
-                          <MenuItem Header="Start Workflow" Click="SuggestedRunbookMenu_Click" CommandParameter="{Binding}"/>
-                          <MenuItem Header="Open Automation" Click="OpenAutomationMenu_Click" CommandParameter="{Binding}"/>
+                        <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}"
+                                     automation:AutomationProperties.AutomationId="ContextMenu_Runbook">
+                          <MenuItem Header="Start Workflow" Click="SuggestedRunbookMenu_Click" CommandParameter="{Binding}"
+                                    automation:AutomationProperties.AutomationId="Card_Runbook_Start"/>
+                          <MenuItem Header="Open Automation" Click="OpenAutomationMenu_Click" CommandParameter="{Binding}"
+                                    automation:AutomationProperties.AutomationId="Card_Runbook_OpenAutomation"/>
                         </ContextMenu>
                       </Border.ContextMenu>
                       <DockPanel>
                         <Button DockPanel.Dock="Right" Content="Start" Tag="{Binding}" Click="SuggestedRunbook_Click"
-                                Style="{DynamicResource SecondaryButton}" Margin="12,0,0,0"/>
+                                Style="{DynamicResource SecondaryButton}" Margin="12,0,0,0"
+                                automation:AutomationProperties.AutomationId="Card_Runbook_Start"/>
                         <StackPanel>
                           <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="SemiBold"/>
                           <TextBlock Text="{Binding Description}" Style="{DynamicResource CardSub}" TextWrapping="Wrap"/>
@@ -258,7 +571,7 @@
             </StackPanel>
           </Border>
 
-          <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,12">
+            <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,12">
             <StackPanel>
               <TextBlock Text="Recent failures" Style="{DynamicResource PanelTitle}" Margin="0,0,0,10"/>
               <ItemsControl ItemsSource="{Binding RecentFailedEntries}" Visibility="{Binding HasRecentFailures, Converter={StaticResource BoolVis}}">
@@ -268,9 +581,12 @@
                             Tag="{Binding}"
                             MouseLeftButtonDown="RecentFailureCard_MouseLeftButtonDown">
                       <Border.ContextMenu>
-                        <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
-                          <MenuItem Header="Create Support Package" Click="RecentFailureSupportMenu_Click" CommandParameter="{Binding}"/>
-                          <MenuItem Header="Open Activity" Click="OpenActivityMenu_Click" CommandParameter="{Binding}"/>
+                        <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}"
+                                     automation:AutomationProperties.AutomationId="ContextMenu_Receipt">
+                          <MenuItem Header="Create Support Package" Click="RecentFailureSupportMenu_Click" CommandParameter="{Binding}"
+                                    automation:AutomationProperties.AutomationId="Card_Receipt_CreateSupportPackage"/>
+                          <MenuItem Header="Open Activity" Click="OpenActivityMenu_Click" CommandParameter="{Binding}"
+                                    automation:AutomationProperties.AutomationId="Card_Receipt_OpenActivity"/>
                         </ContextMenu>
                       </Border.ContextMenu>
                       <StackPanel>
@@ -286,7 +602,7 @@
             </StackPanel>
           </Border>
 
-          <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,12">
+            <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,12">
             <StackPanel>
               <TextBlock Text="Recent automation" Style="{DynamicResource PanelTitle}" Margin="0,0,0,10"/>
               <ItemsControl ItemsSource="{Binding RecentAutomationHistoryEntries}" Visibility="{Binding HasRecentAutomationHistory, Converter={StaticResource BoolVis}}">
@@ -296,10 +612,14 @@
                             Tag="{Binding}"
                             MouseLeftButtonDown="RecentAutomationCard_MouseLeftButtonDown">
                       <Border.ContextMenu>
-                        <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
-                          <MenuItem Header="Open Details" Click="RecentAutomationDetailsMenu_Click" CommandParameter="{Binding}"/>
-                          <MenuItem Header="Copy Summary" Click="RecentAutomationCopyMenu_Click" CommandParameter="{Binding}"/>
-                          <MenuItem Header="Open Automation" Click="OpenAutomationMenu_Click" CommandParameter="{Binding}"/>
+                        <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}"
+                                     automation:AutomationProperties.AutomationId="ContextMenu_Automation">
+                          <MenuItem Header="Open Details" Click="RecentAutomationDetailsMenu_Click" CommandParameter="{Binding}"
+                                    automation:AutomationProperties.AutomationId="Card_Automation_Details"/>
+                          <MenuItem Header="Copy Summary" Click="RecentAutomationCopyMenu_Click" CommandParameter="{Binding}"
+                                    automation:AutomationProperties.AutomationId="Card_Automation_CopySummary"/>
+                          <MenuItem Header="Open Automation" Click="OpenAutomationMenu_Click" CommandParameter="{Binding}"
+                                    automation:AutomationProperties.AutomationId="Card_Automation_OpenCenter"/>
                         </ContextMenu>
                       </Border.ContextMenu>
                       <StackPanel>
@@ -315,7 +635,7 @@
             </StackPanel>
           </Border>
 
-          <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,12">
+            <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,12">
             <StackPanel>
               <TextBlock Text="Recent repair activity" Style="{DynamicResource PanelTitle}" Margin="0,0,0,10"/>
               <ItemsControl ItemsSource="{Binding RecentlyRunFixes}">
@@ -325,9 +645,12 @@
                             Tag="{Binding}"
                             MouseLeftButtonDown="RecentFixCard_MouseLeftButtonDown">
                       <Border.ContextMenu>
-                        <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
-                          <MenuItem Header="Run Again" Click="RecentFixRunMenu_Click" CommandParameter="{Binding}"/>
-                          <MenuItem Header="Open Repair Library" Click="OpenLibraryMenu_Click" CommandParameter="{Binding}"/>
+                        <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}"
+                                     automation:AutomationProperties.AutomationId="ContextMenu_Fix">
+                          <MenuItem Header="Run Again" Click="RecentFixRunMenu_Click" CommandParameter="{Binding}"
+                                    automation:AutomationProperties.AutomationId="Card_Fix_Run"/>
+                          <MenuItem Header="Open Repair Library" Click="OpenLibraryMenu_Click" CommandParameter="{Binding}"
+                                    automation:AutomationProperties.AutomationId="Card_Fix_OpenLibrary"/>
                         </ContextMenu>
                       </Border.ContextMenu>
                       <StackPanel>
@@ -343,7 +666,7 @@
             </StackPanel>
           </Border>
 
-          <Border Style="{DynamicResource InfoCard}" Visibility="{Binding WizardVisible, Converter={StaticResource BoolVis}}">
+            <Border Style="{DynamicResource InfoCard}" Visibility="{Binding WizardVisible, Converter={StaticResource BoolVis}}">
             <StackPanel>
               <TextBlock Text="{Binding WizardFix.Title}" FontWeight="Bold" FontSize="14" Margin="0,0,0,4"/>
               <TextBlock Text="{Binding WizardStepLabel}" Style="{DynamicResource CardSub}" Margin="0,0,0,10"/>
@@ -357,9 +680,10 @@
                 <Button Content="Cancel" Click="WizardCancel_Click" Style="{DynamicResource SecondaryButton}"/>
               </WrapPanel>
             </StackPanel>
-          </Border>
-        </StackPanel>
-      </Grid>
+            </Border>
+          </StackPanel>
+        </Grid>
+      </StackPanel>
     </Grid>
   </ScrollViewer>
 </Page>

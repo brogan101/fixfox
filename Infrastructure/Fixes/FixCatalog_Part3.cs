@@ -5,9 +5,9 @@ namespace HelpDesk.Infrastructure.Fixes;
 
 public sealed partial class FixCatalogService
 {
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  9. SYSTEM INFORMATION
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     private static FixCategory SystemInformation() => new()
     {
         Id="sysinfo", Icon="\uE7F4", Title="System Information",
@@ -41,7 +41,7 @@ public sealed partial class FixCatalogService
                     Write-Output "Last boot    : $($os.LastBootUpTime)"
                     """ },
 
-            new() { Id="show-all-disk-space", Title="All drives — space and health",
+            new() { Id="show-all-disk-space", Title="All drives â€” space and health",
                 Description="Shows used/free space and health status for every attached drive.",
                 Type=FixType.Silent, RequiresAdmin=false,
                 Keywords=["all drives space", "see drive usage", "storage info all drives", "check all disks"],
@@ -53,12 +53,12 @@ public sealed partial class FixCatalogService
                     }
                     Write-Output ""
                     Get-PhysicalDisk | ForEach-Object {
-                        Write-Output "Physical disk: $($_.FriendlyName) — Health: $($_.HealthStatus) — Media: $($_.MediaType) — Size: $([math]::Round($_.Size/1GB)) GB"
+                        Write-Output "Physical disk: $($_.FriendlyName) â€” Health: $($_.HealthStatus) â€” Media: $($_.MediaType) â€” Size: $([math]::Round($_.Size/1GB)) GB"
                     }
                     """ },
 
             new() { Id="show-event-log-errors", Title="Recent system errors (Event Log)",
-                Description="Shows the last 20 critical errors from Windows Event Log — key for crash diagnosis.",
+                Description="Shows the last 20 critical errors from Windows Event Log â€” key for crash diagnosis.",
                 Type=FixType.Silent, RequiresAdmin=false,
                 Keywords=["system errors", "recent errors", "event log", "what errors happened", "crash log"],
                 Script="""
@@ -70,7 +70,7 @@ public sealed partial class FixCatalogService
                     """ },
 
             new() { Id="open-reliability-monitor", Title="Open Reliability Monitor",
-                Description="Shows a timeline of crashes, errors, and app failures — the best visual crash history.",
+                Description="Shows a timeline of crashes, errors, and app failures â€” the best visual crash history.",
                 Type=FixType.Silent, RequiresAdmin=false,
                 Keywords=["reliability monitor", "crash history", "what changed", "stability history", "error timeline"],
                 Script="Start-Process perfmon /rel" },
@@ -100,9 +100,9 @@ public sealed partial class FixCatalogService
                     powercfg /batteryreport /output $f 2>&1
                     if (Test-Path $f) {
                         Start-Process $f
-                        Write-Output "✓ Battery report saved to Desktop and opened in browser."
+                        Write-Output "âœ“ Battery report saved to Desktop and opened in browser."
                     } else {
-                        Write-Output "No battery detected — this is a desktop PC, or power reporting is unavailable."
+                        Write-Output "No battery detected â€” this is a desktop PC, or power reporting is unavailable."
                     }
                     """ },
 
@@ -113,11 +113,11 @@ public sealed partial class FixCatalogService
                 Script="""
                     $f = "$env:USERPROFILE\Desktop\SystemReport_$(Get-Date -Format 'yyyyMMdd_HHmm').txt"
                     msinfo32 /report $f
-                    Write-Output "✓ System report saved to Desktop: $f"
+                    Write-Output "âœ“ System report saved to Desktop: $f"
                     """ },
 
             new() { Id="list-running-services", Title="List non-Microsoft running services",
-                Description="Shows third-party services currently running — helps spot bloatware or malware.",
+                Description="Shows third-party services currently running â€” helps spot bloatware or malware.",
                 Type=FixType.Silent, RequiresAdmin=false,
                 Keywords=["what is running", "background services", "third party services", "what services are running"],
                 Script="""
@@ -129,16 +129,16 @@ public sealed partial class FixCatalogService
         ]
     };
 
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  10. BLUE SCREEN & CRASHES
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     private static FixCategory BlueScreenAndCrashes() => new()
     {
         Id="bsod", Icon="\uE814", Title="Blue Screen & Crashes",
         Fixes=
         [
             new() { Id="bsod-enable-minidumps", Title="Enable crash minidump logging",
-                Description="Configures Windows to save minidump files when it crashes — required for BSOD analysis.",
+                Description="Configures Windows to save minidump files when it crashes â€” required for BSOD analysis.",
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["enable crash dump", "bsod log", "blue screen log", "save crash info", "minidump"],
                 Script="""
@@ -149,7 +149,7 @@ public sealed partial class FixCatalogService
                     Set-ItemProperty -Path $crashPath -Name LogEvent            -Value 1
                     Set-ItemProperty -Path $crashPath -Name Overwrite           -Value 1
                     if (!(Test-Path "$env:WINDIR\Minidump")) { New-Item -Path "$env:WINDIR\Minidump" -ItemType Directory | Out-Null }
-                    Write-Output "✓ Minidump logging enabled. Next BSOD will create a file in C:\Windows\Minidump"
+                    Write-Output "âœ“ Minidump logging enabled. Next BSOD will create a file in C:\Windows\Minidump"
                     """ },
 
             new() { Id="bsod-read-minidumps", Title="Read recent BSOD crash dumps",
@@ -187,23 +187,23 @@ public sealed partial class FixCatalogService
                             Write-Output "$($_.TimeCreated.ToString('yyyy-MM-dd HH:mm'))  $($_.Message.Split("`n")[0].Trim())"
                         }
                     } else {
-                        Write-Output "✓ No unexpected shutdown events found in the last 90 days."
+                        Write-Output "âœ“ No unexpected shutdown events found in the last 90 days."
                     }
                     """ },
 
             new() { Id="bsod-common-fixes", Title="Apply common BSOD prevention fixes",
-                Description="Applies the most effective known BSOD prevention fixes — update drivers, SFC, check RAM.",
+                Description="Applies the most effective known BSOD prevention fixes â€” update drivers, SFC, check RAM.",
                 Keywords=["fix blue screen", "bsod fix", "blue screen of death help", "pc keeps crashing", "random restarts"],
                 Type=FixType.Guided, Steps=[
                     new() { Title="Check for driver problems",  Instruction="Click 'Done' to scan for problem devices.", Script="""
                         $bad = Get-PnpDevice | Where-Object {$_.Status -ne 'OK'}
-                        if ($bad) { $bad | ForEach-Object { Write-Output "PROBLEM: $($_.FriendlyName) — $($_.Status)" } }
-                        else { Write-Output "✓ No driver problems found." }
+                        if ($bad) { $bad | ForEach-Object { Write-Output "PROBLEM: $($_.FriendlyName) â€” $($_.Status)" } }
+                        else { Write-Output "âœ“ No driver problems found." }
                         """ },
-                    new() { Title="Update display driver",       Instruction="Open Device Manager to check for GPU driver updates — outdated GPU drivers cause ~30% of BSODs.", Script="devmgmt.msc" },
+                    new() { Title="Update display driver",       Instruction="Open Device Manager to check for GPU driver updates â€” outdated GPU drivers cause ~30% of BSODs.", Script="devmgmt.msc" },
                     new() { Title="Run System File Checker",     Instruction="Click 'Done' to run SFC and repair any corrupted system files.", Script="Write-Output 'Running SFC (5-15 min)...'; sfc /scannow" },
-                    new() { Title="Schedule RAM test",           Instruction="Click 'Done' to schedule a memory test on next restart — bad RAM is a very common BSOD cause.", Script="mdsched.exe" },
-                    new() { Title="Check temperatures",          Instruction="Overheating causes random BSODs. Use the System Info tab to check CPU and GPU temps. Clean dust from the PC if temps are over 85°C." }
+                    new() { Title="Schedule RAM test",           Instruction="Click 'Done' to schedule a memory test on next restart â€” bad RAM is a very common BSOD cause.", Script="mdsched.exe" },
+                    new() { Title="Check temperatures",          Instruction="Overheating causes random BSODs. Use the System Info tab to check CPU and GPU temps. Clean dust from the PC if temps are over 85Â°C." }
                 ]},
 
             new() { Id="bsod-disable-auto-restart", Title="Show BSOD stop code (disable auto-restart)",
@@ -212,21 +212,21 @@ public sealed partial class FixCatalogService
                 Keywords=["pc restarts automatically", "auto restart crash", "stop automatic reboot", "dont restart on crash"],
                 Script="""
                     Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl' -Name AutoReboot -Value 0
-                    Write-Output "✓ Auto-restart on BSOD disabled."
+                    Write-Output "âœ“ Auto-restart on BSOD disabled."
                     Write-Output "  Next crash: hold power button or press Enter to restart manually."
                     Write-Output "  Re-enable: Set AutoReboot back to 1 in the same registry path."
                     """ },
 
             new() { Id="bsod-driver-verifier", Title="Enable Driver Verifier (advanced)",
-                Description="Enables Driver Verifier to catch the exact driver causing BSODs — advanced troubleshooting.",
+                Description="Enables Driver Verifier to catch the exact driver causing BSODs â€” advanced troubleshooting.",
                 Type=FixType.Guided, RequiresAdmin=true, Keywords=["driver verifier", "find bad driver", "which driver is crashing", "driver test"],
                 Steps=[
-                    new() { Title="⚠ Warning — read carefully",
+                    new() { Title="âš  Warning â€” read carefully",
                         Instruction="Driver Verifier stress-tests all drivers and WILL cause BSODs intentionally. Only do this if you're having unexplained random BSODs and need to find the culprit driver. Create a restore point first." },
                     new() { Title="Enable standard verification",
                         Instruction="Click 'Done' to enable standard Driver Verifier settings.", Script="""
                             verifier /standard /all
-                            Write-Output "✓ Driver Verifier enabled. Restart your PC to begin — it will cause a BSOD when it finds a problem driver."
+                            Write-Output "âœ“ Driver Verifier enabled. Restart your PC to begin â€” it will cause a BSOD when it finds a problem driver."
                             """ },
                     new() { Title="After the crash",
                         Instruction="Read the stop code and faulting module in the BSOD screen. Then disable Driver Verifier with: verifier /reset (in admin Command Prompt) and restart." }
@@ -234,9 +234,9 @@ public sealed partial class FixCatalogService
         ]
     };
 
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  11. EMAIL & OFFICE
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     private static FixCategory EmailAndOffice() => new()
     {
         Id="email", Icon="\uE715", Title="Email & Office",
@@ -254,9 +254,9 @@ public sealed partial class FixCatalogService
                     if (Test-Path $tempPath) {
                         $sz = (Get-ChildItem $tempPath -Recurse -EA SilentlyContinue | Measure-Object -Property Length -Sum -EA SilentlyContinue).Sum
                         Remove-Item "$tempPath\*" -Recurse -Force -EA SilentlyContinue
-                        Write-Output "✓ Cleared $([math]::Round($sz/1MB,1)) MB of Outlook temp files."
+                        Write-Output "âœ“ Cleared $([math]::Round($sz/1MB,1)) MB of Outlook temp files."
                     }
-                    Write-Output "✓ Restart Outlook to apply."
+                    Write-Output "âœ“ Restart Outlook to apply."
                     """ },
 
             new() { Id="repair-outlook-profile", Title="Repair Outlook profile",
@@ -264,7 +264,7 @@ public sealed partial class FixCatalogService
                 Type=FixType.Guided, Keywords=["outlook profile broken", "outlook keeps crashing", "outlook won't start", "repair outlook"],
                 Steps=[
                     new() { Title="Open Mail settings",       Instruction="Mail settings (Control Panel) will open.", Script=@"Start-Process 'C:\Windows\SysWOW64\control.exe' -ArgumentList 'mlcfg32.cpl'" },
-                    new() { Title="Select your profile",      Instruction="Click your email account in the list → click 'Repair'." },
+                    new() { Title="Select your profile",      Instruction="Click your email account in the list â†’ click 'Repair'." },
                     new() { Title="Follow the wizard",        Instruction="Click 'Next' through the repair wizard. Outlook will test and repair the connection to your mail server." }
                 ]},
 
@@ -273,7 +273,7 @@ public sealed partial class FixCatalogService
                 Type=FixType.Guided, Keywords=["office not activated", "office activation error", "microsoft office license", "office product key"],
                 Steps=[
                     new() { Title="Open Apps settings",  Instruction="Apps & Features will open.", Script="Start-Process ms-settings:appsfeatures" },
-                    new() { Title="Find Microsoft 365",  Instruction="Search for 'Microsoft 365' or 'Microsoft Office' → click it → 'Advanced options'." },
+                    new() { Title="Find Microsoft 365",  Instruction="Search for 'Microsoft 365' or 'Microsoft Office' â†’ click it â†’ 'Advanced options'." },
                     new() { Title="Repair the app",      Instruction="Click 'Quick Repair' first. If still failing, run 'Online Repair' (requires internet, takes ~30 minutes)." }
                 ]},
 
@@ -281,13 +281,13 @@ public sealed partial class FixCatalogService
                 Description="Runs the Inbox Repair Tool (scanpst.exe) to fix corrupted Outlook data files.",
                 Keywords=["outlook data file", "pst error", "ost error", "outlook email database", "rebuild outlook"],
                 Type=FixType.Guided, Steps=[
-                    new() { Title="Find your data file",   Instruction="In Outlook: File → Account Settings → Account Settings → Data Files tab. Note the path to your .ost or .pst file." },
+                    new() { Title="Find your data file",   Instruction="In Outlook: File â†’ Account Settings â†’ Account Settings â†’ Data Files tab. Note the path to your .ost or .pst file." },
                     new() { Title="Run scanpst.exe",        Instruction="The Inbox Repair Tool will open.", Script=@"Start-Process 'C:\Program Files\Microsoft Office\root\office16\SCANPST.EXE' -EA SilentlyContinue; Start-Process 'C:\Program Files (x86)\Microsoft Office\root\office16\SCANPST.EXE' -EA SilentlyContinue" },
-                    new() { Title="Repair the file",        Instruction="Click 'Browse', navigate to your .ost or .pst file → click 'Start'. If errors are found, click 'Repair'. This may take 10–60 minutes." }
+                    new() { Title="Repair the file",        Instruction="Click 'Browse', navigate to your .ost or .pst file â†’ click 'Start'. If errors are found, click 'Repair'. This may take 10â€“60 minutes." }
                 ]},
 
             new() { Id="clear-office-cache", Title="Clear Microsoft Office cache",
-                Description="Clears the Office document and thumbnail cache — fixes 'file in use' and sync errors.",
+                Description="Clears the Office document and thumbnail cache â€” fixes 'file in use' and sync errors.",
                 Type=FixType.Silent, RequiresAdmin=false,
                 Keywords=["office slow", "clear office temp files", "office cache", "reset office"],
                 Script="""
@@ -305,14 +305,14 @@ public sealed partial class FixCatalogService
                             Remove-Item "$p\*" -Recurse -Force -EA SilentlyContinue
                         }
                     }
-                    Write-Output "✓ Office cache cleared — freed $([math]::Round($freed/1MB,1)) MB."
+                    Write-Output "âœ“ Office cache cleared â€” freed $([math]::Round($freed/1MB,1)) MB."
                     """ },
         ]
     };
 
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  12. FILE & STORAGE
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     private static FixCategory FileAndStorage() => new()
     {
         Id="files", Icon="\uED25", Title="File & Storage",
@@ -323,8 +323,8 @@ public sealed partial class FixCatalogService
                 Type=FixType.Guided, RequiresAdmin=true,
                 Keywords=["access denied", "can't open file", "permission error", "not enough permissions", "file locked"], Steps=[
                     new() { Title="Find the file/folder",    Instruction="Locate the file or folder you can't access and note its full path (e.g. C:\\Users\\Name\\Documents\\file.txt)." },
-                    new() { Title="Take ownership",          Instruction="In File Explorer: right-click the file → Properties → Security → Advanced → Owner → Edit → type your username → Check Names → OK → Apply." },
-                    new() { Title="Grant full control",      Instruction="Back in Security → Edit → Add → type your username → Check Names → OK → check 'Full control' → Apply → OK." }
+                    new() { Title="Take ownership",          Instruction="In File Explorer: right-click the file â†’ Properties â†’ Security â†’ Advanced â†’ Owner â†’ Edit â†’ type your username â†’ Check Names â†’ OK â†’ Apply." },
+                    new() { Title="Grant full control",      Instruction="Back in Security â†’ Edit â†’ Add â†’ type your username â†’ Check Names â†’ OK â†’ check 'Full control' â†’ Apply â†’ OK." }
                 ]},
 
             new() { Id="recover-deleted-files", Title="Find recently deleted files",
@@ -332,9 +332,9 @@ public sealed partial class FixCatalogService
                 Type=FixType.Guided, Keywords=["recover deleted file", "undelete", "file recovery", "restore deleted", "accidental delete"],
                 Steps=[
                     new() { Title="Check Recycle Bin",         Instruction="Open the Recycle Bin on your desktop. Right-click and 'Sort by Date Deleted' to find recent files." },
-                    new() { Title="Check Previous Versions",   Instruction="Right-click the folder where the file was → Properties → Previous Versions tab. Restore an earlier version of the folder." },
-                    new() { Title="Check OneDrive Recycle Bin", Instruction="If you use OneDrive: go to onedrive.live.com → Recycle Bin. Files deleted from OneDrive folders stay here for 30 days." },
-                    new() { Title="Try file recovery software", Instruction="For truly deleted files: download Recuva (free, from Piriform/CCleaner) or TestDisk. Run immediately — the longer you wait, the less chance of recovery." }
+                    new() { Title="Check Previous Versions",   Instruction="Right-click the folder where the file was â†’ Properties â†’ Previous Versions tab. Restore an earlier version of the folder." },
+                    new() { Title="Check OneDrive Recycle Bin", Instruction="If you use OneDrive: go to onedrive.live.com â†’ Recycle Bin. Files deleted from OneDrive folders stay here for 30 days." },
+                    new() { Title="Try file recovery software", Instruction="For truly deleted files: download Recuva (free, from Piriform/CCleaner) or TestDisk. Run immediately â€” the longer you wait, the less chance of recovery." }
                 ]},
 
             new() { Id="fix-onedrive-sync", Title="Fix OneDrive sync issues",
@@ -350,13 +350,13 @@ public sealed partial class FixCatalogService
                             Start-Process $onedriveExe -ArgumentList "/reset"
                             Start-Sleep 3
                             Start-Process $onedriveExe
-                            Write-Output "✓ OneDrive reset and restarted."
+                            Write-Output "âœ“ OneDrive reset and restarted."
                         } else {
                             Write-Output "OneDrive not found in the standard location."
                         }
                         """ },
                     new() { Title="Sign back in",       Instruction="OneDrive will appear in your taskbar and ask you to sign in if needed. Sign in with your Microsoft account." },
-                    new() { Title="Wait for sync",      Instruction="Allow 5–10 minutes for OneDrive to re-sync your files. Files sync in order of most recently modified first." }
+                    new() { Title="Wait for sync",      Instruction="Allow 5â€“10 minutes for OneDrive to re-sync your files. Files sync in order of most recently modified first." }
                 ]},
 
             new() { Id="show-folder-sizes", Title="Show folder sizes on C:",
@@ -388,14 +388,14 @@ public sealed partial class FixCatalogService
                     Remove-Item 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Streams' -Recurse -Force -EA SilentlyContinue
                     Remove-Item 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\StuckRects3' -Recurse -Force -EA SilentlyContinue
                     Start-Process explorer
-                    Write-Output "✓ File Explorer reset and restarted."
+                    Write-Output "âœ“ File Explorer reset and restarted."
                     """ },
         ]
     };
 
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  13. PHONE & MOBILE
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     private static FixCategory PhoneAndMobile() => new()
     {
         Id="phone", Icon="\uE8EA", Title="Phone & Mobile",
@@ -407,22 +407,22 @@ public sealed partial class FixCatalogService
                 Keywords=["phone link", "connect phone to pc", "mirror phone", "android on pc", "iphone on pc"],
                 Script="Start-Process 'ms-settings:mobile-devices'" },
 
-            new() { Id="phone-not-charging", Title="Phone not charging — diagnosis",
+            new() { Id="phone-not-charging", Title="Phone not charging â€” diagnosis",
                 Description="Step-by-step guide to find and fix why your phone stopped charging.",
                 Keywords=["phone wont charge", "charging not working", "phone charger not working", "phone battery not charging"],
                 Type=FixType.Guided, Steps=[
-                    new() { Title="Test with a different cable",  Instruction="Try a different USB cable. Cables break internally without visible damage — this fixes ~40% of charging problems." },
+                    new() { Title="Test with a different cable",  Instruction="Try a different USB cable. Cables break internally without visible damage â€” this fixes ~40% of charging problems." },
                     new() { Title="Test with a different charger", Instruction="Plug the cable into a different charger or wall adapter. Chargers fail silently without warning." },
                     new() { Title="Clean the charging port",       Instruction="Look inside the charging port with a flashlight. Gently remove lint or debris with a dry wooden toothpick. Do NOT use metal. This is the #1 cause on phones over 1 year old." },
                     new() { Title="Force restart the phone",       Instruction="Hold the power button for 10+ seconds until the phone forces off, then power back on. Some charging circuits require a restart to reset." },
-                    new() { Title="Check for port damage",         Instruction="If nothing worked: look for bent pins or liquid damage in the charging port. Physical port damage requires professional repair (~$50–80)." }
+                    new() { Title="Check for port damage",         Instruction="If nothing worked: look for bent pins or liquid damage in the charging port. Physical port damage requires professional repair (~$50â€“80)." }
                 ]},
 
             new() { Id="phone-not-recognized", Title="Phone not recognized by Windows",
                 Description="Gets Windows to detect your Android or iPhone over USB.",
                 Keywords=["phone not detected", "usb phone not showing", "connect phone usb", "phone not appearing"],
                 Type=FixType.Guided, Steps=[
-                    new() { Title="Set phone to File Transfer",   Instruction="Plug in your phone. On Android: tap the USB notification → select 'File Transfer' or 'MTP'. On iPhone: tap 'Trust' on the phone screen." },
+                    new() { Title="Set phone to File Transfer",   Instruction="Plug in your phone. On Android: tap the USB notification â†’ select 'File Transfer' or 'MTP'. On iPhone: tap 'Trust' on the phone screen." },
                     new() { Title="Try a different cable & port", Instruction="Most USB cables are charge-only and carry no data. Try a different cable and a different USB port on your PC." },
                     new() { Title="Scan for phone drivers",       Instruction="Windows Update will check for phone drivers.", Script="Start-Process ms-settings:windowsupdate" },
                     new() { Title="iPhone: install Apple Devices", Instruction="iPhones require the 'Apple Devices' app (free in Microsoft Store) to be recognized. Open the Store and install it if missing." }
@@ -433,16 +433,16 @@ public sealed partial class FixCatalogService
                 Keywords=["phone wont connect wifi", "phone wifi problem", "phone keeps disconnecting wifi"],
                 Type=FixType.Guided, Steps=[
                     new() { Title="Toggle Airplane Mode",    Instruction="Swipe down on your phone and tap Airplane Mode ON. Wait 15 seconds. Tap it OFF again." },
-                    new() { Title="Forget and re-join",      Instruction="Settings → Wi-Fi → tap your network → Forget. Reconnect manually and re-enter the password." },
+                    new() { Title="Forget and re-join",      Instruction="Settings â†’ Wi-Fi â†’ tap your network â†’ Forget. Reconnect manually and re-enter the password." },
                     new() { Title="Restart your router",     Instruction="Unplug your router and modem from the wall. Wait 30 seconds. Plug them back in. Wait 2 minutes." },
-                    new() { Title="Reset network settings",  Instruction="Last resort: Settings → General Management (Android: System → Reset) → Reset Network Settings. This forgets all saved Wi-Fi passwords." }
+                    new() { Title="Reset network settings",  Instruction="Last resort: Settings â†’ General Management (Android: System â†’ Reset) â†’ Reset Network Settings. This forgets all saved Wi-Fi passwords." }
                 ]},
         ]
     };
 
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  14. REMOTE ACCESS & VPN
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     private static FixCategory RemoteAndVpn() => new()
     {
         Id="remote", Icon="\uE753", Title="Remote Access & VPN",
@@ -452,15 +452,15 @@ public sealed partial class FixCatalogService
                 Description="Step-by-step fixes for a VPN that drops or can't connect.",
                 Keywords=["vpn keeps disconnecting", "vpn dropping", "vpn not stable", "vpn connection lost"],
                 Type=FixType.Guided, Steps=[
-                    new() { Title="Reset network stack",      Instruction="Click 'Done' to flush DNS and reset TCP/IP — fixes most VPN connectivity errors.", Script="""
+                    new() { Title="Reset network stack",      Instruction="Click 'Done' to flush DNS and reset TCP/IP â€” fixes most VPN connectivity errors.", Script="""
                         ipconfig /flushdns | Out-Null
                         netsh winsock reset | Out-Null
                         netsh int ip reset | Out-Null
-                        Write-Output "✓ Network stack reset. Restart your PC for full effect."
+                        Write-Output "âœ“ Network stack reset. Restart your PC for full effect."
                         """ },
                     new() { Title="Switch VPN protocol",      Instruction="In your VPN app settings, try switching the protocol: WireGuard is fastest, OpenVPN UDP is most stable, IKEv2 works best on mobile. Try each if one keeps dropping." },
                     new() { Title="Use a wired connection",   Instruction="Plug directly into your router via Ethernet. VPNs over Wi-Fi are prone to disconnects due to signal fluctuation." },
-                    new() { Title="Disable IPv6",             Instruction="Open Network adapter settings → right-click your adapter → Properties → uncheck 'Internet Protocol Version 6 (TCP/IPv6)'. Re-enable if this causes other issues." }
+                    new() { Title="Disable IPv6",             Instruction="Open Network adapter settings â†’ right-click your adapter â†’ Properties â†’ uncheck 'Internet Protocol Version 6 (TCP/IPv6)'. Re-enable if this causes other issues." }
                 ]},
 
             new() { Id="check-rdp-status", Title="Check Remote Desktop status",
@@ -469,7 +469,7 @@ public sealed partial class FixCatalogService
                 Keywords=["is remote desktop on", "rdp enabled", "remote desktop status", "check rdp"],
                 Script="""
                     $rdp = (Get-ItemProperty 'HKLM:\System\CurrentControlSet\Control\Terminal Server').fDenyTSConnections
-                    $status = if($rdp -eq 0){"ENABLED — Remote connections are allowed"}else{"DISABLED"}
+                    $status = if($rdp -eq 0){"ENABLED â€” Remote connections are allowed"}else{"DISABLED"}
                     Write-Output "Remote Desktop: $status"
                     Write-Output ""
                     Write-Output "Users with RDP access:"
@@ -483,41 +483,41 @@ public sealed partial class FixCatalogService
                 Script="""
                     Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name fDenyTSConnections -Value 0
                     Enable-NetFirewallRule -DisplayGroup 'Remote Desktop' -EA SilentlyContinue
-                    Write-Output "✓ Remote Desktop enabled."
+                    Write-Output "âœ“ Remote Desktop enabled."
                     $ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object {$_.PrefixOrigin -ne 'WellKnown'} | Select-Object -First 1).IPAddress
                     Write-Output "  Connect from another PC using: $ip"
-                    Write-Output "  ⚠ Only enable this on trusted networks — disable when not in use."
+                    Write-Output "  âš  Only enable this on trusted networks â€” disable when not in use."
                     """ },
 
             new() { Id="disable-rdp", Title="Disable Remote Desktop",
-                Description="Disables Remote Desktop — reduces attack surface when you don't need remote access.",
+                Description="Disables Remote Desktop â€” reduces attack surface when you don't need remote access.",
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["disable remote desktop", "turn off rdp", "block remote access", "stop rdp"],
                 Script="""
                     Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name fDenyTSConnections -Value 1
                     Disable-NetFirewallRule -DisplayGroup 'Remote Desktop' -EA SilentlyContinue
-                    Write-Output "✓ Remote Desktop disabled."
+                    Write-Output "âœ“ Remote Desktop disabled."
                     """ },
         ]
     };
 
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  15. MAINTENANCE & RECOVERY
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     private static FixCategory MaintenanceAndRecovery() => new()
     {
         Id="maintenance", Icon="\uE90F", Title="Maintenance & Recovery",
         Fixes=
         [
             new() { Id="create-restore-point", Title="Create system restore point",
-                Description="Creates a Windows restore point right now — your safety net before major changes.",
+                Description="Creates a Windows restore point right now â€” your safety net before major changes.",
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["create restore point", "backup windows", "system snapshot", "before i make changes"],
                 Script="""
-                    $desc = "HelpDesk restore point — $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
+                    $desc = "FixFox restore point â€” $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
                     Enable-ComputerRestore -Drive "C:\" -EA SilentlyContinue
                     Checkpoint-Computer -Description $desc -RestorePointType MODIFY_SETTINGS -EA SilentlyContinue
-                    Write-Output "✓ Restore point created: $desc"
+                    Write-Output "âœ“ Restore point created: $desc"
                     """ },
 
             new() { Id="open-system-restore", Title="Open System Restore wizard",
@@ -539,9 +539,9 @@ public sealed partial class FixCatalogService
                     foreach ($log in @('Application','System','Setup')) {
                         try {
                             Clear-EventLog -LogName $log -EA SilentlyContinue
-                            Write-Output "✓ Cleared: $log"
+                            Write-Output "âœ“ Cleared: $log"
                         } catch {
-                            Write-Output "⚠ Skipped: $log (access denied)"
+                            Write-Output "âš  Skipped: $log (access denied)"
                         }
                     }
                     Write-Output "Event logs cleared."
@@ -558,11 +558,11 @@ public sealed partial class FixCatalogService
                 Keywords=["reset power settings", "restore power plans", "power plan reset", "fix power settings"],
                 Script="""
                     powercfg /restoredefaultschemes
-                    Write-Output "✓ All power plans restored to Windows defaults."
+                    Write-Output "âœ“ All power plans restored to Windows defaults."
                     """ },
 
             new() { Id="clear-font-cache", Title="Clear font cache",
-                Description="Clears Windows font cache — fixes corrupted or missing font rendering.",
+                Description="Clears Windows font cache â€” fixes corrupted or missing font rendering.",
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["font rendering wrong", "fonts corrupted", "text looking wrong", "font cache"],
                 Script="""
@@ -571,14 +571,14 @@ public sealed partial class FixCatalogService
                     Remove-Item "$env:WINDIR\ServiceProfiles\LocalService\AppData\Local\FontCache*" -Force -EA SilentlyContinue
                     Remove-Item "$env:WINDIR\System32\FNTCACHE.DAT" -Force -EA SilentlyContinue
                     Start-Service FontCache -EA SilentlyContinue
-                    Write-Output "✓ Font cache cleared."
+                    Write-Output "âœ“ Font cache cleared."
                     """ },
         ]
     };
 
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  16. SLEEP & POWER
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     private static FixCategory SleepAndPower() => new()
     {
         Id="sleep", Icon="\uE945", Title="Sleep & Power",
@@ -608,11 +608,11 @@ public sealed partial class FixCatalogService
                         $plans = powercfg /list
                         $active = ($plans | Where-Object {$_ -match '\*'} -EA SilentlyContinue) -replace '.*\*\s*',''
                         powercfg /change standby-timeout-ac 30 2>&1 | Out-Null
-                        Write-Output "✓ Wake timers enabled. Sleep timeout set to 30 min."
+                        Write-Output "âœ“ Wake timers enabled. Sleep timeout set to 30 min."
                         """ },
                     new() { Title="Enable keyboard wake",        Instruction="Click 'Done' to enable USB keyboard as a wake device.", Script="""
                         Get-WmiObject Win32_NetworkAdapterConfiguration | Where-Object {$_.IPEnabled} | ForEach-Object { $_.SetWakeOnMagicPacket($true) | Out-Null }
-                        Write-Output "✓ Wake-on-LAN configured. For USB keyboard wake, see Device Manager → HID Keyboard → Power Management → 'Allow this device to wake the computer'."
+                        Write-Output "âœ“ Wake-on-LAN configured. For USB keyboard wake, see Device Manager â†’ HID Keyboard â†’ Power Management â†’ 'Allow this device to wake the computer'."
                         """ },
                     new() { Title="Update chipset/USB drivers",  Instruction="If still can't wake: update USB controller and chipset drivers in Device Manager. These driver bugs cause most wake failures." }
                 ]},
@@ -624,8 +624,8 @@ public sealed partial class FixCatalogService
                 Script="""
                     $path = 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Power'
                     Set-ItemProperty -Path $path -Name HiberbootEnabled -Value 0 -Type DWord
-                    Write-Output "✓ Fast Startup disabled."
-                    Write-Output "  PC will do a full cold boot every time. Re-enable in Power Options → Choose what the power buttons do."
+                    Write-Output "âœ“ Fast Startup disabled."
+                    Write-Output "  PC will do a full cold boot every time. Re-enable in Power Options â†’ Choose what the power buttons do."
                     """ },
 
             new() { Id="show-power-report", Title="Generate power efficiency report",
@@ -637,7 +637,7 @@ public sealed partial class FixCatalogService
                     powercfg /energy /output $f /duration 60
                     if (Test-Path $f) {
                         Start-Process $f
-                        Write-Output "✓ Power efficiency report saved to Desktop and opened."
+                        Write-Output "âœ“ Power efficiency report saved to Desktop and opened."
                     } else {
                         Write-Output "Power report generation failed. Try running as administrator."
                     }
@@ -645,9 +645,9 @@ public sealed partial class FixCatalogService
         ]
     };
 
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  17. WINDOWS FEATURES
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     private static FixCategory WindowsFeatures() => new()
     {
         Id="winfeatures", Icon="\uE782", Title="Windows Features",
@@ -658,25 +658,25 @@ public sealed partial class FixCatalogService
                 Keywords=["windows hello broken", "fingerprint not working", "face recognition broken", "pin not working", "hello setup"],
                 Type=FixType.Guided, Steps=[
                     new() { Title="Open Sign-in options",   Instruction="Sign-in options will open.", Script="Start-Process ms-settings:signinoptions" },
-                    new() { Title="Remove PIN",             Instruction="Click 'Windows Hello PIN' → 'Remove'. If this fails: open an admin CMD and run: net user [username] *" },
-                    new() { Title="Set up a new PIN",       Instruction="Click 'Windows Hello PIN' → 'Set up' → follow the wizard to create a new PIN." }
+                    new() { Title="Remove PIN",             Instruction="Click 'Windows Hello PIN' â†’ 'Remove'. If this fails: open an admin CMD and run: net user [username] *" },
+                    new() { Title="Set up a new PIN",       Instruction="Click 'Windows Hello PIN' â†’ 'Set up' â†’ follow the wizard to create a new PIN." }
                 ]},
 
             new() { Id="fix-cortana-search", Title="Rebuild Windows Search index",
-                Description="Deletes and rebuilds the Windows Search index — fixes searches returning no results.",
+                Description="Deletes and rebuilds the Windows Search index â€” fixes searches returning no results.",
                 Type=FixType.Guided, RequiresAdmin=true, Keywords=["search not working", "cortana broken", "start menu search empty", "search nothing", "rebuild search"],
                 Steps=[
                     new() { Title="Open Indexing Options",   Instruction="Indexing Options will open.", Script="control.exe srchadmin.dll" },
-                    new() { Title="Advanced settings",       Instruction="Click 'Advanced' → click 'Rebuild' under Troubleshooting → click OK. Wait 30–60 minutes for the index to rebuild." }
+                    new() { Title="Advanced settings",       Instruction="Click 'Advanced' â†’ click 'Rebuild' under Troubleshooting â†’ click OK. Wait 30â€“60 minutes for the index to rebuild." }
                 ]},
 
             new() { Id="enable-sandbox", Title="Enable Windows Sandbox",
-                Description="Enables Windows Sandbox — a safe, isolated environment to run untrusted software.",
+                Description="Enables Windows Sandbox â€” a safe, isolated environment to run untrusted software.",
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["windows sandbox", "test programs safely", "isolated environment", "sandbox"],
                 Script="""
                     Enable-WindowsOptionalFeature -Online -FeatureName 'Containers-DisposableClientVM' -All -EA SilentlyContinue
-                    Write-Output "✓ Windows Sandbox enabled (or already enabled). Restart may be required."
+                    Write-Output "âœ“ Windows Sandbox enabled (or already enabled). Restart may be required."
                     Write-Output "  Search for 'Windows Sandbox' in the Start Menu to launch it."
                     """ },
 
@@ -686,7 +686,7 @@ public sealed partial class FixCatalogService
                 Script="""
                     Stop-Process -Name WinStore.App -Force -EA SilentlyContinue
                     wsreset.exe
-                    Write-Output "✓ Microsoft Store cache reset. The Store will reopen in a few seconds."
+                    Write-Output "âœ“ Microsoft Store cache reset. The Store will reopen in a few seconds."
                     """ },
 
             new() { Id="toggle-dark-mode", Title="Toggle dark/light mode",
@@ -700,14 +700,14 @@ public sealed partial class FixCatalogService
                     Set-ItemProperty -Path $path -Name AppsUseLightTheme   -Value $new
                     Set-ItemProperty -Path $path -Name SystemUsesLightTheme -Value $new
                     $mode = if($new -eq 0){"Dark"}else{"Light"}
-                    Write-Output "✓ Switched to $mode mode."
+                    Write-Output "âœ“ Switched to $mode mode."
                     """ },
         ]
     };
 
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  18. ADVANCED TOOLS
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     private static FixCategory AdvancedTools() => new()
     {
         Id="advanced", Icon="\uE713", Title="Advanced Tools",
@@ -720,25 +720,25 @@ public sealed partial class FixCatalogService
                 Script="gpedit.msc" },
 
             new() { Id="open-registry-editor", Title="Open Registry Editor",
-                Description="Opens the Windows Registry Editor (regedit) — for advanced users.",
+                Description="Opens the Windows Registry Editor (regedit) â€” for advanced users.",
                 Type=FixType.Guided, Steps=[
-                    new() { Title="Open Registry Editor", Instruction="⚠ The Registry Editor will open. Incorrect edits can break Windows. Create a restore point before making changes.", Script="regedit.exe" }
+                    new() { Title="Open Registry Editor", Instruction="âš  The Registry Editor will open. Incorrect edits can break Windows. Create a restore point before making changes.", Script="regedit.exe" }
                 ]},
 
             new() { Id="open-resource-monitor", Title="Open Resource Monitor",
-                Description="Opens Resource Monitor — detailed real-time view of CPU, RAM, disk, and network usage.",
+                Description="Opens Resource Monitor â€” detailed real-time view of CPU, RAM, disk, and network usage.",
                 Type=FixType.Silent, RequiresAdmin=false,
                 Keywords=["registry editor", "regedit", "edit registry", "advanced registry", "windows registry"],
                 Script="resmon.exe" },
 
             new() { Id="flush-kerberos-tickets", Title="Clear Kerberos authentication tickets",
-                Description="Clears cached network credentials — fixes 'access denied' on domain networks.",
+                Description="Clears cached network credentials â€” fixes 'access denied' on domain networks.",
                 Type=FixType.Silent, RequiresAdmin=false,
                 Keywords=["kerberos", "network auth", "active directory login", "domain credentials"],
-                Script="klist purge; Write-Output '✓ Kerberos tickets purged.'" },
+                Script="klist purge; Write-Output 'âœ“ Kerberos tickets purged.'" },
 
             new() { Id="repair-wmi-2", Title="Full WMI repository rebuild",
-                Description="Completely rebuilds the WMI repository — fixes deep WMI corruption issues.",
+                Description="Completely rebuilds the WMI repository â€” fixes deep WMI corruption issues.",
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["wmi broken", "wmi error", "management instrumentation", "performance monitor not working", "wmi repair"],
                 Script="""
@@ -751,7 +751,7 @@ public sealed partial class FixCatalogService
                     foreach ($m in $mofs) {
                         mofcomp "$($m.FullName)" 2>&1 | Out-Null
                     }
-                    Write-Output "✓ WMI repository rebuilt. Restart recommended."
+                    Write-Output "âœ“ WMI repository rebuilt. Restart recommended."
                     """ },
 
             new() { Id="enable-verbose-boot", Title="Enable verbose boot messages",
@@ -760,7 +760,7 @@ public sealed partial class FixCatalogService
                 Keywords=["slow startup diagnosis", "what slows boot", "verbose boot", "startup verbose", "analyze startup time"],
                 Script="""
                     Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System' -Name VerboseStatus -Value 1 -Type DWord
-                    Write-Output "✓ Verbose startup/shutdown messages enabled."
+                    Write-Output "âœ“ Verbose startup/shutdown messages enabled."
                     Write-Output "  Disable: Set VerboseStatus to 0 in the same registry path."
                     """ },
 
@@ -771,7 +771,7 @@ public sealed partial class FixCatalogService
                 Script="""
                     $report = "$env:USERPROFILE\Desktop\PCHealthReport_$(Get-Date -Format 'yyyyMMdd_HHmm').txt"
                     $lines = @()
-                    $lines += "=== PC Health Report — $(Get-Date) ==="
+                    $lines += "=== PC Health Report â€” $(Get-Date) ==="
                     $lines += ""
 
                     # System info
@@ -787,7 +787,7 @@ public sealed partial class FixCatalogService
                     # Disk
                     $lines += "DISK"
                     Get-PhysicalDisk | ForEach-Object {
-                        $lines += "  $($_.FriendlyName) — $($_.HealthStatus) — $($_.MediaType)"
+                        $lines += "  $($_.FriendlyName) â€” $($_.HealthStatus) â€” $($_.MediaType)"
                     }
                     $lines += ""
 
@@ -814,32 +814,32 @@ public sealed partial class FixCatalogService
                     ForEach-Object { $lines += "  $($_.TimeCreated.ToString('MM/dd HH:mm')) [$($_.ProviderName)] $($_.Message.Split("`n")[0].Trim())" }
 
                     $lines | Out-File $report -Encoding UTF8
-                    Write-Output "✓ Health report saved to: $report"
+                    Write-Output "âœ“ Health report saved to: $report"
                     Start-Process notepad $report
                     """ },
         ]
     };
 
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  BUNDLES
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     private static List<FixBundle> BuildBundles() =>
     [
         new() {
             Id="weekly-tune-up", Icon="\uE8A0", Title="Weekly Tune-Up",
-            Description="Essential weekly maintenance — clears junk, resets caches, checks health.",
+            Description="Essential weekly maintenance â€” clears junk, resets caches, checks health.",
             EstTime="~3 min",
             FixIds=["clear-temp-files","clear-thumbnail-cache","flush-dns","check-defender-status","disk-space-all-drives"]
         },
         new() {
             Id="network-full-reset", Icon="\uE968", Title="Network Fix Pack",
-            Description="Full network repair — flushes DNS, renews IP, resets TCP/IP stack.",
+            Description="Full network repair â€” flushes DNS, renews IP, resets TCP/IP stack.",
             EstTime="~2 min",
             FixIds=["flush-dns","renew-ip","full-network-reset","test-connection"]
         },
         new() {
             Id="gaming-boost", Icon="\uE7FC", Title="Gaming Boost",
-            Description="Maximizes gaming performance — Game Mode, network tweaks, shader cache clear, registry tweaks.",
+            Description="Maximizes gaming performance â€” Game Mode, network tweaks, shader cache clear, registry tweaks.",
             EstTime="~3 min",
             FixIds=["enable-game-mode","disable-game-bar","gaming-registry-tweaks","gaming-network-tweaks","clear-shader-cache","set-ultimate-performance"]
         },
@@ -857,7 +857,7 @@ public sealed partial class FixCatalogService
         },
         new() {
             Id="full-repair", Icon="\uE90F", Title="Full System Repair",
-            Description="Runs SFC and DISM to fix corrupted Windows files. Requires internet. Takes 20–40 minutes.",
+            Description="Runs SFC and DISM to fix corrupted Windows files. Requires internet. Takes 20â€“40 minutes.",
             EstTime="~30 min",
             FixIds=["run-sfc","run-dism","scan-driver-problems","check-defender-status","bsod-check-recent-crashes"]
         },
@@ -869,7 +869,7 @@ public sealed partial class FixCatalogService
         },
         new() {
             Id="deep-clean", Icon="\uECFC", Title="Deep Clean",
-            Description="Maximum cleanup — temp files, browser caches, thumbnails, Windows Update cache, event logs.",
+            Description="Maximum cleanup â€” temp files, browser caches, thumbnails, Windows Update cache, event logs.",
             EstTime="~5 min",
             FixIds=["clear-temp-files","clear-thumbnail-cache","clear-browser-cache","clear-wsu-download-cache","run-disk-cleanup","clear-event-logs"]
         },
@@ -881,43 +881,43 @@ public sealed partial class FixCatalogService
         },
         new() {
             Id="fresh-start-prep", Icon="\uE8F4", Title="Fresh Start Prep",
-            Description="Cleans up your PC before a reset — clears caches, defragments, repairs Windows image.",
+            Description="Cleans up your PC before a reset â€” clears caches, defragments, repairs Windows image.",
             EstTime="~25 min",
             FixIds=["clear-temp-files","run-sfc","run-dism","optimize-drive","clear-wsu-download-cache","clear-thumbnail-cache"]
         },
         new() {
             Id="laptop-battery-saver", Icon="\uE83F", Title="Laptop Battery Saver",
-            Description="Maximizes battery life — balanced power plan, USB selective suspend, reduces background activity.",
+            Description="Maximizes battery life â€” balanced power plan, USB selective suspend, reduces background activity.",
             EstTime="~2 min",
             FixIds=["set-high-performance","disable-superfetch","optimize-visual-effects","disable-telemetry","usb-selective-suspend"]
         },
         new() {
             Id="gaming-pc-setup", Icon="\uE7FC", Title="Gaming PC Setup",
-            Description="Full gaming optimization — Ultimate Performance plan, HAGS, Game Mode, disable Game Bar, clear shader cache.",
+            Description="Full gaming optimization â€” Ultimate Performance plan, HAGS, Game Mode, disable Game Bar, clear shader cache.",
             EstTime="~5 min",
             FixIds=["set-ultimate-performance","enable-game-mode","disable-game-bar","gaming-registry-tweaks","gaming-network-tweaks","clear-shader-cache","enable-hags","add-defender-game-exclusions"]
         },
         new() {
             Id="new-user-setup", Icon="\uE77B", Title="New User Setup",
-            Description="First-time PC setup — activates Windows, checks updates, sets DNS, adjusts visual effects.",
+            Description="First-time PC setup â€” activates Windows, checks updates, sets DNS, adjusts visual effects.",
             EstTime="~5 min",
             FixIds=["open-windows-update","check-activation","set-dns-cloudflare","optimize-visual-effects","check-defender-status","disable-ads-tips"]
         },
         new() {
             Id="work-from-home-pack", Icon="\uE821", Title="Work From Home Pack",
-            Description="Optimizes your PC for remote work — fixes webcam, mic, network, Teams, and DNS.",
+            Description="Optimizes your PC for remote work â€” fixes webcam, mic, network, Teams, and DNS.",
             EstTime="~4 min",
             FixIds=["fix-webcam","fix-microphone","flush-dns","set-dns-cloudflare","clear-teams-cache","full-network-reset","set-high-performance"]
         },
         new() {
             Id="student-low-end-pack", Icon="\uE7BE", Title="Student / Low-End PC Pack",
-            Description="Maximum performance on limited hardware — disables animations, SuperFetch, optimizes RAM.",
+            Description="Maximum performance on limited hardware â€” disables animations, SuperFetch, optimizes RAM.",
             EstTime="~3 min",
             FixIds=["optimize-visual-effects","disable-superfetch","clear-temp-files","set-high-performance","disable-startup-apps","top-memory-processes"]
         },
         new() {
             Id="post-malware-cleanup", Icon="\uEADF", Title="Post-Malware Cleanup",
-            Description="Post-infection cleanup — updates Defender, clears startup programs, checks hosts file, resets network.",
+            Description="Post-infection cleanup â€” updates Defender, clears startup programs, checks hosts file, resets network.",
             EstTime="~5 min",
             FixIds=["update-virus-definitions","check-defender-status","list-startup-programs","view-hosts-file","full-network-reset","check-open-ports","reset-windows-update"]
         },

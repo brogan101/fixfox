@@ -77,6 +77,7 @@ public partial class App : System.Windows.Application
         svc.AddSingleton<MainViewModel>();
         svc.AddTransient<DashboardPage>();
         svc.AddTransient<FixCenterPage>();
+        svc.AddTransient<FixMyPcPage>();
         svc.AddTransient<BundlesPage>();
         svc.AddTransient<SystemInfoPage>();
         svc.AddTransient<SymptomCheckerPage>();

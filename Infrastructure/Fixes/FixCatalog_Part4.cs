@@ -5,9 +5,9 @@ namespace HelpDesk.Infrastructure.Fixes;
 
 public sealed partial class FixCatalogService
 {
-    // ══════════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  DEVICES & USB
-    // ══════════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     private static FixCategory DevicesAndUsb() => new()
     {
         Id="devices-usb", Icon="\uE88E", Title="Devices & USB",
@@ -23,7 +23,7 @@ public sealed partial class FixCatalogService
                     if ($cams) {
                         Write-Output "=== Camera devices found ==="
                         $cams | ForEach-Object {
-                            Write-Output "$($_.FriendlyName) — Status: $($_.Status)"
+                            Write-Output "$($_.FriendlyName) â€” Status: $($_.Status)"
                         }
                     } else {
                         Write-Output "No camera devices found in Device Manager."
@@ -34,10 +34,10 @@ public sealed partial class FixCatalogService
                     Write-Output "Camera privacy setting: $camPriv"
                     if ($camPriv -eq 'Deny') {
                         Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\webcam" -Name "Value" -Value "Allow" -EA SilentlyContinue
-                        Write-Output "✓ Camera access re-enabled."
+                        Write-Output "âœ“ Camera access re-enabled."
                     } else {
                         Write-Output "  Camera access is currently: $camPriv"
-                        Write-Output "  To enable apps: Settings → Privacy → Camera → Allow apps to access your camera."
+                        Write-Output "  To enable apps: Settings â†’ Privacy â†’ Camera â†’ Allow apps to access your camera."
                     }
                     """ },
 
@@ -49,23 +49,23 @@ public sealed partial class FixCatalogService
                     $mics = Get-WmiObject -Class Win32_SoundDevice -EA SilentlyContinue | Where-Object {$_.Name -match 'Microphone|Mic|Input|Array'}
                     Write-Output "=== Microphone devices ==="
                     if ($mics) {
-                        $mics | ForEach-Object { Write-Output "$($_.Name) — Status: $($_.Status)" }
+                        $mics | ForEach-Object { Write-Output "$($_.Name) â€” Status: $($_.Status)" }
                     } else {
-                        Write-Output "No dedicated microphone found — check Device Manager."
+                        Write-Output "No dedicated microphone found â€” check Device Manager."
                     }
                     $micPriv = Get-ItemPropertyValue -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone" -Name "Value" -EA SilentlyContinue
                     Write-Output ""
                     Write-Output "Microphone privacy: $micPriv"
                     if ($micPriv -eq 'Deny') {
                         Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone" -Name "Value" -Value "Allow" -EA SilentlyContinue
-                        Write-Output "✓ Microphone access re-enabled."
+                        Write-Output "âœ“ Microphone access re-enabled."
                     } else {
-                        Write-Output "  If an app can't hear you, check: Settings → Privacy → Microphone"
+                        Write-Output "  If an app can't hear you, check: Settings â†’ Privacy â†’ Microphone"
                     }
                     """ },
 
             new() { Id="usb-selective-suspend", Title="Disable USB selective suspend",
-                Description="Prevents Windows from powering down USB ports — fixes devices that randomly disconnect.",
+                Description="Prevents Windows from powering down USB ports â€” fixes devices that randomly disconnect.",
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["usb device disconnects","usb keeps disconnecting","mouse disconnects","keyboard disconnects","usb power management"],
                 Script="""
@@ -75,7 +75,7 @@ public sealed partial class FixCatalogService
                     powercfg /setacvalueindex $guid 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0
                     powercfg /setdcvalueindex $guid 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0
                     powercfg /setactive $guid
-                    Write-Output "✓ USB selective suspend disabled. USB devices will stay powered."
+                    Write-Output "âœ“ USB selective suspend disabled. USB devices will stay powered."
                     """ },
 
             new() { Id="fix-usb-not-recognized-guided", Title="Fix 'USB device not recognized'",
@@ -108,7 +108,7 @@ public sealed partial class FixCatalogService
                             Set-ItemProperty -Path $devPath -Name EnhancedPowerManagementEnabled -Value 0 -Type DWord -EA SilentlyContinue
                         }
                     }
-                    Write-Output "✓ Mouse HID queue size increased. Disable USB selective suspend for full effect."
+                    Write-Output "âœ“ Mouse HID queue size increased. Disable USB selective suspend for full effect."
                     """ },
 
             new() { Id="fix-bluetooth-device", Title="Restart Bluetooth service",
@@ -120,15 +120,15 @@ public sealed partial class FixCatalogService
                     Start-Sleep 2
                     Start-Service bthserv -EA SilentlyContinue
                     $status = (Get-Service bthserv -EA SilentlyContinue)?.Status ?? "Not found"
-                    Write-Output "✓ Bluetooth service: $status"
+                    Write-Output "âœ“ Bluetooth service: $status"
                     Write-Output "  Try removing and re-pairing your device."
                     """ },
         ]
     };
 
-    // ══════════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  WINDOWS APPS & FEATURES
-    // ══════════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     private static FixCategory WindowsAppsAndFeatures() => new()
     {
         Id="windows-apps", Icon="\uE71D", Title="Windows Apps & Features",
@@ -146,7 +146,7 @@ public sealed partial class FixCatalogService
                     Get-AppXPackage *WindowsStore* -AllUsers | ForEach-Object {
                         Add-AppxPackage -DisableDevelopmentMode -Register "$($_.InstallLocation)\AppXManifest.xml" -EA SilentlyContinue
                     }
-                    Write-Output "✓ Microsoft Store cache cleared. Store should now open."
+                    Write-Output "âœ“ Microsoft Store cache cleared. Store should now open."
                     """ },
 
             new() { Id="clear-teams-cache", Title="Clear Microsoft Teams cache",
@@ -174,7 +174,7 @@ public sealed partial class FixCatalogService
                             Get-ChildItem $p -Recurse -Force -EA SilentlyContinue | Remove-Item -Force -Recurse -EA SilentlyContinue
                         }
                     }
-                    Write-Output "✓ Cleared $([math]::Round($freed/1MB,1)) MB of Teams cache. Restart Teams."
+                    Write-Output "âœ“ Cleared $([math]::Round($freed/1MB,1)) MB of Teams cache. Restart Teams."
                     """ },
 
             new() { Id="disable-discord-overlay", Title="Disable Discord in-game overlay",
@@ -200,11 +200,11 @@ public sealed partial class FixCatalogService
                     if (Test-Path $gsPath) {
                         Get-ChildItem $gsPath -Recurse -Force -EA SilentlyContinue | Remove-Item -Force -Recurse -EA SilentlyContinue
                     }
-                    Write-Output "✓ Xbox apps re-registered. Restart your PC for full effect."
+                    Write-Output "âœ“ Xbox apps re-registered. Restart your PC for full effect."
                     """ },
 
             new() { Id="rebuild-font-cache", Title="Rebuild font cache",
-                Description="Clears and rebuilds the Windows font cache — fixes rendering issues in apps.",
+                Description="Clears and rebuilds the Windows font cache â€” fixes rendering issues in apps.",
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["fonts not loading","font rendering broken","font cache","text looks wrong","fonts missing in app"],
                 Script="""
@@ -220,7 +220,7 @@ public sealed partial class FixCatalogService
                         if (Test-Path $p) { Remove-Item "$p\*" -Force -Recurse -EA SilentlyContinue }
                     }
                     Start-Service FontCache -EA SilentlyContinue
-                    Write-Output "✓ Font cache cleared. Fonts will rebuild on next login."
+                    Write-Output "âœ“ Font cache cleared. Fonts will rebuild on next login."
                     """ },
 
             new() { Id="fix-desktop-icons", Title="Fix missing/wrong desktop icons",
@@ -235,15 +235,15 @@ public sealed partial class FixCatalogService
                     $cache = "$env:LOCALAPPDATA\Microsoft\Windows\Explorer"
                     Get-ChildItem "$cache\iconcache_*.db" -EA SilentlyContinue | Remove-Item -Force -EA SilentlyContinue
                     Start-Process explorer
-                    Write-Output "✓ Icon cache cleared and Explorer restarted. Icons will rebuild."
+                    Write-Output "âœ“ Icon cache cleared and Explorer restarted. Icons will rebuild."
                     """ },
 
             new() { Id="rebuild-search-index", Title="Rebuild Windows search index",
-                Description="Rebuilds the search index — fixes missing files in search results.",
+                Description="Rebuilds the search index â€” fixes missing files in search results.",
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["windows search not finding files","search not working","search results missing","cortana search broken"],
                 Script="""
-                    Write-Output "Rebuilding search index (this can take 15–30 minutes in background)..."
+                    Write-Output "Rebuilding search index (this can take 15â€“30 minutes in background)..."
                     Stop-Service WSearch -Force -EA SilentlyContinue
                     Start-Sleep 2
                     $dbPath = "$env:PROGRAMDATA\Microsoft\Search\Data\Applications\Windows"
@@ -251,22 +251,22 @@ public sealed partial class FixCatalogService
                         Remove-Item "$dbPath\Windows.edb" -Force -EA SilentlyContinue
                     }
                     Start-Service WSearch -EA SilentlyContinue
-                    Write-Output "✓ Search index database reset. Indexing will rebuild in background."
-                    Write-Output "  Full results will be available in 15–30 minutes."
+                    Write-Output "âœ“ Search index database reset. Indexing will rebuild in background."
+                    Write-Output "  Full results will be available in 15â€“30 minutes."
                     """ },
 
             new() { Id="enable-hags", Title="Enable Hardware-Accelerated GPU Scheduling",
-                Description="Enables HAGS (Windows 10 2004+, Nvidia/AMD required) — reduces GPU latency in games.",
+                Description="Enables HAGS (Windows 10 2004+, Nvidia/AMD required) â€” reduces GPU latency in games.",
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["hags","hardware gpu scheduling","reduce gpu latency","gaming tweak gpu","gpu performance"],
                 Script="""
                     $path = "HKLM:\SYSTEM\CurrentControlSet\Control\GraphicsDrivers"
                     $val  = (Get-ItemProperty -Path $path -Name HwSchMode -EA SilentlyContinue).HwSchMode
                     if ($val -eq 2) {
-                        Write-Output "✓ Hardware-Accelerated GPU Scheduling is already enabled."
+                        Write-Output "âœ“ Hardware-Accelerated GPU Scheduling is already enabled."
                     } else {
                         Set-ItemProperty -Path $path -Name HwSchMode -Value 2 -Type DWord
-                        Write-Output "✓ HAGS enabled. A restart is required to take effect."
+                        Write-Output "âœ“ HAGS enabled. A restart is required to take effect."
                         Write-Output "  Note: Requires Windows 10 2004+ and a compatible GPU driver."
                     }
                     """ },
@@ -281,11 +281,11 @@ public sealed partial class FixCatalogService
                     Start-Service w32tm -EA SilentlyContinue
                     w32tm /resync /force 2>&1
                     $time = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-                    Write-Output "✓ Current time: $time"
+                    Write-Output "âœ“ Current time: $time"
                     """ },
 
             new() { Id="disable-cortana", Title="Disable Cortana",
-                Description="Disables Cortana — reduces background CPU/RAM usage and data collection.",
+                Description="Disables Cortana â€” reduces background CPU/RAM usage and data collection.",
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["disable cortana","cortana using ram","cortana off","stop cortana","cortana cpu"],
                 Script="""
@@ -297,7 +297,7 @@ public sealed partial class FixCatalogService
                     if (!(Test-Path $upath)) { New-Item -Path $upath -Force | Out-Null }
                     Set-ItemProperty -Path $upath -Name BingSearchEnabled -Value 0 -Type DWord -EA SilentlyContinue
                     Set-ItemProperty -Path $upath -Name CortanaEnabled -Value 0 -Type DWord -EA SilentlyContinue
-                    Write-Output "✓ Cortana disabled. Changes take effect after sign out/restart."
+                    Write-Output "âœ“ Cortana disabled. Changes take effect after sign out/restart."
                     """ },
 
             new() { Id="disable-telemetry", Title="Disable Windows telemetry",
@@ -315,17 +315,17 @@ public sealed partial class FixCatalogService
                     # Disable dmwappushsvc
                     Stop-Service dmwappushservice -Force -EA SilentlyContinue
                     Set-Service dmwappushservice -StartupType Disabled -EA SilentlyContinue
-                    Write-Output "✓ Telemetry set to minimum. DiagTrack service disabled."
+                    Write-Output "âœ“ Telemetry set to minimum. DiagTrack service disabled."
                     """ },
 
             new() { Id="flush-arp-cache", Title="Flush ARP cache",
-                Description="Clears the ARP table — fixes connectivity issues after network changes or router swaps.",
+                Description="Clears the ARP table â€” fixes connectivity issues after network changes or router swaps.",
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["arp cache","network after router change","ip conflict","duplicate ip address","network not working after change"],
                 Script="""
                     $before = netsh interface ip show neighbors
                     netsh interface ip delete arpcache 2>&1 | Out-Null
-                    Write-Output "✓ ARP cache flushed."
+                    Write-Output "âœ“ ARP cache flushed."
                     Write-Output "  This resolves IP conflicts and stale MAC-to-IP mappings."
                     """ },
 
@@ -343,8 +343,8 @@ public sealed partial class FixCatalogService
                     # Enable DoH policy
                     $path = "HKLM:\SYSTEM\CurrentControlSet\Services\Dnscache\Parameters"
                     Set-ItemProperty -Path $path -Name EnableAutoDoh -Value 2 -Type DWord -EA SilentlyContinue
-                    Write-Output "✓ DNS set to Cloudflare (1.1.1.1) with DoH enabled."
-                    Write-Output "  Full DoH in Settings: Settings → Network → DNS server assignment → Manual"
+                    Write-Output "âœ“ DNS set to Cloudflare (1.1.1.1) with DoH enabled."
+                    Write-Output "  Full DoH in Settings: Settings â†’ Network â†’ DNS server assignment â†’ Manual"
                     """ },
         ]
     };

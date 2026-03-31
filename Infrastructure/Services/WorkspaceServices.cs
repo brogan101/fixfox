@@ -1,8 +1,11 @@
 using System.Diagnostics;
+using System.Diagnostics.Eventing.Reader;
 using System.IO;
 using HelpDesk.Application.Interfaces;
 using HelpDesk.Domain.Enums;
 using HelpDesk.Domain.Models;
+using Microsoft.Win32;
+using Newtonsoft.Json;
 
 namespace HelpDesk.Infrastructure.Services;
 
@@ -93,6 +96,7 @@ public sealed class ToolboxService : IToolboxService
         string supportNote = "") => new()
     {
         Title = title,
+        ToolKey = BuildToolKey(title),
         Description = description,
         LaunchTarget = target,
         LaunchArguments = arguments,
@@ -101,6 +105,13 @@ public sealed class ToolboxService : IToolboxService
         RequiredCapability = requiredCapability,
         SupportNote = supportNote
     };
+
+    private static string BuildToolKey(string title)
+    {
+        var parts = title.Split([' ', '&', '/', '-', '.', ',', ':', '(', ')'], StringSplitOptions.RemoveEmptyEntries)
+            .Select(part => char.ToUpperInvariant(part[0]) + part[1..]);
+        return string.Concat(parts);
+    }
 }
 
 public sealed class DashboardWorkspaceService : IDashboardWorkspaceService
@@ -221,7 +232,7 @@ public sealed class DashboardWorkspaceService : IDashboardWorkspaceService
             {
                 Key = "health-check-low-score",
                 Title = "Health check found multiple cleanup targets",
-                Summary = $"{healthReport.OverallScore}/100 — {healthReport.Summary}",
+                Summary = $"{healthReport.OverallScore}/100 â€” {healthReport.Summary}",
                 Severity = healthReport.OverallScore < 50 ? ScanSeverity.Critical : ScanSeverity.Warning,
                 ActionLabel = "Run Maintenance",
                 ActionKind = DashboardActionKind.Runbook,
@@ -294,6 +305,121 @@ public sealed class DashboardWorkspaceService : IDashboardWorkspaceService
             .ToList();
     }
 
+    public IReadOnlyList<DashboardSuggestion> BuildSuggestions(
+        DashboardSuggestionSignals signals,
+        IReadOnlyList<AutomationRuleSettings> automationRules,
+        IReadOnlyList<AutomationRunReceipt> automationHistory,
+        DateTime now)
+    {
+        var suggestions = new List<(DashboardSuggestion Suggestion, int Priority)>();
+
+        if (signals.Uptime is { TotalDays: > 7 } uptime)
+        {
+            suggestions.Add((new DashboardSuggestion
+            {
+                Key = "uptime-restart",
+                Title = "Restart and clear memory pressure",
+                Summary = $"This PC has been running for {(int)Math.Floor(uptime.TotalDays)} day(s). A restart can clear memory pressure and apply waiting Windows changes.",
+                Glyph = "\uE777",
+                ActionKind = DashboardActionKind.Runbook,
+                ActionTargetId = "routine-maintenance-runbook",
+                RunButtonLabel = "Run now"
+            }, 95));
+        }
+
+        if (signals.TempFolderBytes is > 1_073_741_824)
+        {
+            suggestions.Add((new DashboardSuggestion
+            {
+                Key = "temp-cleanup",
+                Title = "Clear temp file buildup",
+                Summary = $"The Windows temp folder is using about {signals.TempFolderBytes.Value / 1_073_741_824d:N1} GB. Cleaning it up can free space and reduce background clutter.",
+                Glyph = "\uE74D",
+                ActionKind = DashboardActionKind.Fix,
+                ActionTargetId = "clear-temp-files",
+                RunButtonLabel = "Run now"
+            }, 90));
+        }
+
+        if (signals.HasPendingWindowsUpdate)
+        {
+            suggestions.Add((new DashboardSuggestion
+            {
+                Key = "pending-windows-update",
+                Title = "Check Windows Update",
+                Summary = "Windows reports pending update work. Clearing that backlog often resolves restart, servicing, and slowdown complaints.",
+                Glyph = "\uE895",
+                ActionKind = DashboardActionKind.Fix,
+                ActionTargetId = "open-windows-update",
+                RunButtonLabel = "Open update"
+            }, 88));
+        }
+
+        if (signals.HasRecentCriticalCrash)
+        {
+            suggestions.Add((new DashboardSuggestion
+            {
+                Key = "recent-crash",
+                Title = "Review recent crash recovery steps",
+                Summary = "A critical crash was recorded recently. FixFox is prioritizing the Windows repair workflow before you try more aggressive changes.",
+                Glyph = "\uE814",
+                ActionKind = DashboardActionKind.Runbook,
+                ActionTargetId = "windows-repair-runbook",
+                RunButtonLabel = "Run now"
+            }, 92));
+        }
+
+        if (signals.EnabledStartupItemCount > 8)
+        {
+            suggestions.Add((new DashboardSuggestion
+            {
+                Key = "startup-review",
+                Title = "Review startup items",
+                Summary = $"{signals.EnabledStartupItemCount} startup items are enabled. Trimming the noisier ones can noticeably improve sign-in time.",
+                Glyph = "\uE823",
+                ActionKind = DashboardActionKind.Fix,
+                ActionTargetId = "manage-startup-programs",
+                RunButtonLabel = "Run now"
+            }, 84));
+        }
+
+        if (signals.HasAutomationRules
+            && (!signals.LastAutomationRunUtc.HasValue || now - signals.LastAutomationRunUtc.Value > TimeSpan.FromDays(14)))
+        {
+            suggestions.Add((new DashboardSuggestion
+            {
+                Key = "automation-refresh",
+                Title = "Run your maintenance bundle",
+                Summary = "Automation has not completed a run in over two weeks. Running maintenance now helps FixFox refresh its baseline before issues build up.",
+                Glyph = "\uE768",
+                ActionKind = DashboardActionKind.Runbook,
+                ActionTargetId = "safe-maintenance-runbook",
+                RunButtonLabel = "Run now"
+            }, 82));
+        }
+
+        if (signals.SystemDriveFreePercent is < 15)
+        {
+            suggestions.Add((new DashboardSuggestion
+            {
+                Key = "low-disk-space",
+                Title = "Free up disk space",
+                Summary = $"The system drive is below {signals.SystemDriveFreePercent.Value:N0}% free. Start with safe cleanup before installs, updates, or repairs fail.",
+                Glyph = "\uE7F8",
+                ActionKind = DashboardActionKind.Runbook,
+                ActionTargetId = "disk-full-rescue-runbook",
+                RunButtonLabel = "Run now"
+            }, 94));
+        }
+
+        return suggestions
+            .OrderByDescending(item => item.Priority)
+            .ThenBy(item => item.Suggestion.Title)
+            .Select(item => item.Suggestion)
+            .Take(5)
+            .ToList();
+    }
+
     private static bool ContainsAny(string left, string right, params string[] needles)
     {
         foreach (var needle in needles)
@@ -304,6 +430,238 @@ public sealed class DashboardWorkspaceService : IDashboardWorkspaceService
         }
 
         return false;
+    }
+}
+
+public sealed class DashboardSuggestionSignalService : IDashboardSuggestionSignalService
+{
+    private static readonly TimeSpan SuggestionProbeTimeout = TimeSpan.FromMilliseconds(1800);
+    private static readonly TimeSpan SuggestionEvaluationTimeout = TimeSpan.FromMilliseconds(2200);
+    private readonly Func<CancellationToken, Task<TimeSpan?>> _uptimeProbe;
+    private readonly Func<CancellationToken, Task<long?>> _tempFolderProbe;
+    private readonly Func<CancellationToken, Task<bool>> _pendingUpdateProbe;
+    private readonly Func<CancellationToken, Task<bool>> _recentCrashProbe;
+    private readonly Func<CancellationToken, Task<int>> _startupCountProbe;
+    private readonly Func<CancellationToken, Task<double?>> _systemDriveFreePercentProbe;
+
+    public DashboardSuggestionSignalService()
+        : this(
+            uptimeProbe: _ => Task.FromResult<TimeSpan?>(TimeSpan.FromMilliseconds(Environment.TickCount64)),
+            tempFolderProbe: ct => Task.Run<long?>(() => CalculateDirectorySize(Path.GetTempPath(), ct), ct),
+            pendingUpdateProbe: _ => Task.FromResult(HasPendingWindowsUpdate()),
+            recentCrashProbe: ct => Task.Run(() => HasRecentCriticalCrash(ct), ct),
+            startupCountProbe: ct => Task.Run(() => CountEnabledStartupItems(ct), ct),
+            systemDriveFreePercentProbe: _ => Task.FromResult(GetSystemDriveFreePercent()))
+    {
+    }
+
+    internal DashboardSuggestionSignalService(
+        Func<CancellationToken, Task<TimeSpan?>> uptimeProbe,
+        Func<CancellationToken, Task<long?>> tempFolderProbe,
+        Func<CancellationToken, Task<bool>> pendingUpdateProbe,
+        Func<CancellationToken, Task<bool>> recentCrashProbe,
+        Func<CancellationToken, Task<int>> startupCountProbe,
+        Func<CancellationToken, Task<double?>> systemDriveFreePercentProbe)
+    {
+        _uptimeProbe = uptimeProbe;
+        _tempFolderProbe = tempFolderProbe;
+        _pendingUpdateProbe = pendingUpdateProbe;
+        _recentCrashProbe = recentCrashProbe;
+        _startupCountProbe = startupCountProbe;
+        _systemDriveFreePercentProbe = systemDriveFreePercentProbe;
+    }
+
+    public async Task<DashboardSuggestionSignals> EvaluateAsync(
+        IReadOnlyList<AutomationRuleSettings> automationRules,
+        IReadOnlyList<AutomationRunReceipt> automationHistory,
+        CancellationToken cancellationToken = default)
+    {
+        using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutSource.CancelAfter(SuggestionEvaluationTimeout);
+        var token = timeoutSource.Token;
+
+        var uptimeTask = TryProbeAsync(_uptimeProbe, null, token);
+        var tempTask = TryProbeAsync(_tempFolderProbe, null, token);
+        var updateTask = TryProbeAsync(_pendingUpdateProbe, false, token);
+        var crashTask = TryProbeAsync(_recentCrashProbe, false, token);
+        var startupTask = TryProbeAsync(_startupCountProbe, 0, token);
+        var freePercentTask = TryProbeAsync(_systemDriveFreePercentProbe, null, token);
+
+        await Task.WhenAll(uptimeTask, tempTask, updateTask, crashTask, startupTask, freePercentTask);
+
+        return new DashboardSuggestionSignals
+        {
+            Uptime = uptimeTask.Result,
+            TempFolderBytes = tempTask.Result,
+            HasPendingWindowsUpdate = updateTask.Result,
+            HasRecentCriticalCrash = crashTask.Result,
+            EnabledStartupItemCount = startupTask.Result,
+            HasAutomationRules = automationRules.Any(),
+            LastAutomationRunUtc = automationHistory
+                .OrderByDescending(entry => entry.FinishedAt)
+                .Select(entry => entry.FinishedAt.ToUniversalTime())
+                .FirstOrDefault(),
+            SystemDriveFreePercent = freePercentTask.Result
+        };
+    }
+
+    private static async Task<T> TryProbeAsync<T>(
+        Func<CancellationToken, Task<T>> probe,
+        T fallback,
+        CancellationToken cancellationToken)
+    {
+        using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutSource.CancelAfter(SuggestionProbeTimeout);
+        var probeTask = probe(timeoutSource.Token);
+        var timeoutTask = Task.Delay(SuggestionProbeTimeout, cancellationToken);
+
+        try
+        {
+            var completedTask = await Task.WhenAny(probeTask, timeoutTask);
+            if (!ReferenceEquals(completedTask, probeTask))
+            {
+                timeoutSource.Cancel();
+                return fallback;
+            }
+
+            return await probeTask;
+        }
+        catch (OperationCanceledException)
+        {
+            return fallback;
+        }
+        catch
+        {
+            return fallback;
+        }
+    }
+
+    private static long CalculateDirectorySize(string path, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path))
+            return 0;
+
+        long total = 0;
+        try
+        {
+            foreach (var file in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    total += new FileInfo(file).Length;
+                }
+                catch
+                {
+                }
+            }
+        }
+        catch
+        {
+        }
+
+        return total;
+    }
+
+    private static bool HasPendingWindowsUpdate()
+    {
+        try
+        {
+            using var updateKey = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired");
+            if (updateKey is not null)
+                return true;
+
+            using var cbsKey = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending");
+            return cbsKey is not null;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool HasRecentCriticalCrash(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var query = new EventLogQuery("System", PathType.LogName, "*[System[(Level=1 or Level=2)]]")
+            {
+                ReverseDirection = true
+            };
+
+            using var reader = new EventLogReader(query);
+            for (var index = 0; index < 40; index++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                using var record = reader.ReadEvent();
+                if (record is null)
+                    break;
+
+                if (record.TimeCreated is DateTime created
+                    && created >= DateTime.Now.AddHours(-48))
+                    return true;
+            }
+        }
+        catch
+        {
+        }
+
+        return false;
+    }
+
+    private static int CountEnabledStartupItems(CancellationToken cancellationToken)
+    {
+        var count = 0;
+        CountRegistryApproved(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run", ref count, cancellationToken);
+        CountRegistryApproved(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\StartupFolder", ref count, cancellationToken);
+        CountRegistryApproved(Registry.LocalMachine, @"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run", ref count, cancellationToken);
+        CountRegistryApproved(Registry.LocalMachine, @"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run32", ref count, cancellationToken);
+        CountRegistryApproved(Registry.LocalMachine, @"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\StartupFolder", ref count, cancellationToken);
+        return count;
+    }
+
+    private static void CountRegistryApproved(
+        RegistryKey root,
+        string subKeyPath,
+        ref int count,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var key = root.OpenSubKey(subKeyPath);
+            if (key is null)
+                return;
+
+            foreach (var name in key.GetValueNames())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (key.GetValue(name) is byte[] state && state.Length > 0 && state[0] == 0x02)
+                    count++;
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private static double? GetSystemDriveFreePercent()
+    {
+        try
+        {
+            var root = Path.GetPathRoot(Environment.SystemDirectory);
+            if (string.IsNullOrWhiteSpace(root))
+                return null;
+
+            var drive = new DriveInfo(root);
+            if (!drive.IsReady || drive.TotalSize <= 0)
+                return null;
+
+            return drive.AvailableFreeSpace / (double)drive.TotalSize * 100d;
+        }
+        catch
+        {
+            return null;
+        }
     }
 }
 
@@ -372,148 +730,123 @@ public sealed class MaintenanceProfileService : IMaintenanceProfileService
 public sealed class CommandPaletteService : ICommandPaletteService
 {
     private readonly IFixCatalogService _catalog;
+    private readonly Lazy<IReadOnlyList<SearchSynonymEntry>> _synonyms;
+    private static readonly string SynonymConfigPath = Path.Combine(AppContext.BaseDirectory, "Configuration", "search-synonyms.json");
 
     public CommandPaletteService(IFixCatalogService catalog)
     {
         _catalog = catalog;
+        _synonyms = new Lazy<IReadOnlyList<SearchSynonymEntry>>(LoadSynonyms);
     }
 
     public IReadOnlyList<CommandPaletteItem> Search(
         string query,
-        IReadOnlyList<FixItem> pinnedFixes,
-        IReadOnlyList<FixItem> favoriteFixes,
-        IReadOnlyList<FixItem> recentFixes,
-        IReadOnlyList<RunbookDefinition> runbooks,
-        IReadOnlyList<MaintenanceProfileDefinition> maintenanceProfiles,
-        IReadOnlyList<SupportCenterDefinition> supportCenters,
-        IReadOnlyList<ToolboxGroup> toolboxGroups)
+        CommandPaletteSearchContext context)
     {
+        var allFixes = _catalog.Categories
+            .SelectMany(category => category.Fixes)
+            .Where(fix => !context.ExcludeAdvancedFixes || fix.RiskLevel != FixRiskLevel.Advanced)
+            .ToList();
+        var recentUsage = BuildRecentUsageMap(context);
+
         var items = new List<CommandPaletteItem>();
-
         items.AddRange(BuildPageItems());
-        items.AddRange(maintenanceProfiles.Select(profile => new CommandPaletteItem
-        {
-            Id = profile.Id,
-            Title = profile.Title,
-            Subtitle = profile.Summary,
-            Section = "Maintenance Profiles",
-            Hint = "Run profile",
-            Glyph = "\uE768",
-            SearchText = $"{profile.Title} {profile.Summary} {profile.SafetyNotes} {profile.VerificationNotes}",
-            Kind = CommandPaletteItemKind.MaintenanceProfile,
-            TargetId = profile.Id
-        }));
-        items.AddRange(runbooks.Select(runbook => new CommandPaletteItem
-        {
-            Id = runbook.Id,
-            Title = runbook.Title,
-            Subtitle = runbook.Description,
-            Section = "Workflows",
-            Hint = "Start workflow",
-            Glyph = "\uE7C4",
-            SearchText = $"{runbook.Title} {runbook.Description} {runbook.CategoryId} {runbook.TriggerHint}",
-            Kind = CommandPaletteItemKind.Runbook,
-            TargetId = runbook.Id
-        }));
-        items.AddRange(supportCenters.Select(center => new CommandPaletteItem
-        {
-            Id = center.Id,
-            Title = center.Title,
-            Subtitle = center.Summary,
-            Section = "Support Centers",
-            Hint = center.PrimaryAction.Label,
-            Glyph = "\uE9CE",
-            SearchText = $"{center.Title} {center.Summary} {center.StatusText} {string.Join(" ", center.Highlights)}",
-            Kind = CommandPaletteItemKind.SupportCenter,
-            TargetId = center.Id
-        }));
-        items.AddRange(toolboxGroups.SelectMany(group => group.Entries.Select(entry => new CommandPaletteItem
-        {
-            Id = $"toolbox-{entry.Title}",
-            Title = entry.Title,
-            Subtitle = entry.Description,
-            Section = "Windows Tools",
-            Hint = "Open tool",
-            Glyph = "\uE77B",
-            SearchText = $"{entry.Title} {entry.Description}",
-            Kind = CommandPaletteItemKind.Toolbox,
-            TargetId = entry.Title
-        })));
+        items.AddRange(allFixes.Select(fix => BuildFixItem(fix, recentUsage)));
+        items.AddRange(context.MaintenanceProfiles.Select(BuildMaintenanceProfileItem));
+        items.AddRange(context.Runbooks.Select(runbook => BuildRunbookItem(runbook, recentUsage)));
+        items.AddRange(context.SupportCenters.Select(BuildSupportCenterItem));
+        items.AddRange(context.ToolboxGroups.SelectMany(group => group.Entries.Select(entry => BuildToolboxItem(entry, recentUsage))));
+        items.AddRange(context.RecentReceipts.Select(BuildReceiptItem));
+        items.AddRange(context.AutomationRules.Select(rule => BuildAutomationRuleItem(rule, recentUsage)));
+        items.AddRange(context.AdditionalItems);
 
-        var spotlightFixes = pinnedFixes
-            .Concat(favoriteFixes)
-            .Concat(recentFixes)
-            .DistinctBy(fix => fix.Id)
-            .Select(BuildFixItem);
-
-        items.AddRange(spotlightFixes);
-
-        if (!string.IsNullOrWhiteSpace(query))
-        {
-            items.AddRange(_catalog.Search(query)
-                .Select(BuildFixItem));
-        }
-
-        var allItems = items
+        var distinctItems = items
+            .Where(item => !string.IsNullOrWhiteSpace(item.Id))
             .GroupBy(item => item.Id, StringComparer.OrdinalIgnoreCase)
-            .Select(group => group.First())
+            .Select(group => group.OrderByDescending(item => item.LastUsedUtc).First())
             .ToList();
 
         if (string.IsNullOrWhiteSpace(query))
         {
-            return allItems
-                .OrderByDescending(item => DefaultRank(item))
+            return distinctItems
+                .OrderByDescending(DefaultRank)
+                .ThenByDescending(item => item.LastUsedUtc)
                 .ThenBy(item => item.Title)
-                .Take(10)
+                .Take(12)
                 .ToList();
         }
 
         var trimmed = query.Trim();
-        return allItems
-            .Where(item => Matches(item, trimmed))
-            .OrderByDescending(item => Score(item, trimmed))
+        var expandedQueryTerms = ExpandQueryTerms(trimmed);
+
+        var ranked = distinctItems
+            .Select(item => new
+            {
+                Item = item,
+                Tier = ScoreTier(item, trimmed, expandedQueryTerms)
+            })
+            .Where(result => result.Tier > 0)
+            .Select(result =>
+            {
+                result.Item.MatchTier = result.Tier;
+                return result.Item;
+            })
+            .OrderBy(item => item.MatchTier)
+            .ThenByDescending(item => item.LastUsedUtc)
+            .ThenByDescending(DefaultRank)
             .ThenBy(item => item.Title)
             .Take(12)
             .ToList();
+
+        return ShouldGroupResults(trimmed, ranked)
+            ? InsertGroupHeaders(ranked)
+            : ranked;
     }
 
-    private CommandPaletteItem BuildFixItem(FixItem fix) => new()
+    private CommandPaletteItem BuildFixItem(FixItem fix, IReadOnlyDictionary<string, DateTime?> recentUsage) => new()
     {
-        Id = fix.Id,
+        Id = $"fix:{fix.Id}",
         Title = fix.Title,
         Subtitle = fix.Description,
-        Section = "Repairs",
+        ResultTypeLabel = "Fix",
+        Section = $"Fix · {fix.Category}",
         Hint = fix.Type == FixType.Guided ? "Start guided repair" : "Run repair",
         Glyph = fix.Type == FixType.Guided ? "\uE946" : "\uE90F",
         SearchText = $"{fix.Title} {fix.Description} {string.Join(" ", fix.Tags)} {string.Join(" ", fix.Keywords)}",
+        SearchTags = BuildTags(fix.Category, fix.Tags, fix.Keywords),
         Kind = CommandPaletteItemKind.Fix,
-        TargetId = fix.Id
+        TargetId = fix.Id,
+        LastUsedUtc = GetLastUsedUtc(recentUsage, fix.Id),
+        TooltipText = fix.Description
     };
 
     private static IEnumerable<CommandPaletteItem> BuildPageItems()
     {
-        yield return PageItem("page-home", "Home", "Go to the main command center.", "Navigation", "Open page", "\uE80F", Page.Dashboard);
-        yield return PageItem("page-diagnosis", "Guided Diagnosis", "Describe an issue and rank the most likely repair paths.", "Navigation", "Open page", "\uE897", Page.SymptomChecker);
-        yield return PageItem("page-library", "Repair Library", "Browse and run verified repairs directly.", "Navigation", "Open page", "\uE90F", Page.Fixes);
-        yield return PageItem("page-automation", "Automation", "Open maintenance profiles and guided workflows.", "Navigation", "Open page", "\uE8B1", Page.Bundles);
-        yield return PageItem("page-device-health", "Device Health", "Review the baseline and open the right support center.", "Navigation", "Open page", "\uEC4F", Page.SystemInfo);
-        yield return PageItem("page-tools", "Windows Tools", "Jump straight into the native Windows utilities FixFox surfaces.", "Navigation", "Open page", "\uE77B", Page.Toolbox);
-        yield return PageItem("page-support", "Support Package", "Open escalation tools, support resources, and evidence export.", "Navigation", "Open page", "\uE9A5", Page.Handoff);
-        yield return PageItem("page-activity", "Activity", "Review repair history, rerun actions, or create support packages.", "Navigation", "Open page", "\uE81C", Page.History);
-        yield return PageItem("page-settings", "Settings", "Adjust startup behavior, profiles, and local data handling.", "Navigation", "Open page", "\uE713", Page.Settings);
+        yield return PageItem("page:home", "Home", "Go to the main command center.", "\uE80F", Page.Dashboard, ["dashboard", "home", "overview"]);
+        yield return PageItem("page:diagnosis", "Guided Diagnosis", "Describe an issue and rank the most likely repair paths.", "\uE897", Page.SymptomChecker, ["triage", "diagnosis", "symptoms"]);
+        yield return PageItem("page:library", "Repair Library", "Browse and run verified repairs directly.", "\uE90F", Page.Fixes, ["fix center", "fixes", "repairs"]);
+        yield return PageItem("page:automation", "Automation", "Open schedules, workflows, and maintenance automation.", "\uE8B1", Page.Bundles, ["bundles", "maintenance", "automation"]);
+        yield return PageItem("page:device-health", "Device Health", "Review the baseline and open the right support center.", "\uEC4F", Page.SystemInfo, ["support centers", "health", "system"]);
+        yield return PageItem("page:tools", "Windows Tools", "Jump straight into the native Windows utilities FixFox surfaces.", "\uE77B", Page.Toolbox, ["toolbox", "windows tools", "utilities"]);
+        yield return PageItem("page:support", "Support Package", "Open escalation tools, support resources, and evidence export.", "\uE9A5", Page.Handoff, ["handoff", "support", "bundle"]);
+        yield return PageItem("page:activity", "Activity", "Review repair history, rerun actions, or create support packages.", "\uE81C", Page.History, ["history", "receipts", "activity"]);
+        yield return PageItem("page:settings", "Settings", "Adjust startup behavior, profiles, and local data handling.", "\uE713", Page.Settings, ["preferences", "options", "settings"]);
     }
 
-    private static CommandPaletteItem PageItem(string id, string title, string subtitle, string section, string hint, string glyph, Page page) => new()
+    private static CommandPaletteItem PageItem(string id, string title, string subtitle, string glyph, Page page, string[] tags) => new()
     {
         Id = id,
         Title = title,
         Subtitle = subtitle,
-        Section = section,
-        Hint = hint,
+        ResultTypeLabel = "Page",
+        Section = "Page",
+        Hint = "Open page",
         Glyph = glyph,
-        SearchText = $"{title} {subtitle}",
+        SearchText = $"{title} {subtitle} {string.Join(" ", tags)}",
+        SearchTags = tags,
         Kind = CommandPaletteItemKind.Page,
-        TargetPage = page
+        TargetPage = page,
+        TooltipText = subtitle
     };
 
     private static int DefaultRank(CommandPaletteItem item) => item.Kind switch
@@ -526,29 +859,291 @@ public sealed class CommandPaletteService : ICommandPaletteService
         CommandPaletteItemKind.Runbook => 84,
         CommandPaletteItemKind.Toolbox => 80,
         CommandPaletteItemKind.Fix => 70,
+        CommandPaletteItemKind.Setting => 72,
+        CommandPaletteItemKind.AutomationRule => 74,
+        CommandPaletteItemKind.Receipt => 60,
         _ => 50
     };
 
-    private static bool Matches(CommandPaletteItem item, string query) =>
-        item.Title.Contains(query, StringComparison.OrdinalIgnoreCase)
-        || item.Subtitle.Contains(query, StringComparison.OrdinalIgnoreCase)
-        || item.Section.Contains(query, StringComparison.OrdinalIgnoreCase)
-        || item.Hint.Contains(query, StringComparison.OrdinalIgnoreCase)
-        || item.SearchText.Contains(query, StringComparison.OrdinalIgnoreCase);
-
-    private static int Score(CommandPaletteItem item, string query)
+    private int ScoreTier(CommandPaletteItem item, string query, IReadOnlySet<string> expandedTerms)
     {
-        var score = DefaultRank(item);
-        if (item.Title.Contains(query, StringComparison.OrdinalIgnoreCase))
-            score += 40;
-        if (item.Title.StartsWith(query, StringComparison.OrdinalIgnoreCase))
-            score += 25;
-        if (item.Section.Contains(query, StringComparison.OrdinalIgnoreCase))
-            score += 10;
-        if (item.SearchText.Contains(query, StringComparison.OrdinalIgnoreCase))
-            score += 15;
+        if (string.Equals(item.Title, query, StringComparison.OrdinalIgnoreCase))
+            return 1;
 
-        return score;
+        if (item.Title.StartsWith(query, StringComparison.OrdinalIgnoreCase))
+            return 2;
+
+        if (ContainsWord(item.Title, query))
+            return 3;
+
+        if (ContainsWord(item.Subtitle, query) || ContainsWord(item.SearchText, query))
+            return 4;
+
+        if (expandedTerms.Count > 0 && item.SearchTags.Any(tag => expandedTerms.Contains(tag)))
+            return item.Kind == CommandPaletteItemKind.Receipt ? 6 : 5;
+
+        if (item.Kind == CommandPaletteItemKind.Receipt
+            && (ContainsWord(item.Title, query) || ContainsWord(item.Subtitle, query) || ContainsWord(item.SearchText, query)))
+            return 6;
+
+        return 0;
+    }
+
+    private IReadOnlySet<string> ExpandQueryTerms(string query)
+    {
+        var terms = query
+            .Split([' ', '\t', '-', '/', ',', '.'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(term => term.ToLowerInvariant())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var entry in _synonyms.Value)
+        {
+            if (!entry.Terms.Any(term => terms.Contains(term)))
+                continue;
+
+            foreach (var tag in entry.Tags)
+                terms.Add(tag);
+        }
+
+        return terms;
+    }
+
+    private static bool ContainsWord(string source, string query)
+    {
+        if (string.IsNullOrWhiteSpace(source) || string.IsNullOrWhiteSpace(query))
+            return false;
+
+        return source.Contains(query, StringComparison.OrdinalIgnoreCase)
+            || source.Split([' ', '\t', '-', '/', ',', '.'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Any(word => word.Contains(query, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool ShouldGroupResults(string query, IReadOnlyList<CommandPaletteItem> results)
+        => query.Length <= 12
+           && results.Count > 3
+           && results.Select(item => item.ResultTypeLabel).Distinct(StringComparer.OrdinalIgnoreCase).Count() > 1;
+
+    private static IReadOnlyList<CommandPaletteItem> InsertGroupHeaders(IReadOnlyList<CommandPaletteItem> ranked)
+    {
+        var grouped = new List<CommandPaletteItem>();
+        foreach (var group in ranked.GroupBy(item => item.ResultTypeLabel))
+        {
+            grouped.Add(new CommandPaletteItem
+            {
+                Id = $"group:{group.Key}",
+                Title = $"{group.Key}s ({group.Count()})",
+                ResultTypeLabel = group.Key,
+                GroupKey = group.Key,
+                GroupTitle = group.Key,
+                IsGroupHeader = true
+            });
+            grouped.AddRange(group);
+        }
+
+        return grouped;
+    }
+
+    private static IReadOnlyDictionary<string, DateTime?> BuildRecentUsageMap(CommandPaletteSearchContext context)
+    {
+        var recentUsage = new Dictionary<string, DateTime?>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var fix in context.RecentFixes)
+            recentUsage[fix.Id] = DateTime.UtcNow;
+
+        foreach (var receipt in context.RecentReceipts)
+        {
+            var timestamp = receipt.Timestamp.ToUniversalTime();
+            if (!string.IsNullOrWhiteSpace(receipt.FixId))
+                recentUsage[receipt.FixId] = timestamp;
+            if (!string.IsNullOrWhiteSpace(receipt.RunbookId))
+                recentUsage[receipt.RunbookId] = timestamp;
+        }
+
+        foreach (var rule in context.AutomationRules.Where(rule => rule.LastPinnedAtUtc.HasValue))
+            recentUsage[rule.Id] = rule.LastPinnedAtUtc;
+
+        return recentUsage;
+    }
+
+    private static DateTime? GetLastUsedUtc(IReadOnlyDictionary<string, DateTime?> map, string key)
+        => map.TryGetValue(key, out var value) ? value : null;
+
+    private static string[] BuildTags(string category, params IEnumerable<string>[] sources)
+    {
+        var tags = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            NormalizeCategoryTag(category)
+        };
+
+        foreach (var source in sources)
+        {
+            foreach (var value in source.Where(value => !string.IsNullOrWhiteSpace(value)))
+                tags.Add(value.Trim().ToLowerInvariant());
+        }
+
+        return tags.Where(tag => !string.IsNullOrWhiteSpace(tag)).ToArray();
+    }
+
+    private static string NormalizeCategoryTag(string category)
+    {
+        var normalized = category.ToLowerInvariant();
+        if (normalized.Contains("network"))
+            return "network";
+        if (normalized.Contains("dns") || normalized.Contains("browser"))
+            return "browser";
+        if (normalized.Contains("performance") || normalized.Contains("startup"))
+            return "performance";
+        if (normalized.Contains("audio"))
+            return "audio";
+        if (normalized.Contains("display"))
+            return "display";
+        if (normalized.Contains("update"))
+            return "updates";
+        if (normalized.Contains("storage"))
+            return "storage";
+        if (normalized.Contains("security"))
+            return "security";
+        if (normalized.Contains("crash") || normalized.Contains("bsod"))
+            return "bsod";
+        if (normalized.Contains("device"))
+            return "devices";
+        if (normalized.Contains("printer"))
+            return "printer";
+        if (normalized.Contains("app"))
+            return "apps";
+        if (normalized.Contains("office"))
+            return "outlook";
+        if (normalized.Contains("vpn") || normalized.Contains("remote"))
+            return "vpn";
+        if (normalized.Contains("power"))
+            return "power";
+        if (normalized.Contains("account") || normalized.Contains("sign"))
+            return "accounts";
+        return normalized.Replace('&', ' ').Trim();
+    }
+
+    private static CommandPaletteItem BuildMaintenanceProfileItem(MaintenanceProfileDefinition profile) => new()
+    {
+        Id = $"profile:{profile.Id}",
+        Title = profile.Title,
+        Subtitle = profile.Summary,
+        ResultTypeLabel = "Maintenance",
+        Section = "Maintenance profile",
+        Hint = "Run profile",
+        Glyph = "\uE768",
+        SearchText = $"{profile.Title} {profile.Summary} {profile.SafetyNotes} {profile.VerificationNotes}",
+        SearchTags = ["maintenance", "profile"],
+        Kind = CommandPaletteItemKind.MaintenanceProfile,
+        TargetId = profile.Id,
+        TooltipText = profile.Summary
+    };
+
+    private static CommandPaletteItem BuildRunbookItem(RunbookDefinition runbook, IReadOnlyDictionary<string, DateTime?> recentUsage) => new()
+    {
+        Id = $"runbook:{runbook.Id}",
+        Title = runbook.Title,
+        Subtitle = runbook.Description,
+        ResultTypeLabel = "Runbook",
+        Section = $"Runbook · {runbook.CategoryId}",
+        Hint = "Run flow",
+        Glyph = "\uE7C4",
+        SearchText = $"{runbook.Title} {runbook.Description} {runbook.CategoryId} {runbook.TriggerHint}",
+        SearchTags = BuildTags(runbook.CategoryId, [runbook.TriggerHint]),
+        Kind = CommandPaletteItemKind.Runbook,
+        TargetId = runbook.Id,
+        LastUsedUtc = GetLastUsedUtc(recentUsage, runbook.Id),
+        TooltipText = runbook.Description
+    };
+
+    private static CommandPaletteItem BuildSupportCenterItem(SupportCenterDefinition center) => new()
+    {
+        Id = $"support:{center.Id}",
+        Title = center.Title,
+        Subtitle = center.Summary,
+        ResultTypeLabel = "Page",
+        Section = "Support center",
+        Hint = center.PrimaryAction.Label,
+        Glyph = "\uE9CE",
+        SearchText = $"{center.Title} {center.Summary} {center.StatusText} {string.Join(" ", center.Highlights)}",
+        SearchTags = BuildTags(center.Title, center.Highlights),
+        Kind = CommandPaletteItemKind.SupportCenter,
+        TargetId = center.Id,
+        TooltipText = center.Summary
+    };
+
+    private static CommandPaletteItem BuildToolboxItem(ToolboxEntry entry, IReadOnlyDictionary<string, DateTime?> recentUsage) => new()
+    {
+        Id = $"tool:{entry.ToolKey}",
+        Title = entry.Title,
+        Subtitle = entry.Description,
+        ResultTypeLabel = "Tool",
+        Section = "Windows tool",
+        Hint = "Open tool",
+        Glyph = "\uE77B",
+        SearchText = $"{entry.Title} {entry.Description} {entry.SupportNote}",
+        SearchTags = BuildTags("toolbox", [entry.Title, entry.Description]),
+        Kind = CommandPaletteItemKind.Toolbox,
+        TargetId = entry.Title,
+        LastUsedUtc = GetLastUsedUtc(recentUsage, entry.ToolKey),
+        TooltipText = entry.Description
+    };
+
+    private static CommandPaletteItem BuildReceiptItem(RepairHistoryEntry receipt) => new()
+    {
+        Id = $"receipt:{receipt.Id}",
+        Title = string.IsNullOrWhiteSpace(receipt.FixTitle) ? "Recent receipt" : receipt.FixTitle,
+        Subtitle = $"Receipt · {receipt.Outcome} · {receipt.Timestamp:g}",
+        ResultTypeLabel = "Recent",
+        Section = "Recent receipt",
+        Hint = "Open activity",
+        Glyph = "\uE81C",
+        SearchText = $"{receipt.FixTitle} {receipt.Outcome} {receipt.Timestamp:g} {receipt.VerificationSummary} {receipt.ChangedSummary}",
+        SearchTags = BuildTags(receipt.CategoryName, [receipt.Outcome.ToString()]),
+        Kind = CommandPaletteItemKind.Receipt,
+        TargetId = receipt.Id,
+        LastUsedUtc = receipt.Timestamp.ToUniversalTime(),
+        TooltipText = receipt.ChangedSummary
+    };
+
+    private static CommandPaletteItem BuildAutomationRuleItem(AutomationRuleSettings rule, IReadOnlyDictionary<string, DateTime?> recentUsage) => new()
+    {
+        Id = $"automation:{rule.Id}",
+        Title = rule.Title,
+        Subtitle = rule.Summary,
+        ResultTypeLabel = "Automation",
+        Section = "Automation rule",
+        Hint = "Open automation",
+        Glyph = "\uE8B1",
+        SearchText = $"{rule.Title} {rule.Summary} {rule.RecurrenceSummary} {rule.ScheduleExpression}",
+        SearchTags = BuildTags("automation", rule.IncludedTasks),
+        Kind = CommandPaletteItemKind.AutomationRule,
+        TargetId = rule.Id,
+        LastUsedUtc = GetLastUsedUtc(recentUsage, rule.Id),
+        TooltipText = rule.Summary
+    };
+
+    private static IReadOnlyList<SearchSynonymEntry> LoadSynonyms()
+    {
+        try
+        {
+            if (!File.Exists(SynonymConfigPath))
+                return [];
+
+            var document = JsonConvert.DeserializeObject<SearchSynonymDocument>(File.ReadAllText(SynonymConfigPath));
+            return document?.Entries
+                       .Where(entry => entry.Terms.Count > 0 && entry.Tags.Count > 0)
+                       .Select(entry => new SearchSynonymEntry
+                       {
+                           Terms = entry.Terms.Select(term => term.Trim().ToLowerInvariant()).Distinct().ToList(),
+                           Tags = entry.Tags.Select(tag => tag.Trim().ToLowerInvariant()).Distinct().ToList()
+                       })
+                       .ToList()
+                   ?? [];
+        }
+        catch
+        {
+            return [];
+        }
     }
 }
 

@@ -4,10 +4,10 @@ using HelpDesk.Domain.Enums;
 
 namespace HelpDesk.Infrastructure.Fixes;
 
-// ══════════════════════════════════════════════════════════════════════════
-//  MASTER FIX CATALOG  — every fix has a stable string ID used by bundles,
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//  MASTER FIX CATALOG  â€” every fix has a stable string ID used by bundles,
 //  quick scan links, and history. Zero placeholders. Every script is real.
-// ══════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 public sealed partial class FixCatalogService : IFixCatalogService
 {
     private readonly List<FixCategory>            _cats;
@@ -28,6 +28,8 @@ public sealed partial class FixCatalogService : IFixCatalogService
     {
         _cats    = BuildCategories();
         _bundles = BuildBundles();
+        ApplyBacklogExpansions(_cats, _bundles);
+        EnsureCatalogMetadata(_cats);
         _index   = _cats.SelectMany(c => c.Fixes).ToDictionary(f => f.Id);
         _catByFixId = _cats
             .SelectMany(c => c.Fixes.Select(f => (f.Id, c.Title)))
@@ -112,9 +114,9 @@ public sealed partial class FixCatalogService : IFixCatalogService
         return score;
     }
 
-    // ──────────────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     //  CATEGORIES
-    // ──────────────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     private static List<FixCategory> BuildCategories() =>
     [
         NetworkAndWifi(),
@@ -141,9 +143,9 @@ public sealed partial class FixCatalogService : IFixCatalogService
         WindowsTweaksAndCustomization(),
     ];
 
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  1. NETWORK & WI-FI
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     private static FixCategory NetworkAndWifi() => new()
     {
         Id="network", Icon="\uE968", Title="Network & Wi-Fi",
@@ -155,7 +157,7 @@ public sealed partial class FixCatalogService : IFixCatalogService
                 Keywords=["internet not working", "website not loading", "can't open websites", "dns error", "site won't load", "pages not loading"],
                 Script="""
                     ipconfig /flushdns
-                    Write-Output "✓ DNS cache cleared successfully."
+                    Write-Output "âœ“ DNS cache cleared successfully."
                     """ },
 
             new() { Id="full-network-reset", Title="Full network stack reset",
@@ -163,14 +165,14 @@ public sealed partial class FixCatalogService : IFixCatalogService
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["no internet", "internet stopped working", "lost connection", "wifi not working", "can't connect", "network broken"],
                 Script="""
-                    Write-Output "Resetting network stack — this takes ~10 seconds..."
+                    Write-Output "Resetting network stack â€” this takes ~10 seconds..."
                     netsh int ip reset 2>&1 | Out-Null
                     netsh winsock reset 2>&1 | Out-Null
                     netsh advfirewall reset 2>&1 | Out-Null
                     ipconfig /release 2>&1 | Out-Null
                     ipconfig /flushdns 2>&1 | Out-Null
                     ipconfig /renew 2>&1 | Out-Null
-                    Write-Output "✓ Network stack reset. Restart your PC to complete."
+                    Write-Output "âœ“ Network stack reset. Restart your PC to complete."
                     """ },
 
             new() { Id="renew-ip", Title="Renew IP address",
@@ -182,7 +184,7 @@ public sealed partial class FixCatalogService : IFixCatalogService
                     Start-Sleep 2
                     ipconfig /renew 2>&1 | Out-Null
                     $ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object {$_.PrefixOrigin -ne 'WellKnown'} | Select-Object -First 1).IPAddress
-                    Write-Output "✓ IP renewed. New address: $ip"
+                    Write-Output "âœ“ IP renewed. New address: $ip"
                     """ },
 
             new() { Id="test-connection", Title="Test internet connection",
@@ -199,7 +201,7 @@ public sealed partial class FixCatalogService : IFixCatalogService
                     foreach ($t in $targets) {
                         $r = Test-Connection $t.Host -Count 2 -Quiet -ErrorAction SilentlyContinue
                         $ms = if($r){ (Test-Connection $t.Host -Count 1 -ErrorAction SilentlyContinue).ResponseTime }else{ "N/A" }
-                        Write-Output "$(if($r){'✓'}else{'✗'}) $($t.Name): $(if($r){"Reachable (${ms}ms)"}else{'UNREACHABLE'})"
+                        Write-Output "$(if($r){'âœ“'}else{'âœ—'}) $($t.Name): $(if($r){"Reachable (${ms}ms)"}else{'UNREACHABLE'})"
                     }
                     """ },
 
@@ -221,19 +223,19 @@ public sealed partial class FixCatalogService : IFixCatalogService
                     """ },
 
             new() { Id="cycle-adapter", Title="Disable/re-enable network adapter",
-                Description="Toggles your adapter — the network equivalent of unplugging and replugging.",
+                Description="Toggles your adapter â€” the network equivalent of unplugging and replugging.",
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["restart wifi adapter", "toggle wifi", "network adapter not working", "refresh connection"],
                 Script="""
                     $a = Get-NetAdapter | Where-Object {$_.Status -eq 'Up'} | Select-Object -First 1
-                    if (!$a) { Write-Output "✗ No active adapter found."; exit 1 }
+                    if (!$a) { Write-Output "âœ— No active adapter found."; exit 1 }
                     Write-Output "Cycling adapter: $($a.Name)..."
                     Disable-NetAdapter -Name $a.Name -Confirm:$false
                     Start-Sleep 3
                     Enable-NetAdapter -Name $a.Name -Confirm:$false
                     Start-Sleep 4
                     $status = (Get-NetAdapter -Name $a.Name).Status
-                    Write-Output "✓ Adapter cycled. Status: $status"
+                    Write-Output "âœ“ Adapter cycled. Status: $status"
                     """ },
 
             new() { Id="show-wifi-networks", Title="Scan nearby Wi-Fi networks",
@@ -249,7 +251,7 @@ public sealed partial class FixCatalogService : IFixCatalogService
                     """ },
 
             new() { Id="set-dns-cloudflare", Title="Switch to Cloudflare DNS (faster)",
-                Description="Changes your DNS to Cloudflare 1.1.1.1 — faster and more private than ISP DNS.",
+                Description="Changes your DNS to Cloudflare 1.1.1.1 â€” faster and more private than ISP DNS.",
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["make internet faster", "slow dns", "cloudflare dns", "1.1.1.1"],
                 Script="""
@@ -258,12 +260,12 @@ public sealed partial class FixCatalogService : IFixCatalogService
                         Set-DnsClientServerAddress -InterfaceIndex $a.InterfaceIndex -ServerAddresses ("1.1.1.1","1.0.0.1") -EA SilentlyContinue
                     }
                     ipconfig /flushdns | Out-Null
-                    Write-Output "✓ DNS changed to Cloudflare (1.1.1.1 / 1.0.0.1)"
+                    Write-Output "âœ“ DNS changed to Cloudflare (1.1.1.1 / 1.0.0.1)"
                     Write-Output "  Note: To revert, open Network adapter settings and set DNS back to 'Automatic'."
                     """ },
 
             new() { Id="set-dns-google", Title="Switch to Google DNS",
-                Description="Changes your DNS to Google 8.8.8.8 — very reliable for most users.",
+                Description="Changes your DNS to Google 8.8.8.8 â€” very reliable for most users.",
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["google dns", "8.8.8.8", "faster dns", "change dns"],
                 Script="""
@@ -272,7 +274,7 @@ public sealed partial class FixCatalogService : IFixCatalogService
                         Set-DnsClientServerAddress -InterfaceIndex $a.InterfaceIndex -ServerAddresses ("8.8.8.8","8.8.4.4") -EA SilentlyContinue
                     }
                     ipconfig /flushdns | Out-Null
-                    Write-Output "✓ DNS changed to Google (8.8.8.8 / 8.8.4.4)"
+                    Write-Output "âœ“ DNS changed to Google (8.8.8.8 / 8.8.4.4)"
                     """ },
 
             new() { Id="reset-dns-auto", Title="Reset DNS to automatic (ISP default)",
@@ -285,7 +287,7 @@ public sealed partial class FixCatalogService : IFixCatalogService
                         Set-DnsClientServerAddress -InterfaceIndex $a.InterfaceIndex -ResetServerAddresses -EA SilentlyContinue
                     }
                     ipconfig /flushdns | Out-Null
-                    Write-Output "✓ DNS reset to automatic (ISP default)"
+                    Write-Output "âœ“ DNS reset to automatic (ISP default)"
                     """ },
 
             new() { Id="run-network-diag", Title="Run Windows network diagnostics",
@@ -312,7 +314,7 @@ public sealed partial class FixCatalogService : IFixCatalogService
                     """ },
 
             new() { Id="check-open-ports", Title="Show active network connections",
-                Description="Lists established connections — useful for spotting suspicious remote access.",
+                Description="Lists established connections â€” useful for spotting suspicious remote access.",
                 Type=FixType.Silent, RequiresAdmin=false,
                 Keywords=["check connections", "suspicious network", "who is connected", "open connections"],
                 Script="""
@@ -322,13 +324,13 @@ public sealed partial class FixCatalogService : IFixCatalogService
                         try {
                             $proc = Get-Process -Id $c.OwningProcess -EA SilentlyContinue
                             $name = if($proc){$proc.ProcessName}else{"Unknown"}
-                            Write-Output "$($c.LocalAddress):$($c.LocalPort) → $($c.RemoteAddress):$($c.RemotePort)  [$name]"
+                            Write-Output "$($c.LocalAddress):$($c.LocalPort) â†’ $($c.RemoteAddress):$($c.RemotePort)  [$name]"
                         } catch {}
                     }
                     """ },
 
             new() { Id="disable-netbios", Title="Disable NetBIOS (reduces latency)",
-                Description="Disables NetBIOS over TCP/IP on all adapters — reduces latency for gaming and streaming.",
+                Description="Disables NetBIOS over TCP/IP on all adapters â€” reduces latency for gaming and streaming.",
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["reduce ping", "lower latency", "gaming network tweak", "disable legacy network"],
                 Script="""
@@ -336,20 +338,20 @@ public sealed partial class FixCatalogService : IFixCatalogService
                     foreach ($a in $adapters) {
                         $a.SetTcpipNetbios(2) | Out-Null  # 2 = Disable
                     }
-                    Write-Output "✓ NetBIOS disabled on all active adapters. Restart to apply."
+                    Write-Output "âœ“ NetBIOS disabled on all active adapters. Restart to apply."
                     """ },
 
             new() { Id="forget-rejoin-wifi", Title="Forget & reconnect to Wi-Fi",
                 Description="Walks through forgetting a bad Wi-Fi profile and reconnecting fresh.",
                 Type=FixType.Guided, Keywords=["rejoin wifi", "reconnect wifi", "wifi password wrong", "wifi not connecting", "forget network"],
                 Steps=[
-                    new() { Title="Open Wi-Fi settings",  Instruction="Wi-Fi settings will open — click 'Manage known networks'.", Script="Start-Process ms-settings:network-wifi" },
+                    new() { Title="Open Wi-Fi settings",  Instruction="Wi-Fi settings will open â€” click 'Manage known networks'.", Script="Start-Process ms-settings:network-wifi" },
                     new() { Title="Forget your network",  Instruction="Find your Wi-Fi network in the list, click it, then click 'Forget'." },
                     new() { Title="Reconnect",            Instruction="Click the Wi-Fi icon in the taskbar, select your network, enter your password, and connect." }
                 ]},
 
             new() { Id="view-hosts-file", Title="Check Windows Hosts file",
-                Description="Displays hosts file entries — malware sometimes redirects websites here.",
+                Description="Displays hosts file entries â€” malware sometimes redirects websites here.",
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["hosts file", "blocked websites", "site redirected", "malware redirecting browser"],
                 Script="""
@@ -362,9 +364,9 @@ public sealed partial class FixCatalogService : IFixCatalogService
         ]
     };
 
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  2. PERFORMANCE & CLEANUP
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     private static FixCategory PerformanceAndCleanup() => new()
     {
         Id="performance", Icon="\uE9D9", Title="Performance & Cleanup",
@@ -388,7 +390,7 @@ public sealed partial class FixCatalogService : IFixCatalogService
                                 Remove-Item -Force -Recurse -EA SilentlyContinue
                         }
                     }
-                    Write-Output "✓ Freed $([math]::Round($freed/1MB, 1)) MB of temporary files."
+                    Write-Output "âœ“ Freed $([math]::Round($freed/1MB, 1)) MB of temporary files."
                     """ },
 
             new() { Id="clear-thumbnail-cache", Title="Rebuild thumbnail & icon cache",
@@ -403,7 +405,7 @@ public sealed partial class FixCatalogService : IFixCatalogService
                     $files | Remove-Item -Force -EA SilentlyContinue
                     ie4uinit.exe -show
                     Start-Process explorer
-                    Write-Output "✓ Removed $count thumbnail cache files. Explorer restarted."
+                    Write-Output "âœ“ Removed $count thumbnail cache files. Explorer restarted."
                     """ },
 
             new() { Id="clear-dns-clipboard-cache", Title="Clear DNS, clipboard & shadow copies cache",
@@ -415,7 +417,7 @@ public sealed partial class FixCatalogService : IFixCatalogService
                     cmd /c "echo off | clip" 2>&1 | Out-Null
                     # WinSxS cleanup (component store)
                     Dism /Online /Cleanup-Image /StartComponentCleanup /EA SilentlyContinue | Out-Null
-                    Write-Output "✓ DNS cache flushed, clipboard cleared, component store cleaned."
+                    Write-Output "âœ“ DNS cache flushed, clipboard cleared, component store cleaned."
                     """ },
 
             new() { Id="top-memory-processes", Title="Top 10 memory-hungry processes",
@@ -449,11 +451,11 @@ public sealed partial class FixCatalogService : IFixCatalogService
                 Script="""
                     powercfg /setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c
                     $plan = (powercfg /getactivescheme) -replace '.*: ',''
-                    Write-Output "✓ Power plan set. Active scheme: $plan"
+                    Write-Output "âœ“ Power plan set. Active scheme: $plan"
                     """ },
 
             new() { Id="set-ultimate-performance", Title="Enable Ultimate Performance power plan",
-                Description="Enables Windows' hidden 'Ultimate Performance' plan — maximum speed, higher power draw.",
+                Description="Enables Windows' hidden 'Ultimate Performance' plan â€” maximum speed, higher power draw.",
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["ultimate performance", "maximum speed", "gaming performance mode"],
                 Script="""
@@ -462,14 +464,14 @@ public sealed partial class FixCatalogService : IFixCatalogService
                     if ($result -match '{(.+)}') {
                         $guid = $Matches[1]
                         powercfg /setactive $guid | Out-Null
-                        Write-Output "✓ Ultimate Performance plan created and activated."
+                        Write-Output "âœ“ Ultimate Performance plan created and activated."
                     } else {
-                        # Already exists — find and activate it
+                        # Already exists â€” find and activate it
                         $plans = powercfg /list
                         $ultimate = $plans | Where-Object { $_ -match 'Ultimate' }
                         if ($ultimate -match '\*\s+({[^}]+})') {
                             powercfg /setactive $Matches[1] | Out-Null
-                            Write-Output "✓ Ultimate Performance plan activated."
+                            Write-Output "âœ“ Ultimate Performance plan activated."
                         } else {
                             Write-Output "Ultimate Performance plan not available on this edition of Windows."
                         }
@@ -477,7 +479,7 @@ public sealed partial class FixCatalogService : IFixCatalogService
                     """ },
 
             new() { Id="disable-startup-apps", Title="Disable startup programs",
-                Description="Opens Task Manager on the Startup tab — disable items causing slow boots.",
+                Description="Opens Task Manager on the Startup tab â€” disable items causing slow boots.",
                 Type=FixType.Guided, Keywords=["slow startup", "slow boot", "too many startup programs", "apps starting automatically", "computer takes forever to start"],
                 Steps=[
                     new() { Title="Open Startup tab",   Instruction="Task Manager will open on the Startup tab.", Script="Start-Process taskmgr -ArgumentList '/0 /startup'" },
@@ -492,8 +494,8 @@ public sealed partial class FixCatalogService : IFixCatalogService
                     Get-PSDrive -PSProvider FileSystem | Where-Object {$_.Used+$_.Free -gt 0} | ForEach-Object {
                         $total = $_.Used + $_.Free
                         $pct   = if($total -gt 0){[math]::Round(100*$_.Used/$total,0)}else{0}
-                        $bar   = "█" * [math]::Round($pct/5) + "░" * (20 - [math]::Round($pct/5))
-                        Write-Output ("{0}: [{1}] {2}% — {3:N1}GB used / {4:N1}GB free" -f $_.Name,$bar,$pct,($_.Used/1GB),($_.Free/1GB))
+                        $bar   = "â–ˆ" * [math]::Round($pct/5) + "â–‘" * (20 - [math]::Round($pct/5))
+                        Write-Output ("{0}: [{1}] {2}% â€” {3:N1}GB used / {4:N1}GB free" -f $_.Name,$bar,$pct,($_.Used/1GB),($_.Free/1GB))
                     }
                     """ },
 
@@ -502,7 +504,7 @@ public sealed partial class FixCatalogService : IFixCatalogService
                 Type=FixType.Silent, RequiresAdmin=false,
                 Keywords=["disk full", "find big files", "storage full", "hard drive full", "what is taking up space"],
                 Script="""
-                    Write-Output "Scanning C: for large files (may take 30–60 seconds)..."
+                    Write-Output "Scanning C: for large files (may take 30â€“60 seconds)..."
                     Get-ChildItem 'C:\' -Recurse -File -ErrorAction SilentlyContinue |
                         Sort-Object Length -Descending |
                         Select-Object -First 20 |
@@ -524,11 +526,11 @@ public sealed partial class FixCatalogService : IFixCatalogService
                         Set-ItemProperty -Path $cat.PSPath -Name StateFlags0064 -Value 2 -Type DWord -EA SilentlyContinue
                     }
                     Start-Process cleanmgr -ArgumentList "/sagerun:64" -Wait
-                    Write-Output "✓ Disk Cleanup complete."
+                    Write-Output "âœ“ Disk Cleanup complete."
                     """ },
 
             new() { Id="optimize-drive", Title="Optimize / defrag drive (C:)",
-                Description="Optimizes C: — defragments HDDs and sends TRIM command to SSDs.",
+                Description="Optimizes C: â€” defragments HDDs and sends TRIM command to SSDs.",
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["defrag", "optimize ssd", "defragment hard drive", "slow drive"],
                 Script="""
@@ -542,7 +544,7 @@ public sealed partial class FixCatalogService : IFixCatalogService
                 Type=FixType.Guided, RequiresAdmin=true,
                 Keywords=["disk errors", "bad sectors", "hard drive errors", "fix disk", "chkdsk"], Steps=[
                     new() { Title="Schedule scan",    Instruction="Click 'Done' to schedule a full disk scan on next restart.", Script="echo Y | chkdsk C: /f /r /x" },
-                    new() { Title="Restart your PC",  Instruction="Save all open files and restart. The scan runs before Windows loads and takes 20–60 minutes depending on drive size." }
+                    new() { Title="Restart your PC",  Instruction="Save all open files and restart. The scan runs before Windows loads and takes 20â€“60 minutes depending on drive size." }
                 ]},
 
             new() { Id="clear-wsu-download-cache", Title="Clear Windows Update download cache",
@@ -554,7 +556,7 @@ public sealed partial class FixCatalogService : IFixCatalogService
                     $sz = (Get-ChildItem $path -Recurse -EA SilentlyContinue | Measure-Object -Property Length -Sum -EA SilentlyContinue).Sum
                     Remove-Item "$path\*" -Recurse -Force -EA SilentlyContinue
                     Start-Service wuauserv -EA SilentlyContinue
-                    Write-Output "✓ Freed $([math]::Round($sz/1MB)) MB of Windows Update download cache."
+                    Write-Output "âœ“ Freed $([math]::Round($sz/1MB)) MB of Windows Update download cache."
                     """ },
 
             new() { Id="optimize-visual-effects", Title="Optimize visual effects for speed",
@@ -568,16 +570,16 @@ public sealed partial class FixCatalogService : IFixCatalogService
                     # Additional animation tweaks
                     Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name MenuShowDelay -Value 0
                     Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop\WindowMetrics' -Name MinAnimate -Value 0
-                    Write-Output "✓ Visual effects optimized for performance. Sign out and back in to apply."
+                    Write-Output "âœ“ Visual effects optimized for performance. Sign out and back in to apply."
                     """ },
 
             new() { Id="disable-superfetch", Title="Disable SysMain (SuperFetch)",
-                Description="Stops the SysMain service that pre-loads apps — helps on older/low-RAM machines.",
+                Description="Stops the SysMain service that pre-loads apps â€” helps on older/low-RAM machines.",
                 Type=FixType.Silent, RequiresAdmin=true,
                 Script="""
                     Stop-Service SysMain -Force -EA SilentlyContinue
                     Set-Service SysMain -StartupType Disabled -EA SilentlyContinue
-                    Write-Output "✓ SysMain (SuperFetch) disabled. This can reduce HDD thrashing on older PCs."
+                    Write-Output "âœ“ SysMain (SuperFetch) disabled. This can reduce HDD thrashing on older PCs."
                     Write-Output "  Note: On fast SSDs, SysMain usually helps rather than hurts."
                     """ },
 
@@ -595,14 +597,14 @@ public sealed partial class FixCatalogService : IFixCatalogService
                     winmgmt /regserver 2>&1 | Out-Null
                     Pop-Location
                     Start-Service winmgmt
-                    Write-Output "✓ WMI service repaired and restarted."
+                    Write-Output "âœ“ WMI service repaired and restarted."
                     """ },
         ]
     };
 
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  3. AUDIO & DISPLAY
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     private static FixCategory AudioAndDisplay() => new()
     {
         Id="audio", Icon="\uE767", Title="Audio & Display",
@@ -619,7 +621,7 @@ public sealed partial class FixCatalogService : IFixCatalogService
                     Start-Service AudioEndpointBuilder -EA SilentlyContinue
                     Start-Service AudioSrv -EA SilentlyContinue
                     $status = (Get-Service AudioSrv).Status
-                    Write-Output "✓ Audio service status: $status"
+                    Write-Output "âœ“ Audio service status: $status"
                     """ },
 
             new() { Id="list-audio-devices", Title="List all audio devices",
@@ -641,13 +643,13 @@ public sealed partial class FixCatalogService : IFixCatalogService
                 Script="msdt.exe /id AudioPlaybackDiagnostic" },
 
             new() { Id="fix-audio-driver", Title="Reinstall audio driver",
-                Description="Uninstalls and reinstalls the audio driver — fixes persistent sound problems.",
+                Description="Uninstalls and reinstalls the audio driver â€” fixes persistent sound problems.",
                 Type=FixType.Guided, Keywords=["reinstall audio driver", "sound driver", "audio driver broken", "crackling sound", "distorted audio"],
                 Steps=[
                     new() { Title="Open Device Manager",        Instruction="Device Manager will open.", Script="devmgmt.msc" },
                     new() { Title="Expand Sound controllers",   Instruction="Click 'Sound, video and game controllers'." },
-                    new() { Title="Uninstall audio device",     Instruction="Right-click your audio device → 'Uninstall device' → check 'Delete driver software' → Uninstall." },
-                    new() { Title="Reinstall driver",           Instruction="Click Action → 'Scan for hardware changes'. Windows reinstalls the driver automatically. Restart when prompted." }
+                    new() { Title="Uninstall audio device",     Instruction="Right-click your audio device â†’ 'Uninstall device' â†’ check 'Delete driver software' â†’ Uninstall." },
+                    new() { Title="Reinstall driver",           Instruction="Click Action â†’ 'Scan for hardware changes'. Windows reinstalls the driver automatically. Restart when prompted." }
                 ]},
 
             new() { Id="set-audio-output", Title="Change audio output device",
@@ -663,7 +665,7 @@ public sealed partial class FixCatalogService : IFixCatalogService
                 Type=FixType.Guided, Steps=[
                     new() { Title="Open Playback devices",    Instruction="Sound settings will open.", Script="Start-Process mmsys.cpl" },
                     new() { Title="Open Properties",          Instruction="Double-click your default playback device to open its Properties." },
-                    new() { Title="Disable enhancements",     Instruction="Click the 'Enhancements' or 'Advanced' tab → check 'Disable all enhancements' → click OK. Also try changing the sample rate to 24 bit, 44100 Hz." }
+                    new() { Title="Disable enhancements",     Instruction="Click the 'Enhancements' or 'Advanced' tab â†’ check 'Disable all enhancements' â†’ click OK. Also try changing the sample rate to 24 bit, 44100 Hz." }
                 ]},
 
             new() { Id="list-monitors", Title="List connected monitors",
@@ -673,7 +675,7 @@ public sealed partial class FixCatalogService : IFixCatalogService
                 Script="""
                     Write-Output "=== Connected monitors ==="
                     Get-PnpDevice -Class Monitor | ForEach-Object {
-                        Write-Output "$($_.FriendlyName) — Status: $($_.Status)"
+                        Write-Output "$($_.FriendlyName) â€” Status: $($_.Status)"
                     }
                     $count = (Get-PnpDevice -Class Monitor | Where-Object {$_.Status -eq 'OK'}).Count
                     Write-Output "Active monitors: $count"
@@ -684,7 +686,7 @@ public sealed partial class FixCatalogService : IFixCatalogService
                 Type=FixType.Guided, Steps=[
                     new() { Title="Open display settings",     Instruction="Display Settings will open.", Script="Start-Process ms-settings:display" },
                     new() { Title="Adjust scale",              Instruction="Under 'Scale', try 100%, 125%, or 150%. Laptops usually look best at 125% or 150%. Click Apply." },
-                    new() { Title="Fix individual blurry app", Instruction="For a specific blurry app: right-click its shortcut → Properties → Compatibility → 'Change high DPI settings' → check 'Override high DPI scaling behavior' → set to 'Application'." }
+                    new() { Title="Fix individual blurry app", Instruction="For a specific blurry app: right-click its shortcut â†’ Properties â†’ Compatibility â†’ 'Change high DPI settings' â†’ check 'Override high DPI scaling behavior' â†’ set to 'Application'." }
                 ]},
 
             new() { Id="fix-screen-flicker", Title="Fix screen flickering",
@@ -693,7 +695,7 @@ public sealed partial class FixCatalogService : IFixCatalogService
                 Steps=[
                     new() { Title="Open Task Manager",    Instruction="Task Manager will open. If the taskbar flickers along with the screen, it's a driver issue. If Task Manager itself flickers, it's an app conflict.", Script="Start-Process taskmgr" },
                     new() { Title="Update display driver", Instruction="Open Device Manager to update your GPU driver.", Script="devmgmt.msc" },
-                    new() { Title="Lower refresh rate",    Instruction="Settings → System → Display → Advanced display → try 60Hz instead of a higher rate." }
+                    new() { Title="Lower refresh rate",    Instruction="Settings â†’ System â†’ Display â†’ Advanced display â†’ try 60Hz instead of a higher rate." }
                 ]},
 
             new() { Id="update-display-driver", Title="Update display driver",
@@ -702,7 +704,7 @@ public sealed partial class FixCatalogService : IFixCatalogService
                 Steps=[
                     new() { Title="Open Device Manager",      Instruction="Device Manager will open.", Script="devmgmt.msc" },
                     new() { Title="Expand Display Adapters",  Instruction="Click 'Display adapters' to expand." },
-                    new() { Title="Update driver",            Instruction="Right-click your GPU → 'Update driver' → 'Search automatically for drivers'." }
+                    new() { Title="Update driver",            Instruction="Right-click your GPU â†’ 'Update driver' â†’ 'Search automatically for drivers'." }
                 ]},
 
             new() { Id="calibrate-display", Title="Calibrate display colors",
@@ -712,23 +714,23 @@ public sealed partial class FixCatalogService : IFixCatalogService
                 Script="Start-Process dccw.exe" },
 
             new() { Id="set-display-settings", Title="Open display settings",
-                Description="Opens display settings — for resolution, scale, and multi-monitor setup.",
+                Description="Opens display settings â€” for resolution, scale, and multi-monitor setup.",
                 Type=FixType.Silent, RequiresAdmin=false,
                 Script="Start-Process ms-settings:display" },
 
             new() { Id="fix-hdmi-no-sound", Title="Fix no sound through HDMI/DisplayPort",
-                Description="Sets the HDMI/DisplayPort audio device as default — fixes TV and monitor audio.",
+                Description="Sets the HDMI/DisplayPort audio device as default â€” fixes TV and monitor audio.",
                 Type=FixType.Guided, Steps=[
                     new() { Title="Open Playback devices",   Instruction="The Playback devices window will open.", Script="Start-Process mmsys.cpl" },
-                    new() { Title="Show all devices",        Instruction="Right-click anywhere in the list → check 'Show Disabled Devices' and 'Show Disconnected Devices'." },
-                    new() { Title="Set HDMI as default",     Instruction="Find your HDMI or DisplayPort audio device, right-click it → 'Set as Default Device'. Click OK." }
+                    new() { Title="Show all devices",        Instruction="Right-click anywhere in the list â†’ check 'Show Disabled Devices' and 'Show Disconnected Devices'." },
+                    new() { Title="Set HDMI as default",     Instruction="Find your HDMI or DisplayPort audio device, right-click it â†’ 'Set as Default Device'. Click OK." }
                 ]},
         ]
     };
 
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  4. WINDOWS UPDATE & DRIVERS
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     private static FixCategory UpdatesAndDrivers() => new()
     {
         Id="updates", Icon="\uE777", Title="Updates & Drivers",
@@ -760,7 +762,7 @@ public sealed partial class FixCatalogService : IFixCatalogService
                     foreach ($s in @('bits','wuauserv','cryptSvc','msiserver')) {
                         Start-Service $s -EA SilentlyContinue
                     }
-                    Write-Output "✓ Windows Update reset complete. Try checking for updates again."
+                    Write-Output "âœ“ Windows Update reset complete. Try checking for updates again."
                     """ },
 
             new() { Id="scan-driver-problems", Title="Scan for driver problems",
@@ -772,33 +774,33 @@ public sealed partial class FixCatalogService : IFixCatalogService
                     if ($bad) {
                         Write-Output "=== Devices with problems ==="
                         $bad | ForEach-Object {
-                            Write-Output "✗ $($_.FriendlyName) — Status: $($_.Status) — Class: $($_.Class)"
+                            Write-Output "âœ— $($_.FriendlyName) â€” Status: $($_.Status) â€” Class: $($_.Class)"
                         }
                     } else {
-                        Write-Output "✓ All devices are working correctly. No driver issues found."
+                        Write-Output "âœ“ All devices are working correctly. No driver issues found."
                     }
                     """ },
 
             new() { Id="run-sfc", Title="Run System File Checker (SFC)",
-                Description="Scans and repairs corrupted Windows system files. Takes 5–15 minutes.",
+                Description="Scans and repairs corrupted Windows system files. Takes 5â€“15 minutes.",
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["fix corrupted files", "windows file checker", "system file repair", "sfc scannow"],
                 Script="""
-                    Write-Output "Running SFC scan — please wait (5–15 minutes)..."
+                    Write-Output "Running SFC scan â€” please wait (5â€“15 minutes)..."
                     sfc /scannow
-                    Write-Output "✓ SFC scan complete. Check the output above for results."
+                    Write-Output "âœ“ SFC scan complete. Check the output above for results."
                     """ },
 
-            new() { Id="run-dism", Title="Run DISM — repair Windows image",
+            new() { Id="run-dism", Title="Run DISM â€” repair Windows image",
                 Description="Repairs the Windows component store. Run this if SFC reports it cannot fix files.",
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["repair windows", "windows image repair", "dism restore", "fix windows components"],
                 Script="""
                     Write-Output "Running DISM health check..."
                     DISM /Online /Cleanup-Image /CheckHealth
-                    Write-Output "Running DISM full restore (requires internet, 10–25 min)..."
+                    Write-Output "Running DISM full restore (requires internet, 10â€“25 min)..."
                     DISM /Online /Cleanup-Image /RestoreHealth
-                    Write-Output "✓ DISM complete."
+                    Write-Output "âœ“ DISM complete."
                     """ },
 
             new() { Id="check-activation", Title="Check Windows activation status",
@@ -822,8 +824,8 @@ public sealed partial class FixCatalogService : IFixCatalogService
                 Description="Schedules a Windows Memory Diagnostic to detect bad RAM on next restart.",
                 Type=FixType.Guided, Steps=[
                     new() { Title="Schedule the test",   Instruction="Memory Diagnostic will be scheduled for next restart.", Script="mdsched.exe" },
-                    new() { Title="Restart your PC",     Instruction="Save your work and restart. The test runs before Windows loads and takes 10–30 minutes." },
-                    new() { Title="Check results",       Instruction="After restart: search 'Event Viewer' → Windows Logs → System → look for 'MemoryDiagnostics-Results' events." }
+                    new() { Title="Restart your PC",     Instruction="Save your work and restart. The test runs before Windows loads and takes 10â€“30 minutes." },
+                    new() { Title="Check results",       Instruction="After restart: search 'Event Viewer' â†’ Windows Logs â†’ System â†’ look for 'MemoryDiagnostics-Results' events." }
                 ]},
 
             new() { Id="install-directx", Title="Update DirectX runtime",

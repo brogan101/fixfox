@@ -8,6 +8,7 @@ using System.Resources;
 using HelpDesk.Application.Interfaces;
 using HelpDesk.Domain;
 using HelpDesk.Domain.Enums;
+using HelpDesk.Infrastructure.Services;
 using Newtonsoft.Json;
 
 namespace HelpDesk.Application.Services;
@@ -80,8 +81,10 @@ public sealed class StartupVerifier
             Check("Settings readable", CheckSettingsReadable),
             Check("Settings writable", CheckSettingsWritable),
             Check("History file", CheckHistoryFile),
+            Check("Automation history file", CheckAutomationHistoryFile),
             Check("Notifications file", CheckNotificationsFile),
             Check("FixFoxLogo resource", CheckLogoResource),
+            Check("FixFoxLogo icon resource", CheckIconResource),
             Check("Fix catalog builds", CheckFixCatalog),
             Check("Fix IDs unique", CheckFixIdsUnique),
             Check("Bundle refs valid", CheckBundleRefs),
@@ -187,11 +190,27 @@ public sealed class StartupVerifier
         return (VerifyStatus.Pass, $"Readable ({new FileInfo(path).Length / 1024} KB)");
     }
 
+    private static (VerifyStatus, string) CheckAutomationHistoryFile()
+    {
+        if (!File.Exists(ProductizationPaths.AutomationHistoryFile))
+            return (VerifyStatus.Pass, "Automation history file does not exist yet");
+
+        JsonConvert.DeserializeObject(File.ReadAllText(ProductizationPaths.AutomationHistoryFile));
+        return (VerifyStatus.Pass, $"Readable ({new FileInfo(ProductizationPaths.AutomationHistoryFile).Length / 1024} KB)");
+    }
+
     private static (VerifyStatus, string) CheckLogoResource()
     {
         return HasCompiledWpfResource("fixfoxlogo.png")
             ? (VerifyStatus.Pass, "Logo resource found in compiled WPF resources")
             : (VerifyStatus.Fail, "FixFoxLogo.png not found in compiled WPF resources");
+    }
+
+    private static (VerifyStatus, string) CheckIconResource()
+    {
+        return HasCompiledWpfResource("fixfoxlogo.ico")
+            ? (VerifyStatus.Pass, "Icon resource found in compiled WPF resources")
+            : (VerifyStatus.Fail, "FixFoxLogo.ico not found in compiled WPF resources");
     }
 
     private (VerifyStatus, string) CheckFixCatalog()

@@ -17,7 +17,7 @@ internal sealed class FakeSettingsService : ISettingsService
         LastLoadStatus = new SettingsLoadStatus
         {
             RecoveredDefaults = true,
-            SchemaVersion = Settings.SettingsSchemaVersion,
+            SchemaVersion = Settings.SchemaVersion,
             Notes = ["Defaults restored in the fake settings store."]
         };
     }
@@ -62,6 +62,11 @@ internal sealed class FakeDeploymentConfigurationService : IDeploymentConfigurat
         if (Current.RestrictTechnicianExports)
             settings.SupportBundleExportLevel = "Basic";
     }
+
+    public PolicyState GetPolicyState(string settingKey, AppSettings? settings = null)
+        => ProductizationPolicies.GetPolicyState(Current, settings ?? SettingsFallback, settingKey);
+
+    private static AppSettings SettingsFallback => new();
 }
 
 internal sealed class FakeAppLogger : IAppLogger
@@ -89,6 +94,11 @@ internal sealed class FakeRepairHistoryService : IRepairHistoryService
     private readonly List<RepairHistoryEntry> _entries = [];
     public IReadOnlyList<RepairHistoryEntry> Entries => _entries;
     public void Record(RepairHistoryEntry entry) => _entries.Insert(0, entry);
+    public void Delete(IEnumerable<string> entryIds)
+    {
+        var idSet = entryIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        _entries.RemoveAll(entry => idSet.Contains(entry.Id));
+    }
     public void Clear() => _entries.Clear();
 }
 
@@ -98,6 +108,19 @@ internal sealed class FakeAutomationHistoryService : IAutomationHistoryService
     public IReadOnlyList<AutomationRunReceipt> Entries => _entries;
     public void Record(AutomationRunReceipt entry) => _entries.Insert(0, entry);
     public void Clear() => _entries.Clear();
+}
+
+internal sealed class FakeHealthAlertHistoryService : IHealthAlertHistoryService
+{
+    private readonly List<HealthAlertHistoryEntry> _entries = [];
+    public IReadOnlyList<HealthAlertHistoryEntry> Entries => _entries;
+    public void Record(HealthAlert alert) => _entries.Insert(0, new HealthAlertHistoryEntry
+    {
+        AlertId = alert.Id,
+        Title = alert.Title,
+        Severity = alert.Severity,
+        DetectedUtc = alert.DetectedUtc
+    });
 }
 
 internal sealed class FakeFixCatalogService : IFixCatalogService

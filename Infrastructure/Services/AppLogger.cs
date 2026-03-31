@@ -4,9 +4,9 @@ using HelpDesk.Shared;
 
 namespace HelpDesk.Infrastructure.Services;
 
-// ══════════════════════════════════════════════════════════════════════════
-//  APP LOGGER  — file-based structured logger written to AppData\FixFox\app.log
-// ══════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//  APP LOGGER  â€” file-based structured logger written to AppData\FixFox\app.log
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 public sealed class AppLogger : IAppLogger
 {
@@ -25,8 +25,18 @@ public sealed class AppLogger : IAppLogger
     public void Error(string message, Exception? ex = null)
     {
         Write("ERR", ex is null ? message : $"{message} | {ex.GetType().Name}: {ex.Message}");
-        if (ex?.StackTrace is string st)
-            Write("ERR", $"  Stack: {st.Split('\n').FirstOrDefault()?.Trim() ?? ""}");
+        if (ex is not null)
+        {
+            var current = ex.InnerException;
+            while (current is not null)
+            {
+                Write("ERR", $"  Inner: {current.GetType().Name}: {current.Message}");
+                current = current.InnerException;
+            }
+
+            if (ex.StackTrace is string st)
+                Write("ERR", $"  Stack: {st.Split('\n').FirstOrDefault()?.Trim() ?? ""}");
+        }
     }
 
     private void Write(string level, string message)

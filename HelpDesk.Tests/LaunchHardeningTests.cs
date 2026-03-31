@@ -19,7 +19,7 @@ public sealed class LaunchHardeningTests : IDisposable
         var backup = new AppSettings
         {
             BehaviorProfile = "Work Laptop",
-            SettingsSchemaVersion = 1,
+            SchemaVersion = 1,
             LastSessionEndedCleanly = false
         };
         File.WriteAllText(
@@ -30,7 +30,7 @@ public sealed class LaunchHardeningTests : IDisposable
         var loaded = service.Load();
 
         Assert.Equal("Work Laptop", loaded.BehaviorProfile);
-        Assert.Equal(ProductizationPolicies.CurrentSettingsSchemaVersion, loaded.SettingsSchemaVersion);
+        Assert.Equal(ProductizationPolicies.CurrentSettingsSchemaVersion, loaded.SchemaVersion);
         Assert.True(service.LastLoadStatus.LoadedFromBackup);
         Assert.True(service.LastLoadStatus.PreviousSessionEndedUncleanly);
         Assert.Contains(service.LastLoadStatus.Notes, note => note.Contains("backup", StringComparison.OrdinalIgnoreCase));
@@ -75,7 +75,7 @@ public sealed class LaunchHardeningTests : IDisposable
         Assert.True(reloaded.WindowWidth >= 1100);
         Assert.True(reloaded.WindowHeight >= 700);
         Assert.True(File.Exists(Path.Combine(_tempRoot, "settings.json")));
-        Assert.Empty(Directory.GetFiles(_tempRoot, "*.tmp-*"));
+        Assert.False(File.Exists(Path.Combine(_tempRoot, "settings.json.tmp")));
     }
 
     [Fact]
@@ -92,6 +92,61 @@ public sealed class LaunchHardeningTests : IDisposable
 
         var reloaded = service.Load();
         Assert.False(reloaded.ShowNotifications);
+    }
+
+    [Fact]
+    public void SettingsService_Migrates_Legacy_Schema_Without_Throwing()
+    {
+        Directory.CreateDirectory(_tempRoot);
+        File.WriteAllText(
+            Path.Combine(_tempRoot, "settings.json"),
+            JsonConvert.SerializeObject(new
+            {
+                SchemaVersion = 0,
+                BehaviorProfile = "Standard",
+                Theme = "Dark"
+            }, Formatting.Indented));
+
+        var service = new SettingsService(_tempRoot);
+        var loaded = service.Load();
+
+        Assert.Equal(ProductizationPolicies.CurrentSettingsSchemaVersion, loaded.SchemaVersion);
+        Assert.False(string.IsNullOrWhiteSpace(loaded.NotificationMode));
+        Assert.False(string.IsNullOrWhiteSpace(loaded.SupportBundleExportLevel));
+        Assert.False(string.IsNullOrWhiteSpace(loaded.DefaultLandingPage));
+    }
+
+    [Fact]
+    public void SettingsService_Writes_Valid_Json_That_RoundTrips()
+    {
+        Directory.CreateDirectory(_tempRoot);
+        var service = new SettingsService(_tempRoot);
+        var settings = service.Load();
+        settings.BehaviorProfile = "Work Laptop";
+        settings.ShowNotifications = false;
+
+        service.Save(settings);
+
+        var json = File.ReadAllText(Path.Combine(_tempRoot, "settings.json"));
+        var reparsed = JsonConvert.DeserializeObject<AppSettings>(json);
+
+        Assert.NotNull(reparsed);
+        Assert.Equal("Work Laptop", reparsed!.BehaviorProfile);
+        Assert.False(reparsed.ShowNotifications);
+    }
+
+    [Fact]
+    public void SettingsService_Handles_Garbage_File_Gracefully()
+    {
+        Directory.CreateDirectory(_tempRoot);
+        File.WriteAllText(Path.Combine(_tempRoot, "settings.json"), "GARBAGE");
+
+        var service = new SettingsService(_tempRoot);
+        var loaded = service.Load();
+
+        Assert.NotNull(loaded);
+        Assert.True(service.LastLoadStatus.RecoveredDefaults || service.LastLoadStatus.LoadedFromBackup);
+        Assert.True(File.Exists(Path.Combine(_tempRoot, "settings.json")));
     }
 
     [Fact]
@@ -155,7 +210,7 @@ public sealed class LaunchHardeningTests : IDisposable
             JsonConvert.SerializeObject(new
             {
                 ChannelName = "Stable",
-                LatestVersion = "1.0.1",
+                LatestVersion = "1.1.1",
                 DownloadUrl = "https://github.com/brogan101/fixfox/releases",
                 ReleaseNotesPath = releaseNotes,
                 Summary = "A newer FixFox build is available."
@@ -174,7 +229,7 @@ public sealed class LaunchHardeningTests : IDisposable
         var info = await service.CheckForUpdatesAsync();
 
         Assert.True(info.UpdateAvailable);
-        Assert.Equal("1.0.1", info.LatestVersion);
+        Assert.Equal("1.1.1", info.LatestVersion);
         Assert.Equal("Release feed", info.SourceName);
         Assert.Equal(releaseNotes, info.ReleaseNotesPath);
     }

@@ -10,6 +10,10 @@
     <h:ThemeIsDarkConverter x:Key="ThemeIsDark"/>
     <h:NullToCollapsedConverter x:Key="NullCollapsed"/>
     <h:BoolToVisConverter x:Key="BoolVis"/>
+    <h:EnumEqualsConverter x:Key="EnumEquals"/>
+    <h:LockedToIsEnabledConverter x:Key="LockedToIsEnabled"/>
+    <h:PolicyStateToVisibilityConverter x:Key="PolicyStateToVisibility"/>
+    <h:PolicyStateToTextConverter x:Key="PolicyStateToText"/>
   </Page.Resources>
 
   <ScrollViewer>
@@ -27,6 +31,30 @@
       </StackPanel>
 
       <StackPanel Grid.Row="1">
+
+        <TextBlock Text="Simple View" Style="{DynamicResource CardLabel}" Margin="0,0,0,8"/>
+        <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,16">
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0" Margin="0,0,12,0">
+              <TextBlock Text="Simple view - hides technical details for easier use" FontSize="13" FontWeight="Medium"/>
+              <TextBlock Text="Show a smaller navigation, simpler wording, and safer search results for people who just want their PC to work."
+                         Style="{DynamicResource CardSub}"
+                         Margin="0,4,0,0"
+                         TextWrapping="Wrap"/>
+            </StackPanel>
+            <ui:ToggleSwitch Grid.Column="1"
+                             IsChecked="{Binding SimplifiedModeEnabled, Mode=TwoWay}"
+                             Tag="SimplifiedMode"
+                             Checked="SettingsToggle_Changed"
+                             Unchecked="SettingsToggle_Changed"
+                             VerticalAlignment="Center"
+                             automation:AutomationProperties.AutomationId="Settings_SimplifiedMode_Toggle"/>
+          </Grid>
+        </Border>
 
         <!-- Appearance -->
         <TextBlock Text="Appearance" Style="{DynamicResource CardLabel}" Margin="0,0,0,8"/>
@@ -48,47 +76,108 @@
           </StackPanel>
         </Border>
 
-        <TextBlock Text="Profiles" Style="{DynamicResource CardLabel}" Margin="0,0,0,8"/>
-        <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,16">
+        <TextBlock Text="Profiles" Style="{DynamicResource CardLabel}" Margin="0,0,0,8"
+                   Visibility="{Binding ShowAdvancedSettings, Converter={StaticResource BoolVis}}"/>
+        <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,16"
+                Visibility="{Binding ShowAdvancedSettings, Converter={StaticResource BoolVis}}">
           <StackPanel>
             <TextBlock Text="Behavior Profile" FontSize="13" FontWeight="Medium"/>
             <TextBlock Text="Profiles tune notifications, tray behavior, and safe defaults so this build fits the kind of device you are supporting."
                        Style="{DynamicResource CardSub}" Margin="0,4,0,10" TextWrapping="Wrap"/>
-            <ComboBox ItemsSource="{Binding BehaviorProfileOptions}"
-                      SelectedItem="{Binding SelectedBehaviorProfile, Mode=TwoWay}"
-                      SelectionChanged="BehaviorProfile_Changed"
-                      IsEnabled="{Binding CanEditBehaviorProfile}"
-                      Width="220"/>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+              <ComboBox ItemsSource="{Binding BehaviorProfileOptions}"
+                        SelectedItem="{Binding SelectedBehaviorProfile, Mode=TwoWay}"
+                        Tag="BehaviorProfile"
+                        SelectionChanged="BehaviorProfile_Changed"
+                        IsEnabled="{Binding CanEditBehaviorProfileSetting}"
+                        Width="220"/>
+              <Border Style="{DynamicResource CompactStatusBadge}"
+                      Margin="8,0,0,0"
+                      VerticalAlignment="Center"
+                      Visibility="{Binding BehaviorProfilePolicyState, Converter={StaticResource PolicyStateToVisibility}}"
+                      automation:AutomationProperties.AutomationId="Settings_BehaviorProfile_PolicyTag">
+                <TextBlock Text="{Binding BehaviorProfilePolicyState, Converter={StaticResource PolicyStateToText}}"
+                           Style="{DynamicResource CompactStatusText}"/>
+              </Border>
+            </StackPanel>
             <TextBlock Text="Notification Mode" FontSize="13" FontWeight="Medium" Margin="0,14,0,0"/>
             <TextBlock Text="Choose whether the app stays quiet, shows only important alerts, or surfaces the full steady-state view."
                        Style="{DynamicResource CardSub}" Margin="0,4,0,10" TextWrapping="Wrap"/>
-            <ComboBox ItemsSource="{Binding NotificationModeOptions}"
-                      SelectedItem="{Binding SelectedNotificationMode, Mode=TwoWay}"
-                      SelectionChanged="SettingsCombo_Changed"
-                      IsEnabled="{Binding CanEditNotificationMode}"
-                      Width="220"/>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+              <ComboBox ItemsSource="{Binding NotificationModeOptions}"
+                        SelectedItem="{Binding SelectedNotificationMode, Mode=TwoWay}"
+                        Tag="NotificationMode"
+                        SelectionChanged="SettingsCombo_Changed"
+                        IsEnabled="{Binding CanEditNotificationModeSetting}"
+                        Width="220"/>
+              <Border Style="{DynamicResource CompactStatusBadge}"
+                      Margin="8,0,0,0"
+                      VerticalAlignment="Center"
+                      Visibility="{Binding NotificationModePolicyState, Converter={StaticResource PolicyStateToVisibility}}"
+                      automation:AutomationProperties.AutomationId="Settings_NotificationMode_PolicyTag">
+                <TextBlock Text="{Binding NotificationModePolicyState, Converter={StaticResource PolicyStateToText}}"
+                           Style="{DynamicResource CompactStatusText}"/>
+              </Border>
+            </StackPanel>
             <TextBlock Text="Support Package Detail" FontSize="13" FontWeight="Medium" Margin="0,14,0,0"/>
             <TextBlock Text="Basic packages redact more aggressively. Technician detail keeps richer receipt history for escalation."
                        Style="{DynamicResource CardSub}" Margin="0,4,0,10" TextWrapping="Wrap"/>
-            <ComboBox ItemsSource="{Binding SupportBundleExportLevelOptions}"
-                      SelectedItem="{Binding SelectedSupportBundleExportLevel, Mode=TwoWay}"
-                      SelectionChanged="SettingsCombo_Changed"
-                      IsEnabled="{Binding CanEditSupportBundleDetail}"
-                      Width="220"/>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+              <ComboBox ItemsSource="{Binding SupportBundleExportLevelOptions}"
+                        SelectedItem="{Binding SelectedSupportBundleExportLevel, Mode=TwoWay}"
+                        Tag="SupportBundleExportLevel"
+                        SelectionChanged="SettingsCombo_Changed"
+                        IsEnabled="{Binding CanEditSupportBundleDetailSetting}"
+                        Width="220"/>
+              <Border Style="{DynamicResource CompactStatusBadge}"
+                      Margin="8,0,0,0"
+                      VerticalAlignment="Center"
+                      Visibility="{Binding SupportBundleExportLevelPolicyState, Converter={StaticResource PolicyStateToVisibility}}"
+                      automation:AutomationProperties.AutomationId="Settings_SupportBundleExportLevel_PolicyTag">
+                <TextBlock Text="{Binding SupportBundleExportLevelPolicyState, Converter={StaticResource PolicyStateToText}}"
+                           Style="{DynamicResource CompactStatusText}"/>
+              </Border>
+            </StackPanel>
             <TextBlock Text="{Binding SupportBundleDetailAvailabilityText}" Style="{DynamicResource MetaText}" Margin="0,6,0,0" TextWrapping="Wrap"/>
             <TextBlock Text="Startup Landing Page" FontSize="13" FontWeight="Medium" Margin="0,14,0,0"/>
             <TextBlock Text="Choose which workspace opens first so the app lands where this device needs it most."
                        Style="{DynamicResource CardSub}" Margin="0,4,0,10" TextWrapping="Wrap"/>
-            <ComboBox ItemsSource="{Binding LandingPageOptions}"
-                      SelectedItem="{Binding SelectedLandingPage, Mode=TwoWay}"
-                      SelectionChanged="LandingPage_Changed"
-                      IsEnabled="{Binding CanEditLandingPage}"
-                      Width="220"/>
-            <CheckBox Content="Show advanced controls and deeper technical detail"
-                      IsChecked="{Binding AdvancedModeEnabled, Mode=TwoWay}"
-                      IsEnabled="{Binding CanToggleAdvancedMode}"
-                      Margin="0,12,0,0"/>
-            <TextBlock Text="{Binding AdvancedModeAvailabilityText}" Style="{DynamicResource MetaText}" Margin="0,6,0,0" TextWrapping="Wrap"/>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+              <ComboBox ItemsSource="{Binding LandingPageOptions}"
+                        SelectedItem="{Binding SelectedLandingPage, Mode=TwoWay}"
+                        Tag="LandingPage"
+                        SelectionChanged="LandingPage_Changed"
+                        IsEnabled="{Binding CanEditLandingPageSetting}"
+                        Width="220"/>
+              <Border Style="{DynamicResource CompactStatusBadge}"
+                      Margin="8,0,0,0"
+                      VerticalAlignment="Center"
+                      Visibility="{Binding LandingPagePolicyState, Converter={StaticResource PolicyStateToVisibility}}"
+                      automation:AutomationProperties.AutomationId="Settings_LandingPage_PolicyTag">
+                <TextBlock Text="{Binding LandingPagePolicyState, Converter={StaticResource PolicyStateToText}}"
+                           Style="{DynamicResource CompactStatusText}"/>
+              </Border>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,12,0,0"
+                        Visibility="{Binding ShowAdvancedSettings, Converter={StaticResource BoolVis}}">
+              <CheckBox Content="Show advanced controls and deeper technical detail"
+                        IsChecked="{Binding AdvancedModeEnabled, Mode=TwoWay}"
+                        IsEnabled="{Binding CanEditAdvancedModeSetting}"
+                        Tag="AdvancedMode"
+                        Checked="AdvancedMode_Changed" Unchecked="AdvancedMode_Changed"
+                        automation:AutomationProperties.AutomationId="Settings_AdvancedMode_Toggle"
+                        VerticalAlignment="Center"/>
+              <Border Style="{DynamicResource CompactStatusBadge}"
+                      Margin="8,0,0,0"
+                      VerticalAlignment="Center"
+                      Visibility="{Binding AdvancedModePolicyState, Converter={StaticResource PolicyStateToVisibility}}"
+                      automation:AutomationProperties.AutomationId="Settings_AdvancedMode_PolicyTag">
+                <TextBlock Text="{Binding AdvancedModePolicyState, Converter={StaticResource PolicyStateToText}}"
+                           Style="{DynamicResource CompactStatusText}"/>
+              </Border>
+            </StackPanel>
+            <TextBlock Text="{Binding AdvancedModeAvailabilityText}" Style="{DynamicResource MetaText}" Margin="0,6,0,0" TextWrapping="Wrap"
+                       Visibility="{Binding ShowAdvancedSettings, Converter={StaticResource BoolVis}}"/>
             <Separator Margin="0,12,0,12"/>
             <DockPanel>
               <StackPanel DockPanel.Dock="Left">
@@ -103,8 +192,10 @@
           </StackPanel>
         </Border>
 
-        <TextBlock Text="Product access" Style="{DynamicResource CardLabel}" Margin="0,0,0,8"/>
-        <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,16">
+        <TextBlock Text="Product access" Style="{DynamicResource CardLabel}" Margin="0,0,0,8"
+                   Visibility="{Binding ShowAdvancedSettings, Converter={StaticResource BoolVis}}"/>
+        <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,16"
+                Visibility="{Binding ShowAdvancedSettings, Converter={StaticResource BoolVis}}">
           <StackPanel>
             <TextBlock Text="Edition and deployment" FontSize="13" FontWeight="Medium"/>
             <TextBlock Text="{Binding EditionSummaryText}" Style="{DynamicResource CardSub}" Margin="0,4,0,2"/>
@@ -118,8 +209,10 @@
           </StackPanel>
         </Border>
 
-        <TextBlock Text="Automation &amp; behavior" Style="{DynamicResource CardLabel}" Margin="0,0,0,8"/>
-        <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,16">
+        <TextBlock Text="Automation &amp; behavior" Style="{DynamicResource CardLabel}" Margin="0,0,0,8"
+                   Visibility="{Binding ShowAdvancedSettings, Converter={StaticResource BoolVis}}"/>
+        <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,16"
+                Visibility="{Binding ShowAdvancedSettings, Converter={StaticResource BoolVis}}">
           <StackPanel>
             <DockPanel Margin="0,0,0,12">
               <StackPanel DockPanel.Dock="Left">
@@ -138,11 +231,22 @@
                 <TextBlock Text="Run Quick Scan on Launch" FontSize="13" FontWeight="Medium"/>
                 <TextBlock Text="Run a lightweight health scan when the app opens." Style="{DynamicResource CardSub}"/>
               </StackPanel>
-              <ui:ToggleSwitch Grid.Column="1"
-                               IsChecked="{Binding Settings.RunQuickScanOnLaunch, Mode=TwoWay}"
-                               automation:AutomationProperties.AutomationId="SettingsRunQuickScanOnLaunchToggle"
-                               Checked="SettingsToggle_Changed" Unchecked="SettingsToggle_Changed"
-                               VerticalAlignment="Center"/>
+              <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <ui:ToggleSwitch IsChecked="{Binding Settings.RunQuickScanOnLaunch, Mode=TwoWay}"
+                                 IsEnabled="{Binding RunQuickScanOnLaunchPolicyState, Converter={StaticResource LockedToIsEnabled}}"
+                                 Tag="RunQuickScanOnLaunch"
+                                 automation:AutomationProperties.AutomationId="SettingsRunQuickScanOnLaunchToggle"
+                                 Checked="SettingsToggle_Changed" Unchecked="SettingsToggle_Changed"
+                                 VerticalAlignment="Center"/>
+                <Border Style="{DynamicResource CompactStatusBadge}"
+                        Margin="8,0,0,0"
+                        VerticalAlignment="Center"
+                        Visibility="{Binding RunQuickScanOnLaunchPolicyState, Converter={StaticResource PolicyStateToVisibility}}"
+                        automation:AutomationProperties.AutomationId="Settings_RunQuickScanOnLaunch_PolicyTag">
+                  <TextBlock Text="{Binding RunQuickScanOnLaunchPolicyState, Converter={StaticResource PolicyStateToText}}"
+                             Style="{DynamicResource CompactStatusText}"/>
+                </Border>
+              </StackPanel>
             </Grid>
             <Separator Margin="0,4,0,12"/>
             <Grid Margin="0,0,0,12">
@@ -163,11 +267,22 @@
                 <TextBlock Text="Show Notifications" FontSize="13" FontWeight="Medium"/>
                 <TextBlock Text="Show alerts when FixFox finds something that needs attention." Style="{DynamicResource CardSub}"/>
               </StackPanel>
-              <ui:ToggleSwitch Grid.Column="1"
-                               IsChecked="{Binding Settings.ShowNotifications, Mode=TwoWay}"
-                               automation:AutomationProperties.AutomationId="SettingsShowNotificationsToggle"
-                               Checked="SettingsToggle_Changed" Unchecked="SettingsToggle_Changed"
-                               VerticalAlignment="Center"/>
+              <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <ui:ToggleSwitch IsChecked="{Binding Settings.ShowNotifications, Mode=TwoWay}"
+                                 IsEnabled="{Binding ShowNotificationsPolicyState, Converter={StaticResource LockedToIsEnabled}}"
+                                 Tag="ShowNotifications"
+                                 automation:AutomationProperties.AutomationId="SettingsShowNotificationsToggle"
+                                 Checked="SettingsToggle_Changed" Unchecked="SettingsToggle_Changed"
+                                 VerticalAlignment="Center"/>
+                <Border Style="{DynamicResource CompactStatusBadge}"
+                        Margin="8,0,0,0"
+                        VerticalAlignment="Center"
+                        Visibility="{Binding ShowNotificationsPolicyState, Converter={StaticResource PolicyStateToVisibility}}"
+                        automation:AutomationProperties.AutomationId="Settings_ShowNotifications_PolicyTag">
+                  <TextBlock Text="{Binding ShowNotificationsPolicyState, Converter={StaticResource PolicyStateToText}}"
+                             Style="{DynamicResource CompactStatusText}"/>
+                </Border>
+              </StackPanel>
             </Grid>
             <Separator Margin="0,4,0,12"/>
             <Grid Margin="0,0,0,4">
@@ -176,10 +291,21 @@
                 <TextBlock Text="Check for Updates on Launch" FontSize="13" FontWeight="Medium"/>
                 <TextBlock Text="Review the configured update channel when the app starts." Style="{DynamicResource CardSub}"/>
               </StackPanel>
-              <ui:ToggleSwitch Grid.Column="1"
-                               IsChecked="{Binding Settings.CheckForUpdatesOnLaunch, Mode=TwoWay}"
-                               Checked="SettingsToggle_Changed" Unchecked="SettingsToggle_Changed"
-                               VerticalAlignment="Center"/>
+              <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <ui:ToggleSwitch IsChecked="{Binding Settings.CheckForUpdatesOnLaunch, Mode=TwoWay}"
+                                 IsEnabled="{Binding CheckForUpdatesOnLaunchPolicyState, Converter={StaticResource LockedToIsEnabled}}"
+                                 Tag="CheckForUpdatesOnLaunch"
+                                 Checked="SettingsToggle_Changed" Unchecked="SettingsToggle_Changed"
+                                 VerticalAlignment="Center"/>
+                <Border Style="{DynamicResource CompactStatusBadge}"
+                        Margin="8,0,0,0"
+                        VerticalAlignment="Center"
+                        Visibility="{Binding CheckForUpdatesOnLaunchPolicyState, Converter={StaticResource PolicyStateToVisibility}}"
+                        automation:AutomationProperties.AutomationId="Settings_CheckForUpdatesOnLaunch_PolicyTag">
+                  <TextBlock Text="{Binding CheckForUpdatesOnLaunchPolicyState, Converter={StaticResource PolicyStateToText}}"
+                             Style="{DynamicResource CompactStatusText}"/>
+                </Border>
+              </StackPanel>
             </Grid>
             <Separator Margin="0,4,0,12"/>
             <Grid Margin="0,0,0,4">
@@ -188,10 +314,21 @@
                 <TextBlock Text="Prefer Safe Maintenance Defaults" FontSize="13" FontWeight="Medium"/>
                 <TextBlock Text="Use the conservative maintenance workflow first instead of broader cleanup or deeper repair packs." Style="{DynamicResource CardSub}"/>
               </StackPanel>
-              <ui:ToggleSwitch Grid.Column="1"
-                               IsChecked="{Binding Settings.PreferSafeMaintenanceDefaults, Mode=TwoWay}"
-                               Checked="SettingsToggle_Changed" Unchecked="SettingsToggle_Changed"
-                               VerticalAlignment="Center"/>
+              <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <ui:ToggleSwitch IsChecked="{Binding Settings.PreferSafeMaintenanceDefaults, Mode=TwoWay}"
+                                 IsEnabled="{Binding PreferSafeMaintenanceDefaultsPolicyState, Converter={StaticResource LockedToIsEnabled}}"
+                                 Tag="PreferSafeMaintenanceDefaults"
+                                 Checked="SettingsToggle_Changed" Unchecked="SettingsToggle_Changed"
+                                 VerticalAlignment="Center"/>
+                <Border Style="{DynamicResource CompactStatusBadge}"
+                        Margin="8,0,0,0"
+                        VerticalAlignment="Center"
+                        Visibility="{Binding PreferSafeMaintenanceDefaultsPolicyState, Converter={StaticResource PolicyStateToVisibility}}"
+                        automation:AutomationProperties.AutomationId="Settings_PreferSafeMaintenanceDefaults_PolicyTag">
+                  <TextBlock Text="{Binding PreferSafeMaintenanceDefaultsPolicyState, Converter={StaticResource PolicyStateToText}}"
+                             Style="{DynamicResource CompactStatusText}"/>
+                </Border>
+              </StackPanel>
             </Grid>
             <Separator Margin="0,4,0,12"/>
             <Grid Margin="0,0,0,4">
@@ -220,6 +357,119 @@
           </StackPanel>
         </Border>
 
+        <TextBlock Text="Health Monitoring" Style="{DynamicResource CardLabel}" Margin="0,0,0,8"/>
+        <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,16">
+          <StackPanel>
+            <Grid Margin="0,0,0,12">
+              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+              <StackPanel Grid.Column="0">
+                <TextBlock Text="Enable background health monitoring" FontSize="13" FontWeight="Medium"/>
+                <TextBlock Text="Quietly watch for storage pressure, overdue updates, stale security definitions, recent crashes, and slower startup while FixFox is in the tray." Style="{DynamicResource CardSub}" TextWrapping="Wrap"/>
+              </StackPanel>
+              <ui:ToggleSwitch Grid.Column="1"
+                               IsChecked="{Binding Settings.EnableBackgroundHealthMonitoring, Mode=TwoWay}"
+                               Tag="EnableBackgroundHealthMonitoring"
+                               Checked="SettingsToggle_Changed" Unchecked="SettingsToggle_Changed"
+                               automation:AutomationProperties.AutomationId="Settings_HealthMonitor_EnableBackgroundMonitoring"
+                               VerticalAlignment="Center"/>
+            </Grid>
+            <Separator Margin="0,4,0,12"/>
+            <Grid Margin="0,0,0,12">
+              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+              <StackPanel Grid.Column="0">
+                <TextBlock Text="Show tray notifications for health alerts" FontSize="13" FontWeight="Medium"/>
+                <TextBlock Text="Raise tray balloons when FixFox finds something worth surfacing while the app is running quietly in the background." Style="{DynamicResource CardSub}" TextWrapping="Wrap"/>
+              </StackPanel>
+              <ui:ToggleSwitch Grid.Column="1"
+                               IsChecked="{Binding Settings.ShowHealthAlertTrayNotifications, Mode=TwoWay}"
+                               Tag="ShowHealthAlertTrayNotifications"
+                               Checked="SettingsToggle_Changed" Unchecked="SettingsToggle_Changed"
+                               automation:AutomationProperties.AutomationId="Settings_HealthMonitor_ShowTrayNotifications"
+                               VerticalAlignment="Center"/>
+            </Grid>
+            <Separator Margin="0,4,0,12"/>
+            <Grid Margin="0,0,0,12">
+              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+              <StackPanel Grid.Column="0">
+                <TextBlock Text="Send weekly health summary" FontSize="13" FontWeight="Medium"/>
+                <TextBlock Text="Create a weekly health summary receipt so repeat visitors can see what changed over time without opening logs." Style="{DynamicResource CardSub}" TextWrapping="Wrap"/>
+              </StackPanel>
+              <ui:ToggleSwitch Grid.Column="1"
+                               IsChecked="{Binding Settings.SendWeeklyHealthSummary, Mode=TwoWay}"
+                               Tag="SendWeeklyHealthSummary"
+                               Checked="SettingsToggle_Changed" Unchecked="SettingsToggle_Changed"
+                               automation:AutomationProperties.AutomationId="Settings_HealthMonitor_SendWeeklySummary"
+                               VerticalAlignment="Center"/>
+            </Grid>
+            <Separator Margin="0,4,0,12"/>
+            <StackPanel>
+              <TextBlock Text="Notification frequency" FontSize="13" FontWeight="Medium"/>
+              <TextBlock Text="Choose how chatty FixFox should be when it raises health alerts in the tray." Style="{DynamicResource CardSub}" Margin="0,4,0,10" TextWrapping="Wrap"/>
+              <StackPanel>
+                <RadioButton Content="Show all alerts"
+                             GroupName="HealthAlertFrequency"
+                             IsChecked="{Binding Settings.HealthAlertNotificationFrequency, Converter={StaticResource EnumEquals}, ConverterParameter=All}"
+                             Tag="All"
+                             Checked="HealthAlertFrequency_Checked"
+                             automation:AutomationProperties.AutomationId="Settings_HealthMonitor_NotificationFrequency_All"
+                             Margin="0,0,0,8"/>
+                <RadioButton Content="Show only warnings and critical"
+                             GroupName="HealthAlertFrequency"
+                             IsChecked="{Binding Settings.HealthAlertNotificationFrequency, Converter={StaticResource EnumEquals}, ConverterParameter=WarningsAndCritical}"
+                             Tag="WarningsAndCritical"
+                             Checked="HealthAlertFrequency_Checked"
+                             automation:AutomationProperties.AutomationId="Settings_HealthMonitor_NotificationFrequency_WarningsAndCritical"
+                             Margin="0,0,0,8"/>
+                <RadioButton Content="Show only critical"
+                             GroupName="HealthAlertFrequency"
+                             IsChecked="{Binding Settings.HealthAlertNotificationFrequency, Converter={StaticResource EnumEquals}, ConverterParameter=CriticalOnly}"
+                             Tag="CriticalOnly"
+                             Checked="HealthAlertFrequency_Checked"
+                             automation:AutomationProperties.AutomationId="Settings_HealthMonitor_NotificationFrequency_CriticalOnly"/>
+              </StackPanel>
+            </StackPanel>
+            <Expander Header="Advanced checks" Margin="0,14,0,0">
+              <StackPanel Margin="0,10,0,0">
+                <CheckBox Content="Low disk space alerts"
+                          IsChecked="{Binding Settings.HealthAlertLowDiskEnabled, Mode=TwoWay}"
+                          Tag="HealthAlertLowDiskEnabled"
+                          Checked="SettingsToggle_Changed" Unchecked="SettingsToggle_Changed"
+                          automation:AutomationProperties.AutomationId="Settings_HealthMonitor_LowDiskAlerts"
+                          Margin="0,0,0,8"/>
+                <CheckBox Content="Windows Update overdue alerts"
+                          IsChecked="{Binding Settings.HealthAlertWindowsUpdateEnabled, Mode=TwoWay}"
+                          Tag="HealthAlertWindowsUpdateEnabled"
+                          Checked="SettingsToggle_Changed" Unchecked="SettingsToggle_Changed"
+                          automation:AutomationProperties.AutomationId="Settings_HealthMonitor_WindowsUpdateAlerts"
+                          Margin="0,0,0,8"/>
+                <CheckBox Content="Defender definition alerts"
+                          IsChecked="{Binding Settings.HealthAlertDefenderDefinitionsEnabled, Mode=TwoWay}"
+                          Tag="HealthAlertDefenderDefinitionsEnabled"
+                          Checked="SettingsToggle_Changed" Unchecked="SettingsToggle_Changed"
+                          automation:AutomationProperties.AutomationId="Settings_HealthMonitor_DefenderDefinitionAlerts"
+                          Margin="0,0,0,8"/>
+                <CheckBox Content="Pending reboot alerts"
+                          IsChecked="{Binding Settings.HealthAlertPendingRebootEnabled, Mode=TwoWay}"
+                          Tag="HealthAlertPendingRebootEnabled"
+                          Checked="SettingsToggle_Changed" Unchecked="SettingsToggle_Changed"
+                          automation:AutomationProperties.AutomationId="Settings_HealthMonitor_PendingRebootAlerts"
+                          Margin="0,0,0,8"/>
+                <CheckBox Content="Crash detection alerts"
+                          IsChecked="{Binding Settings.HealthAlertCrashDetectionEnabled, Mode=TwoWay}"
+                          Tag="HealthAlertCrashDetectionEnabled"
+                          Checked="SettingsToggle_Changed" Unchecked="SettingsToggle_Changed"
+                          automation:AutomationProperties.AutomationId="Settings_HealthMonitor_CrashDetectionAlerts"
+                          Margin="0,0,0,8"/>
+                <CheckBox Content="Startup slowdown alerts"
+                          IsChecked="{Binding Settings.HealthAlertStartupSlowdownEnabled, Mode=TwoWay}"
+                          Tag="HealthAlertStartupSlowdownEnabled"
+                          Checked="SettingsToggle_Changed" Unchecked="SettingsToggle_Changed"
+                          automation:AutomationProperties.AutomationId="Settings_HealthMonitor_StartupSlowdownAlerts"/>
+              </StackPanel>
+            </Expander>
+          </StackPanel>
+        </Border>
+
         <TextBlock Text="System" Style="{DynamicResource CardLabel}" Margin="0,0,0,8"/>
         <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,16">
           <StackPanel>
@@ -229,11 +479,22 @@
                 <TextBlock Text="Run at Startup" FontSize="13" FontWeight="Medium"/>
                 <TextBlock Text="Launch the app automatically with Windows" Style="{DynamicResource CardSub}"/>
               </StackPanel>
-              <ui:ToggleSwitch Grid.Column="1"
-                               IsChecked="{Binding Settings.RunAtStartup, Mode=TwoWay}"
-                               automation:AutomationProperties.AutomationId="SettingsRunAtStartupToggle"
-                               Checked="RunAtStartup_Changed" Unchecked="RunAtStartup_Changed"
-                               VerticalAlignment="Center"/>
+              <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <ui:ToggleSwitch IsChecked="{Binding Settings.RunAtStartup, Mode=TwoWay}"
+                                 IsEnabled="{Binding CanEditRunAtStartupSetting}"
+                                 Tag="RunAtStartup"
+                                 automation:AutomationProperties.AutomationId="SettingsRunAtStartupToggle"
+                                 Checked="RunAtStartup_Changed" Unchecked="RunAtStartup_Changed"
+                                 VerticalAlignment="Center"/>
+                <Border Style="{DynamicResource CompactStatusBadge}"
+                        Margin="8,0,0,0"
+                        VerticalAlignment="Center"
+                        Visibility="{Binding RunAtStartupPolicyState, Converter={StaticResource PolicyStateToVisibility}}"
+                        automation:AutomationProperties.AutomationId="Settings_RunAtStartup_PolicyTag">
+                  <TextBlock Text="{Binding RunAtStartupPolicyState, Converter={StaticResource PolicyStateToText}}"
+                             Style="{DynamicResource CompactStatusText}"/>
+                </Border>
+              </StackPanel>
             </Grid>
             <Separator Margin="0,4,0,12"/>
             <Grid Margin="0,0,0,4">
@@ -242,11 +503,22 @@
                 <TextBlock Text="Minimize to Tray" FontSize="13" FontWeight="Medium"/>
                 <TextBlock Text="Keep the app running in the system tray when closed" Style="{DynamicResource CardSub}"/>
               </StackPanel>
-              <ui:ToggleSwitch Grid.Column="1"
-                               IsChecked="{Binding Settings.MinimizeToTray, Mode=TwoWay}"
-                               automation:AutomationProperties.AutomationId="SettingsMinimizeToTrayToggle"
-                               Checked="SettingsToggle_Changed" Unchecked="SettingsToggle_Changed"
-                               VerticalAlignment="Center"/>
+              <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <ui:ToggleSwitch IsChecked="{Binding Settings.MinimizeToTray, Mode=TwoWay}"
+                                 IsEnabled="{Binding CanEditMinimizeToTraySetting}"
+                                 Tag="MinimizeToTray"
+                                 automation:AutomationProperties.AutomationId="SettingsMinimizeToTrayToggle"
+                                 Checked="SettingsToggle_Changed" Unchecked="SettingsToggle_Changed"
+                                 VerticalAlignment="Center"/>
+                <Border Style="{DynamicResource CompactStatusBadge}"
+                        Margin="8,0,0,0"
+                        VerticalAlignment="Center"
+                        Visibility="{Binding MinimizeToTrayPolicyState, Converter={StaticResource PolicyStateToVisibility}}"
+                        automation:AutomationProperties.AutomationId="Settings_MinimizeToTray_PolicyTag">
+                  <TextBlock Text="{Binding MinimizeToTrayPolicyState, Converter={StaticResource PolicyStateToText}}"
+                             Style="{DynamicResource CompactStatusText}"/>
+                </Border>
+              </StackPanel>
             </Grid>
             <Separator Margin="0,4,0,12"/>
             <Grid Margin="0,0,0,4">
@@ -255,11 +527,22 @@
                 <TextBlock Text="Show Tray Balloon Tips" FontSize="13" FontWeight="Medium"/>
                 <TextBlock Text="Display a tray notice when the app is minimized to the tray" Style="{DynamicResource CardSub}"/>
               </StackPanel>
-              <ui:ToggleSwitch Grid.Column="1"
-                               IsChecked="{Binding Settings.ShowTrayBalloons, Mode=TwoWay}"
-                               automation:AutomationProperties.AutomationId="SettingsShowTrayBalloonsToggle"
-                               Checked="SettingsToggle_Changed" Unchecked="SettingsToggle_Changed"
-                               VerticalAlignment="Center"/>
+              <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <ui:ToggleSwitch IsChecked="{Binding Settings.ShowTrayBalloons, Mode=TwoWay}"
+                                 IsEnabled="{Binding CanEditShowTrayBalloonsSetting}"
+                                 Tag="ShowTrayBalloons"
+                                 automation:AutomationProperties.AutomationId="SettingsShowTrayBalloonsToggle"
+                                 Checked="SettingsToggle_Changed" Unchecked="SettingsToggle_Changed"
+                                 VerticalAlignment="Center"/>
+                <Border Style="{DynamicResource CompactStatusBadge}"
+                        Margin="8,0,0,0"
+                        VerticalAlignment="Center"
+                        Visibility="{Binding ShowTrayBalloonsPolicyState, Converter={StaticResource PolicyStateToVisibility}}"
+                        automation:AutomationProperties.AutomationId="Settings_ShowTrayBalloons_PolicyTag">
+                  <TextBlock Text="{Binding ShowTrayBalloonsPolicyState, Converter={StaticResource PolicyStateToText}}"
+                             Style="{DynamicResource CompactStatusText}"/>
+                </Border>
+              </StackPanel>
             </Grid>
           </StackPanel>
         </Border>
@@ -279,6 +562,8 @@
               <Button Content="Recovery &amp; Resume" Click="OpenRecoveryGuide_Click"
                       Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
               <Button Content="Troubleshooting" Click="OpenTroubleshootingGuide_Click"
+                      Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
+              <Button Content="Keyboard Shortcuts" Click="OpenKeyboardShortcuts_Click"
                       Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
               <Button Content="Release Notes" Click="OpenReleaseNotes_Click"
                       Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8"/>

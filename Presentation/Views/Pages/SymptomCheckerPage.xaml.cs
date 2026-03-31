@@ -62,6 +62,39 @@ public partial class SymptomCheckerPage : Page
         }
     }
 
+    private void GuidedDiagnosisHelp_Click(object sender, RoutedEventArgs e)
+        => ShowHelpPopover(
+            sender as FrameworkElement,
+            "Answer a few questions and FixFox will suggest the most likely cause and fix.",
+            "Help_GuidedDiagnosis_Popover");
+
+    private async void DiagnosisRunFix_Click(object sender, RoutedEventArgs e)
+        => await _vm.RunTopDiagnosisFixAsync();
+
+    private async void DiagnosisRunFlow_Click(object sender, RoutedEventArgs e)
+    {
+        if (_vm.TopTriageRunbook is not null)
+            await _vm.RunRunbookAsync(_vm.TopTriageRunbook);
+    }
+
+    private async void DiagnosisViewStepsFirst_Click(object sender, RoutedEventArgs e)
+    {
+        if (_vm.TopTriageRunbook is null)
+            return;
+
+        var owner = Window.GetWindow(this) as HelpDesk.Presentation.Views.MainWindow
+            ?? System.Windows.Application.Current?.MainWindow as HelpDesk.Presentation.Views.MainWindow;
+
+        if (owner is not null)
+            await owner.PreviewRunbookAsync(_vm.TopTriageRunbook);
+    }
+
+    private void DiagnosisGuidedCheck_Click(object sender, RoutedEventArgs e)
+        => _vm.RunTopDiagnosisGuidedCheck();
+
+    private void DiagnosisEscalate_Click(object sender, RoutedEventArgs e)
+        => _vm.OpenDiagnosisEscalation();
+
     private async void ResultCard_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (e.ClickCount != 2 || sender is not Border { Tag: FixItem fix })
@@ -74,6 +107,25 @@ public partial class SymptomCheckerPage : Page
     {
         if (sender is MenuItem { CommandParameter: FixItem fix })
             await RunBestActionAsync(fix);
+    }
+
+    private static void ShowHelpPopover(FrameworkElement? anchor, string message, string automationId)
+    {
+        if (anchor is null)
+            return;
+
+        var menu = new ContextMenu
+        {
+            PlacementTarget = anchor,
+            StaysOpen = false
+        };
+        System.Windows.Automation.AutomationProperties.SetAutomationId(menu, automationId);
+        menu.Items.Add(new MenuItem
+        {
+            Header = message,
+            IsEnabled = false
+        });
+        menu.IsOpen = true;
     }
 
     private async void RunMenu_Click(object sender, RoutedEventArgs e)

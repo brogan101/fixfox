@@ -5,9 +5,9 @@ using HelpDesk.Shared;
 
 namespace HelpDesk.Infrastructure.Services;
 
-// ══════════════════════════════════════════════════════════════════════════
-//  CRASH LOGGER  — writes crash reports to AppData\FixFox\crashes\
-// ══════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//  CRASH LOGGER  â€” writes crash reports to AppData\FixFox\crashes\
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 public sealed class CrashLogger : ICrashLogger
 {
@@ -23,19 +23,19 @@ public sealed class CrashLogger : ICrashLogger
 
             var lines = new List<string>
             {
-                $"FixFox Crash Report — {DateTime.Now:yyyy-MM-dd HH:mm:ss}",
+                $"FixFox Crash Report - {DateTime.Now:yyyy-MM-dd HH:mm:ss}",
                 $"Version : {Constants.AppVersion}",
                 $".NET    : {Environment.Version}",
                 $"OS      : {Environment.OSVersion}",
                 $"Machine : {Environment.MachineName}",
                 $"User    : {Environment.UserName}",
-                new string('─', 70),
+                new string('-', 70),
             };
 
             if (!string.IsNullOrWhiteSpace(context))
             {
                 lines.Add($"Context : {context}");
-                lines.Add(new string('─', 70));
+                lines.Add(new string('-', 70));
             }
 
             // Walk the exception chain

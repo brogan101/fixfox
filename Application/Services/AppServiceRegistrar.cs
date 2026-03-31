@@ -46,8 +46,17 @@ public static class AppServiceRegistrar
         services.AddSingleton<IMaintenanceProfileService, MaintenanceProfileService>();
         services.AddSingleton<ISupportCenterService, SupportCenterService>();
         services.AddSingleton<ICommandPaletteService, CommandPaletteService>();
+        services.AddSingleton<ITextSubstitutionService, TextSubstitutionService>();
         services.AddSingleton<IDashboardWorkspaceService, DashboardWorkspaceService>();
+        services.AddSingleton<IDashboardSuggestionSignalService, DashboardSuggestionSignalService>();
         services.AddSingleton<IAutomationCoordinatorService, AutomationCoordinatorService>();
+        services.AddSingleton<IShellPresenceService, ShellPresenceService>();
+        services.AddSingleton<HealthAlertHistoryService>();
+        services.AddSingleton<IHealthAlertHistoryService>(provider => provider.GetRequiredService<HealthAlertHistoryService>());
+        services.AddSingleton<WeeklySummaryService>();
+        services.AddSingleton<IWeeklySummaryService>(provider => provider.GetRequiredService<WeeklySummaryService>());
+        services.AddSingleton<HealthMonitorService>();
+        services.AddSingleton<IHealthMonitorService>(provider => provider.GetRequiredService<HealthMonitorService>());
 
         if (headless)
             services.AddSingleton<IAppLogger, ConsoleAppLogger>();
@@ -59,6 +68,8 @@ public static class AppServiceRegistrar
         services.AddSingleton<InstalledProgramsService>();
         services.AddSingleton<StartupAppsService>();
         services.AddSingleton<StorageInsightsService>();
+        services.AddSingleton<BrowserExtensionReviewService>();
+        services.AddSingleton<WorkFromHomeDependencyService>();
         services.AddSingleton<SchedulerService>();
     }
 }

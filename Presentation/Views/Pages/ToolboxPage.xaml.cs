@@ -38,6 +38,12 @@ public partial class ToolboxPage : Page
             await OpenEntryAsync(entry);
     }
 
+    private void TogglePinMenu_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem { CommandParameter: ToolboxEntry entry })
+            _vm.ToggleToolboxPin(entry);
+    }
+
     private void CopyToolTarget_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not MenuItem { CommandParameter: ToolboxEntry entry })
@@ -72,6 +78,7 @@ public partial class ToolboxPage : Page
             entry.LaunchState = ToolLaunchState.Success;
             entry.LastLaunchedAt = DateTime.Now;
             entry.LaunchSummary = "Opened successfully.";
+            _vm.RecordToolboxLaunch(entry);
         }
         catch (Exception ex)
         {
@@ -89,5 +96,23 @@ public partial class ToolboxPage : Page
 
         if (!string.IsNullOrWhiteSpace(target))
             System.Windows.Clipboard.SetText(target);
+    }
+
+    private void TogglePinButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: ToolboxEntry entry })
+            _vm.ToggleToolboxPin(entry);
+    }
+
+    public Task OpenFocusedToolAsync()
+    {
+        if (Keyboard.FocusedElement is FrameworkElement { DataContext: ToolboxEntry entry })
+            return OpenEntryAsync(entry);
+
+        var first = _vm.RecentToolboxEntries.FirstOrDefault()
+            ?? _vm.FavoriteToolboxEntries.FirstOrDefault()
+            ?? _vm.ToolboxGroups.SelectMany(group => group.Entries).FirstOrDefault();
+
+        return first is null ? Task.CompletedTask : OpenEntryAsync(first);
     }
 }

@@ -12,11 +12,17 @@
     <h:InverseBoolConverter x:Key="InvBool"/>
     <h:InverseBoolToVisConverter x:Key="InvBoolVis"/>
     <h:NullToCollapsedConverter x:Key="NullCollapsed"/>
+    <h:EnumEqualsConverter x:Key="EnumEquals"/>
+    <h:EnumEqualsToVisibilityConverter x:Key="EnumEqualsToVisibility"/>
   </Page.Resources>
 
   <ScrollViewer>
     <Grid Margin="28,24">
       <Grid.RowDefinitions>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
         <RowDefinition Height="Auto"/>
         <RowDefinition Height="Auto"/>
         <RowDefinition Height="Auto"/>
@@ -28,7 +34,7 @@
       <StackPanel Grid.Row="0" Margin="0,0,0,20">
         <TextBlock Text="Automation" Style="{DynamicResource PageTitle}"
                    automation:AutomationProperties.AutomationId="BundlesPageMarker"/>
-        <TextBlock Text="Review schedules, watchers, safe maintenance, and guided workflows without losing sight of what runs automatically."
+        <TextBlock Text="Review schedules, watchers, attention items, and safe maintenance workflows without losing track of what FixFox runs automatically."
                    Style="{DynamicResource PageSubtitle}"/>
       </StackPanel>
 
@@ -40,6 +46,16 @@
         <StackPanel>
           <TextBlock Text="{Binding RunningBundle.Title}" FontWeight="Bold" FontSize="14" Margin="0,0,0,4"/>
           <TextBlock Text="{Binding BundleStatus}" Style="{DynamicResource CardSub}" Margin="0,0,0,8"/>
+          <TextBlock Style="{DynamicResource MetaText}"
+                     Margin="0,0,0,8"
+                     Visibility="{Binding DataContext.AdvancedModeEnabled, RelativeSource={RelativeSource AncestorType=Page}, Converter={StaticResource BoolVis}}">
+            <Run Text="Operation: "/>
+            <Run Text="{Binding RunningBundle.Title}"/>
+            <Run Text="  •  Step "/>
+            <Run Text="{Binding BundleProgress}"/>
+            <Run Text=" of "/>
+            <Run Text="{Binding BundleTotal}"/>
+          </TextBlock>
           <ProgressBar Value="{Binding BundleProgress}"
                        Maximum="{Binding BundleTotal}"
                        Height="8"
@@ -47,9 +63,9 @@
                        Background="{DynamicResource BorderBrush}"
                        BorderThickness="0"/>
           <TextBlock Margin="0,4,0,0" FontSize="11" Foreground="{DynamicResource TextSecBrush}">
-            <Run Text="{Binding BundleProgress, Mode=OneWay}"/>
+            <Run Text="{Binding BundleProgress}"/>
             <Run Text=" of "/>
-            <Run Text="{Binding BundleTotal, Mode=OneWay}"/>
+            <Run Text="{Binding BundleTotal}"/>
             <Run Text=" steps"/>
           </TextBlock>
         </StackPanel>
@@ -60,12 +76,12 @@
               Margin="0,0,0,16"
               Visibility="{Binding LastRunbookSummary, Converter={StaticResource NullCollapsed}}">
         <StackPanel>
-          <TextBlock Text="Latest workflow result" Style="{DynamicResource CardLabel}" Margin="0,0,0,6"/>
+          <TextBlock Text="Latest Workflow Result" Style="{DynamicResource CardLabel}" Margin="0,0,0,6"/>
           <TextBlock Text="{Binding LastRunbookSummary.Summary}" FontWeight="SemiBold" FontSize="14"/>
           <TextBlock Style="{DynamicResource CardSub}" Margin="0,4,0,10">
-            <Run Text="{Binding LastRunbookSummary.CompletedSteps, Mode=OneWay}"/>
+            <Run Text="{Binding LastRunbookSummary.CompletedSteps}"/>
             <Run Text=" of "/>
-            <Run Text="{Binding LastRunbookSummary.TotalSteps, Mode=OneWay}"/>
+            <Run Text="{Binding LastRunbookSummary.TotalSteps}"/>
             <Run Text=" steps completed"/>
           </TextBlock>
           <ItemsControl ItemsSource="{Binding LastRunbookSummary.Timeline}">
@@ -80,10 +96,9 @@
 
       <Border Grid.Row="3" Style="{DynamicResource InfoCard}" Margin="0,0,0,16">
         <StackPanel>
-          <TextBlock Text="Safe maintenance profiles" Style="{DynamicResource PanelTitle}"/>
+          <TextBlock Text="Safe Maintenance Profiles" Style="{DynamicResource PanelTitle}"/>
           <TextBlock Text="These are the fastest receipt-backed workflows for ordinary cleanup, browser rescue, meeting checks, and remote-work recovery."
-                     Style="{DynamicResource CardSub}" Margin="0,4,0,14"/>
-
+                     Style="{DynamicResource CardSub}" Margin="0,4,0,14" TextWrapping="Wrap"/>
           <ItemsControl ItemsSource="{Binding MaintenanceProfiles}"
                         IsEnabled="{Binding IsBundleRunning, Converter={StaticResource InvBool}}">
             <ItemsControl.ItemsPanel>
@@ -95,11 +110,15 @@
               <DataTemplate DataType="{x:Type m:MaintenanceProfileDefinition}">
                 <Border Style="{DynamicResource FixCard}" Width="300" Margin="0,0,12,12" Padding="14,12" Tag="{Binding}">
                   <Border.ContextMenu>
-                    <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
-                      <MenuItem Header="Review Profile" Click="MaintenanceProfileDetails_Click" CommandParameter="{Binding}"/>
-                      <MenuItem Header="Copy Profile Summary" Click="MaintenanceProfileCopy_Click" CommandParameter="{Binding}"/>
+                    <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}"
+                                 automation:AutomationProperties.AutomationId="ContextMenu_MaintenanceProfile">
+                      <MenuItem Header="Review Profile" Click="MaintenanceProfileDetails_Click" CommandParameter="{Binding}"
+                                automation:AutomationProperties.AutomationId="Card_MaintenanceProfile_Review"/>
+                      <MenuItem Header="Copy Profile Summary" Click="MaintenanceProfileCopy_Click" CommandParameter="{Binding}"
+                                automation:AutomationProperties.AutomationId="Card_MaintenanceProfile_CopySummary"/>
                       <Separator/>
-                      <MenuItem Header="Run Profile" Click="MaintenanceProfileRunMenu_Click" CommandParameter="{Binding}"/>
+                      <MenuItem Header="Run Profile" Click="MaintenanceProfileRunMenu_Click" CommandParameter="{Binding}"
+                                automation:AutomationProperties.AutomationId="Card_MaintenanceProfile_Run"/>
                     </ContextMenu>
                   </Border.ContextMenu>
                   <StackPanel>
@@ -113,16 +132,10 @@
                     </Border>
                     <TextBlock Text="{Binding VerificationNotes}" Style="{DynamicResource MetaText}" TextWrapping="Wrap"/>
                     <WrapPanel Margin="0,12,0,0">
-                      <Button Content="Review"
-                              Tag="{Binding}"
-                              Click="MaintenanceProfileDetailsButton_Click"
-                              Style="{DynamicResource SecondaryButton}"
-                              Margin="0,0,8,8"/>
-                      <Button Content="Run Profile"
-                              Tag="{Binding}"
-                              Click="MaintenanceProfileRun_Click"
-                              Style="{DynamicResource AccentButtonStyle}"
-                              Margin="0,0,0,8"/>
+                      <Button Content="Review" Tag="{Binding}" Click="MaintenanceProfileDetailsButton_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"
+                              automation:AutomationProperties.AutomationId="Card_MaintenanceProfile_Review"/>
+                      <Button Content="Run Profile" Tag="{Binding}" Click="MaintenanceProfileRun_Click" Style="{DynamicResource AccentButtonStyle}" Margin="0,0,0,8"
+                              automation:AutomationProperties.AutomationId="Card_MaintenanceProfile_Run"/>
                     </WrapPanel>
                   </StackPanel>
                 </Border>
@@ -136,7 +149,7 @@
         <StackPanel>
           <DockPanel Margin="0,0,0,12">
             <StackPanel DockPanel.Dock="Left">
-              <TextBlock Text="Automation overview" Style="{DynamicResource PanelTitle}"/>
+              <TextBlock Text="Automation Overview" Style="{DynamicResource PanelTitle}"/>
               <TextBlock Text="{Binding AutomationOverviewText}" Style="{DynamicResource CardSub}" Margin="0,4,0,4" TextWrapping="Wrap"/>
               <TextBlock Text="{Binding AutomationPauseStatusText}" Style="{DynamicResource MetaText}" TextWrapping="Wrap"/>
             </StackPanel>
@@ -165,7 +178,7 @@
             </Grid.ColumnDefinitions>
             <Border Grid.Column="0" Background="{DynamicResource BgCard2Brush}" CornerRadius="8" Padding="12" Margin="0,0,8,0">
               <StackPanel>
-                <TextBlock Text="Quiet hours" Style="{DynamicResource CardLabel}"/>
+                <TextBlock Text="Quiet Hours" Style="{DynamicResource CardLabel}"/>
                 <TextBlock Text="Automation can stay quiet during these hours." Style="{DynamicResource MetaText}" Margin="0,4,0,8" TextWrapping="Wrap"/>
                 <WrapPanel>
                   <ComboBox ItemsSource="{Binding QuietHoursTimeOptions}" SelectedItem="{Binding SelectedAutomationQuietHoursStart, Mode=TwoWay}" Width="120" Margin="0,0,8,8"/>
@@ -175,8 +188,12 @@
             </Border>
             <Border Grid.Column="1" Background="{DynamicResource BgCard2Brush}" CornerRadius="8" Padding="12" Margin="8,0,0,0">
               <StackPanel>
-                <TextBlock Text="Recent result" Style="{DynamicResource CardLabel}"/>
-                <TextBlock Text="{Binding LastAutomationResultText}" Style="{DynamicResource MetaText}" Margin="0,4,0,8" TextWrapping="Wrap"/>
+                <TextBlock Text="Recent Result" Style="{DynamicResource CardLabel}"/>
+                <TextBlock Text="{Binding LastAutomationResultText}"
+                           Style="{DynamicResource MetaText}"
+                           Margin="0,4,0,8"
+                           TextWrapping="Wrap"
+                           automation:AutomationProperties.AutomationId="Automation_LastResultText"/>
                 <TextBlock Text="{Binding NextAutomationRunText, StringFormat='Next scheduled action: {0}'}" Style="{DynamicResource MetaText}" TextWrapping="Wrap"/>
               </StackPanel>
             </Border>
@@ -184,250 +201,317 @@
         </StackPanel>
       </Border>
 
-      <StackPanel Grid.Row="5">
-        <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,16">
-          <StackPanel>
-            <TextBlock Text="Scheduled tasks" Style="{DynamicResource PanelTitle}"/>
-            <TextBlock Text="Choose what runs automatically, when it runs, and which safety conditions apply before FixFox does anything in the background."
-                       Style="{DynamicResource CardSub}" Margin="0,4,0,12" TextWrapping="Wrap"/>
-            <ItemsControl ItemsSource="{Binding ScheduledAutomationRules}" Visibility="{Binding HasScheduledAutomationRules, Converter={StaticResource BoolVis}}">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate DataType="{x:Type m:AutomationRuleSettings}">
-                  <Border Style="{DynamicResource FixCard}" Padding="12" Margin="0,0,0,10" Tag="{Binding}">
-                    <Border.ContextMenu>
-                      <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
-                        <MenuItem Header="Review Automation" Click="AutomationRuleDetails_Click" CommandParameter="{Binding}"/>
-                        <MenuItem Header="Copy Automation Summary" Click="AutomationRuleCopy_Click" CommandParameter="{Binding}"/>
-                        <Separator/>
-                        <MenuItem Header="Run Now" Click="AutomationRuleRunMenu_Click" CommandParameter="{Binding}"/>
-                        <MenuItem Header="Pause Until Tomorrow" Click="AutomationRulePauseMenu_Click" CommandParameter="{Binding}"/>
-                      </ContextMenu>
-                    </Border.ContextMenu>
-                    <StackPanel>
-                      <DockPanel Margin="0,0,0,8">
-                        <StackPanel DockPanel.Dock="Left">
-                          <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="14"/>
-                          <TextBlock Text="{Binding Summary}" Style="{DynamicResource CardSub}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                        </StackPanel>
-                        <CheckBox DockPanel.Dock="Right" Content="Enabled" IsChecked="{Binding Enabled, Mode=TwoWay}" Checked="AutomationRuleSetting_Changed" Unchecked="AutomationRuleSetting_Changed" Margin="12,0,0,0" VerticalAlignment="Top"/>
-                      </DockPanel>
-                      <WrapPanel Margin="0,0,0,8">
-                        <Border Background="{DynamicResource BgCard2Brush}" CornerRadius="6" Padding="8,4" Margin="0,0,8,8">
-                          <TextBlock Text="{Binding StatusText}" Style="{DynamicResource MetaText}" TextWrapping="Wrap"/>
-                        </Border>
-                        <Border Background="{DynamicResource BgCard2Brush}" CornerRadius="6" Padding="8,4" Margin="0,0,8,8">
-                          <TextBlock Text="{Binding LastRunText}" Style="{DynamicResource MetaText}" TextWrapping="Wrap"/>
-                        </Border>
-                        <Border Background="{DynamicResource BgCard2Brush}" CornerRadius="6" Padding="8,4" Margin="0,0,0,8">
-                          <TextBlock Text="{Binding NextRunText}" Style="{DynamicResource MetaText}" TextWrapping="Wrap"/>
-                        </Border>
-                      </WrapPanel>
-                      <WrapPanel>
-                        <StackPanel Margin="0,0,12,8">
-                          <TextBlock Text="Schedule" Style="{DynamicResource CardLabel}" Margin="0,0,0,4"/>
-                          <ComboBox ItemsSource="{Binding DataContext.AutomationScheduleModeOptions, RelativeSource={RelativeSource AncestorType=Page}}"
-                                    SelectedItem="{Binding ScheduleKind, Mode=TwoWay}"
-                                    SelectionChanged="AutomationRuleSetting_Changed"
-                                    Width="140"/>
-                        </StackPanel>
-                        <StackPanel Margin="0,0,12,8">
-                          <TextBlock Text="Day" Style="{DynamicResource CardLabel}" Margin="0,0,0,4"/>
-                          <ComboBox ItemsSource="{Binding DataContext.WeeklyTuneUpDayOptions, RelativeSource={RelativeSource AncestorType=Page}}"
-                                    SelectedItem="{Binding ScheduleDay, Mode=TwoWay}"
-                                    SelectionChanged="AutomationRuleSetting_Changed"
-                                    Width="130"/>
-                        </StackPanel>
-                        <StackPanel Margin="0,0,12,8">
-                          <TextBlock Text="Time" Style="{DynamicResource CardLabel}" Margin="0,0,0,4"/>
-                          <ComboBox ItemsSource="{Binding DataContext.WeeklyTuneUpTimeOptions, RelativeSource={RelativeSource AncestorType=Page}}"
-                                    SelectedItem="{Binding ScheduleTime, Mode=TwoWay}"
-                                    SelectionChanged="AutomationRuleSetting_Changed"
-                                    Width="120"/>
-                        </StackPanel>
-                      </WrapPanel>
-                      <WrapPanel Margin="0,4,0,0">
-                        <CheckBox Content="Run only when idle" IsChecked="{Binding RunOnlyWhenIdle, Mode=TwoWay}" Checked="AutomationRuleSetting_Changed" Unchecked="AutomationRuleSetting_Changed" Margin="0,0,12,8"/>
-                        <CheckBox Content="Skip on battery" IsChecked="{Binding SkipOnBattery, Mode=TwoWay}" Checked="AutomationRuleSetting_Changed" Unchecked="AutomationRuleSetting_Changed" Margin="0,0,12,8"/>
-                        <CheckBox Content="Skip on metered connection" IsChecked="{Binding SkipOnMeteredConnection, Mode=TwoWay}" Checked="AutomationRuleSetting_Changed" Unchecked="AutomationRuleSetting_Changed" Margin="0,0,12,8"/>
-                        <CheckBox Content="Notify only if issues are found" IsChecked="{Binding NotifyOnlyIfIssuesFound, Mode=TwoWay}" Checked="AutomationRuleSetting_Changed" Unchecked="AutomationRuleSetting_Changed" Margin="0,0,12,8"/>
-                        <CheckBox Content="Scan only" IsChecked="{Binding ScanOnly, Mode=TwoWay}" Checked="AutomationRuleSetting_Changed" Unchecked="AutomationRuleSetting_Changed" Margin="0,0,0,8"
-                                  Visibility="{Binding SupportsScanOnly, Converter={StaticResource BoolVis}}"/>
-                      </WrapPanel>
-                      <WrapPanel Margin="0,6,0,0">
-                        <Button Content="Review" Tag="{Binding}" Click="AutomationRuleDetailsButton_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
-                        <Button Content="Run Now" Tag="{Binding}" Click="AutomationRuleRun_Click" Style="{DynamicResource AccentButtonStyle}" Margin="0,0,8,8"/>
-                        <Button Content="Pause Until Tomorrow" Tag="{Binding}" Click="AutomationRulePause_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
-                        <Button Content="Save" Tag="{Binding}" Click="AutomationRuleSave_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8"/>
-                      </WrapPanel>
+      <Border x:Name="AttentionSection"
+              Grid.Row="5"
+              Style="{DynamicResource InfoCard}"
+              Margin="0,0,0,16"
+              automation:AutomationProperties.AutomationId="Automation_AttentionTab">
+        <StackPanel>
+          <DockPanel Margin="0,0,0,12">
+            <StackPanel DockPanel.Dock="Left">
+              <TextBlock Text="Attention"
+                         Style="{DynamicResource PanelTitle}"
+                         automation:AutomationProperties.AutomationId="Automation_AttentionTab"/>
+              <TextBlock Text="{Binding AutomationAttentionSummaryText}" Style="{DynamicResource CardSub}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+            </StackPanel>
+          </DockPanel>
+          <ItemsControl ItemsSource="{Binding AutomationAttentionEntries}" AlternationCount="512"
+                        Visibility="{Binding HasAutomationAttentionEntries, Converter={StaticResource BoolVis}}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate DataType="{x:Type m:AutomationAttentionItem}">
+                <Border Style="{DynamicResource FixCard}" Padding="12" Margin="0,0,0,8">
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*"/>
+                      <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                      <TextBlock Text="{Binding Receipt.RuleTitle}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                      <TextBlock Style="{DynamicResource MetaText}" Margin="0,4,0,0">
+                        <Run Text="{Binding RelativeTimeText}"/>
+                        <Run Text="  •  "/>
+                        <Run Text="{Binding Receipt.Outcome}"/>
+                      </TextBlock>
+                      <TextBlock Text="{Binding ReasonText}" Style="{DynamicResource CardSub}" Margin="0,6,0,0" TextWrapping="Wrap"/>
                     </StackPanel>
-                  </Border>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-            <TextBlock Text="No scheduled automations are available for the current profile." Style="{DynamicResource CardSub}"
-                       Visibility="{Binding HasScheduledAutomationRules, Converter={StaticResource InvBoolVis}}"/>
-          </StackPanel>
-        </Border>
-
-          <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,16">
-            <StackPanel>
-              <TextBlock Text="Watchers and background checks" Style="{DynamicResource PanelTitle}"/>
-              <TextBlock Text="Watchers stay read-only until attention is actually needed. They do not apply deep fixes on their own."
-                       Style="{DynamicResource CardSub}" Margin="0,4,0,12" TextWrapping="Wrap"/>
-            <ItemsControl ItemsSource="{Binding WatcherAutomationRules}" Visibility="{Binding HasWatcherAutomationRules, Converter={StaticResource BoolVis}}">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate DataType="{x:Type m:AutomationRuleSettings}">
-                  <Border Style="{DynamicResource FixCard}" Padding="12" Margin="0,0,0,8" Tag="{Binding}">
-                    <Border.ContextMenu>
-                      <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
-                        <MenuItem Header="Review Watcher" Click="AutomationRuleDetails_Click" CommandParameter="{Binding}"/>
-                        <MenuItem Header="Run Check Now" Click="AutomationRuleRunMenu_Click" CommandParameter="{Binding}"/>
-                        <MenuItem Header="Pause Until Tomorrow" Click="AutomationRulePauseMenu_Click" CommandParameter="{Binding}"/>
-                      </ContextMenu>
-                    </Border.ContextMenu>
-                    <DockPanel>
-                      <WrapPanel DockPanel.Dock="Right" Margin="12,0,0,0">
-                        <CheckBox Content="Enabled" IsChecked="{Binding Enabled, Mode=TwoWay}" Checked="AutomationRuleSetting_Changed" Unchecked="AutomationRuleSetting_Changed" Margin="0,0,8,8"/>
-                        <Button Content="Run Check" Tag="{Binding}" Click="AutomationRuleRun_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
-                        <Button Content="Pause" Tag="{Binding}" Click="AutomationRulePause_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8"/>
-                      </WrapPanel>
-                      <StackPanel>
-                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
-                        <TextBlock Text="{Binding Summary}" Style="{DynamicResource CardSub}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                        <TextBlock Text="{Binding StatusText}" Style="{DynamicResource MetaText}" Margin="0,6,0,0" TextWrapping="Wrap"/>
-                        <TextBlock Text="{Binding ConditionSummary}" Style="{DynamicResource MetaText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                      </StackPanel>
-                    </DockPanel>
-                  </Border>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-            <TextBlock Text="No watcher rules are active for the current profile."
-                       Style="{DynamicResource CardSub}"
-                       Visibility="{Binding HasWatcherAutomationRules, Converter={StaticResource InvBoolVis}}"/>
-          </StackPanel>
-        </Border>
-
-        <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,16">
-          <StackPanel>
-            <DockPanel Margin="0,0,0,12">
-              <StackPanel DockPanel.Dock="Left">
-                <TextBlock Text="Automation history" Style="{DynamicResource PanelTitle}"/>
-                <TextBlock Text="See what ran, why it ran, what changed, and what still needs attention."
+                    <WrapPanel Grid.Column="1" HorizontalAlignment="Right">
+                      <Button Content="Retry Now" Tag="{Binding}" Click="AutomationAttentionRetry_Click" Style="{DynamicResource AccentButtonStyle}" Margin="0,0,8,8"
+                              automation:AutomationProperties.AutomationId="{Binding RelativeSource={RelativeSource AncestorType=ContentPresenter}, Path=(ItemsControl.AlternationIndex), StringFormat=Automation_AttentionItem_{0}_Retry}"/>
+                      <Button Content="Skip Once" Tag="{Binding}" Click="AutomationAttentionSkip_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"
+                              automation:AutomationProperties.AutomationId="{Binding RelativeSource={RelativeSource AncestorType=ContentPresenter}, Path=(ItemsControl.AlternationIndex), StringFormat=Automation_AttentionItem_{0}_Skip}"/>
+                      <Button Content="Dismiss" Tag="{Binding}" Click="AutomationAttentionDismiss_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"
+                              automation:AutomationProperties.AutomationId="{Binding RelativeSource={RelativeSource AncestorType=ContentPresenter}, Path=(ItemsControl.AlternationIndex), StringFormat=Automation_AttentionItem_{0}_Dismiss}"/>
+                      <Button Content="View Receipt" Tag="{Binding}" Click="AutomationAttentionViewReceipt_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8"
+                              automation:AutomationProperties.AutomationId="{Binding RelativeSource={RelativeSource AncestorType=ContentPresenter}, Path=(ItemsControl.AlternationIndex), StringFormat=Automation_AttentionItem_{0}_ViewReceipt}"/>
+                    </WrapPanel>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <Border Background="{DynamicResource BgCard2Brush}" CornerRadius="8" Padding="14,12"
+                  Visibility="{Binding HasAutomationAttentionEntries, Converter={StaticResource InvBoolVis}}">
+            <DockPanel>
+              <Ellipse Width="10" Height="10" Fill="{DynamicResource AccentGreenBrush}" Margin="0,2,10,0"/>
+              <StackPanel>
+                <TextBlock Text="All automations running smoothly." FontWeight="SemiBold"/>
+                <TextBlock Text="Skipped, blocked, and failed runs will appear here when FixFox needs your review."
                            Style="{DynamicResource CardSub}" Margin="0,4,0,0" TextWrapping="Wrap"/>
               </StackPanel>
-              <WrapPanel DockPanel.Dock="Right" HorizontalAlignment="Right">
-                <ComboBox ItemsSource="{Binding AutomationHistoryFilterOptions}"
-                          SelectedItem="{Binding AutomationHistoryFilter, Mode=TwoWay}"
-                          Width="170" Margin="0,0,8,8"/>
-                <Button Content="Clear History" Click="ClearAutomationHistory_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8"/>
-              </WrapPanel>
             </DockPanel>
-            <ItemsControl ItemsSource="{Binding FilteredAutomationHistoryEntries}" Visibility="{Binding HasFilteredAutomationHistoryEntries, Converter={StaticResource BoolVis}}">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate DataType="{x:Type m:AutomationRunReceipt}">
-                  <Border Style="{DynamicResource FixCard}"
-                          Padding="12"
-                          Margin="0,0,0,8"
-                          Tag="{Binding}"
-                          Focusable="True"
-                          automation:AutomationProperties.AutomationId="AutomationHistoryCard"
-                          MouseLeftButtonDown="AutomationReceiptCard_MouseLeftButtonDown">
-                    <Border.ContextMenu>
-                      <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
-                        <MenuItem Header="Open Details" Click="AutomationReceiptDetails_Click" CommandParameter="{Binding}"/>
-                        <MenuItem Header="Copy Summary" Click="AutomationReceiptCopy_Click" CommandParameter="{Binding}"/>
-                        <Separator/>
-                        <MenuItem Header="Create Support Package" Click="AutomationReceiptSupport_Click" CommandParameter="{Binding}"/>
-                      </ContextMenu>
-                    </Border.ContextMenu>
-                    <DockPanel>
-                      <WrapPanel DockPanel.Dock="Right" Margin="12,0,0,0">
-                        <Button Content="Details"
-                                Tag="{Binding}"
-                                Click="AutomationReceiptDetailsButton_Click"
-                                automation:AutomationProperties.AutomationId="AutomationReceiptDetailsButton"
-                                Style="{DynamicResource SecondaryButton}"
-                                Margin="0,0,8,8"/>
-                        <Button Content="Rerun" Tag="{Binding}" Click="AutomationReceiptRerun_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
-                        <Button Content="Support" Tag="{Binding}" Click="AutomationReceiptSupportButton_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8"/>
-                      </WrapPanel>
-                      <StackPanel>
-                        <TextBlock Text="{Binding RuleTitle}" FontWeight="SemiBold"/>
-                        <TextBlock Text="{Binding Summary}" Style="{DynamicResource CardSub}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                        <TextBlock Style="{DynamicResource MetaText}" Margin="0,6,0,0">
-                          <Run Text="{Binding StartedAt, StringFormat='{}{0:g}'}"/>
-                          <Run Text=" • "/>
-                          <Run Text="{Binding Outcome}"/>
-                          <Run Text=" • "/>
-                          <Run Text="{Binding TriggerSource}"/>
-                        </TextBlock>
-                      </StackPanel>
-                    </DockPanel>
-                  </Border>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-            <TextBlock Text="No automation history has been recorded yet." Style="{DynamicResource CardSub}"
-                       Visibility="{Binding HasFilteredAutomationHistoryEntries, Converter={StaticResource InvBoolVis}}"/>
-          </StackPanel>
-        </Border>
+          </Border>
+        </StackPanel>
+      </Border>
 
-        <TextBlock Text="Guided workflows" Style="{DynamicResource CardLabel}" Margin="0,0,0,8"/>
-        <ItemsControl ItemsSource="{Binding Runbooks}"
-                      IsEnabled="{Binding IsBundleRunning, Converter={StaticResource InvBool}}">
+      <Border Grid.Row="6" Style="{DynamicResource InfoCard}" Margin="0,0,0,16">
+        <StackPanel>
+          <TextBlock Text="Scheduled Tasks" Style="{DynamicResource PanelTitle}"/>
+          <TextBlock Text="Choose what runs automatically, when it runs, and which safety conditions apply before FixFox does anything in the background."
+                     Style="{DynamicResource CardSub}" Margin="0,4,0,12" TextWrapping="Wrap"/>
+          <ItemsControl ItemsSource="{Binding ScheduledAutomationRules}" Visibility="{Binding HasScheduledAutomationRules, Converter={StaticResource BoolVis}}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate DataType="{x:Type m:AutomationRuleSettings}">
+                <Border Style="{DynamicResource FixCard}" Padding="12" Margin="0,0,0,10" Tag="{Binding}">
+                  <Border.ContextMenu>
+                    <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}"
+                                 automation:AutomationProperties.AutomationId="ContextMenu_Automation">
+                      <MenuItem Header="Review Automation" Click="AutomationRuleDetails_Click" CommandParameter="{Binding}"
+                                automation:AutomationProperties.AutomationId="Card_Automation_Edit"/>
+                      <MenuItem Header="Copy Automation Summary" Click="AutomationRuleCopy_Click" CommandParameter="{Binding}"
+                                automation:AutomationProperties.AutomationId="Card_Automation_CopySummary"/>
+                      <Separator/>
+                      <MenuItem Header="Run Now" Click="AutomationRuleRunMenu_Click" CommandParameter="{Binding}"
+                                automation:AutomationProperties.AutomationId="Card_Automation_RunNow"/>
+                      <MenuItem Header="Pause Until Tomorrow" Click="AutomationRulePauseMenu_Click" CommandParameter="{Binding}"
+                                automation:AutomationProperties.AutomationId="Card_Automation_PauseUntilTomorrow"/>
+                    </ContextMenu>
+                  </Border.ContextMenu>
+                  <StackPanel>
+                    <DockPanel Margin="0,0,0,8">
+                      <StackPanel DockPanel.Dock="Left">
+                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="14"/>
+                        <TextBlock Text="{Binding Summary}" Style="{DynamicResource CardSub}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                      </StackPanel>
+                      <WrapPanel DockPanel.Dock="Right" Margin="12,0,0,0">
+                        <CheckBox Content="Enabled" IsChecked="{Binding Enabled, Mode=TwoWay}" Checked="AutomationRuleSetting_Changed" Unchecked="AutomationRuleSetting_Changed" Margin="0,0,12,8" VerticalAlignment="Top"/>
+                        <CheckBox Content="Pin To Tray" IsChecked="{Binding IsPinnedToTray, Mode=OneWay}" Click="AutomationRulePin_Click" Margin="0,0,0,8" VerticalAlignment="Top"/>
+                      </WrapPanel>
+                    </DockPanel>
+                    <WrapPanel Margin="0,0,0,8">
+                      <Border Background="{DynamicResource BgCard2Brush}" CornerRadius="6" Padding="8,4" Margin="0,0,8,8"><TextBlock Text="{Binding StatusText}" Style="{DynamicResource MetaText}" TextWrapping="Wrap"/></Border>
+                      <Border Background="{DynamicResource BgCard2Brush}" CornerRadius="6" Padding="8,4" Margin="0,0,8,8"><TextBlock Text="{Binding LastRunText}" Style="{DynamicResource MetaText}" TextWrapping="Wrap"/></Border>
+                      <Border Background="{DynamicResource BgCard2Brush}" CornerRadius="6" Padding="8,4" Margin="0,0,8,8"><TextBlock Text="{Binding NextRunText}" Style="{DynamicResource MetaText}" TextWrapping="Wrap"/></Border>
+                      <Border Background="{DynamicResource BgCard2Brush}" CornerRadius="6" Padding="8,4" Margin="0,0,0,8"><TextBlock Text="{Binding RecurrenceSummary}" Style="{DynamicResource MetaText}" TextWrapping="Wrap"/></Border>
+                    </WrapPanel>
+                    <StackPanel Margin="0,0,0,10"
+                                Visibility="{Binding DataContext.AdvancedModeEnabled, RelativeSource={RelativeSource AncestorType=Page}, Converter={StaticResource BoolVis}}">
+                      <TextBlock Style="{DynamicResource MetaText}" TextWrapping="Wrap">
+                        <Run Text="Exact schedule: "/>
+                        <Run Text="{Binding ScheduleExpression, Mode=OneWay}"/>
+                      </TextBlock>
+                      <TextBlock Style="{DynamicResource MetaText}" Margin="0,4,0,0" TextWrapping="Wrap">
+                        <Run Text="Time zone: "/>
+                        <Run Text="{Binding DataContext.LocalTimeZoneDisplayName, RelativeSource={RelativeSource AncestorType=Page}, Mode=OneWay}"/>
+                      </TextBlock>
+                    </StackPanel>
+                    <Border Background="{DynamicResource BgCard2Brush}" CornerRadius="8" Padding="12" Margin="0,0,0,10" automation:AutomationProperties.AutomationId="Automation_RecurrenceEditor">
+                      <StackPanel>
+                        <TextBlock Text="Recurrence" Style="{DynamicResource CardLabel}" Margin="0,0,0,8"/>
+                        <WrapPanel Margin="0,0,0,8">
+                          <RadioButton Content="{Binding DataContext.TextSubstitutions[Automation_Recurrence_EveryXDays], RelativeSource={RelativeSource AncestorType=Page}}" GroupName="{Binding Id}" Margin="0,0,12,8" IsChecked="{Binding ScheduleKind, Converter={StaticResource EnumEquals}, ConverterParameter=EveryXDays}" Tag="EveryXDays" Checked="AutomationRecurrenceMode_Checked"/>
+                          <RadioButton Content="{Binding DataContext.TextSubstitutions[Automation_Recurrence_WeekdaysOnly], RelativeSource={RelativeSource AncestorType=Page}}" GroupName="{Binding Id}" Margin="0,0,12,8" IsChecked="{Binding ScheduleKind, Converter={StaticResource EnumEquals}, ConverterParameter=WeekdaysOnly}" Tag="WeekdaysOnly" Checked="AutomationRecurrenceMode_Checked"/>
+                          <RadioButton Content="{Binding DataContext.TextSubstitutions[Automation_Recurrence_StartupDelay], RelativeSource={RelativeSource AncestorType=Page}}" GroupName="{Binding Id}" Margin="0,0,12,8" IsChecked="{Binding ScheduleKind, Converter={StaticResource EnumEquals}, ConverterParameter=StartupDelay}" Tag="StartupDelay" Checked="AutomationRecurrenceMode_Checked"/>
+                          <RadioButton Content="{Binding DataContext.TextSubstitutions[Automation_Recurrence_Weekly], RelativeSource={RelativeSource AncestorType=Page}}" GroupName="{Binding Id}" Margin="0,0,12,8" IsChecked="{Binding ScheduleKind, Converter={StaticResource EnumEquals}, ConverterParameter=Weekly}" Tag="Weekly" Checked="AutomationRecurrenceMode_Checked"/>
+                          <RadioButton Content="{Binding DataContext.TextSubstitutions[Automation_Recurrence_ManualOnly], RelativeSource={RelativeSource AncestorType=Page}}" GroupName="{Binding Id}" Margin="0,0,0,8" IsChecked="{Binding ScheduleKind, Converter={StaticResource EnumEquals}, ConverterParameter=Manual}" Tag="Manual" Checked="AutomationRecurrenceMode_Checked"/>
+                        </WrapPanel>
+                        <WrapPanel Visibility="{Binding ScheduleKind, Converter={StaticResource EnumEqualsToVisibility}, ConverterParameter=EveryXDays}">
+                          <TextBlock Text="Run every" VerticalAlignment="Center" Margin="0,0,8,8"/>
+                          <ComboBox ItemsSource="{Binding DataContext.AutomationIntervalDayOptions, RelativeSource={RelativeSource AncestorType=Page}}" SelectedItem="{Binding IntervalDays, Mode=TwoWay}" SelectionChanged="AutomationRuleSetting_Changed" Width="90" Margin="0,0,8,8"/>
+                          <TextBlock Text="day(s) at" VerticalAlignment="Center" Margin="0,0,8,8"/>
+                          <ComboBox ItemsSource="{Binding DataContext.WeeklyTuneUpTimeOptions, RelativeSource={RelativeSource AncestorType=Page}}" SelectedItem="{Binding ScheduleTime, Mode=TwoWay}" SelectionChanged="AutomationRuleSetting_Changed" Width="120" Margin="0,0,0,8"/>
+                        </WrapPanel>
+                        <WrapPanel Visibility="{Binding ScheduleKind, Converter={StaticResource EnumEqualsToVisibility}, ConverterParameter=WeekdaysOnly}">
+                          <TextBlock Text="Run Monday to Friday at" VerticalAlignment="Center" Margin="0,0,8,8"/>
+                          <ComboBox ItemsSource="{Binding DataContext.WeeklyTuneUpTimeOptions, RelativeSource={RelativeSource AncestorType=Page}}" SelectedItem="{Binding ScheduleTime, Mode=TwoWay}" SelectionChanged="AutomationRuleSetting_Changed" Width="120" Margin="0,0,0,8"/>
+                        </WrapPanel>
+                        <WrapPanel Visibility="{Binding ScheduleKind, Converter={StaticResource EnumEqualsToVisibility}, ConverterParameter=StartupDelay}">
+                          <TextBlock Text="Run at startup after" VerticalAlignment="Center" Margin="0,0,8,8"/>
+                          <ComboBox ItemsSource="{Binding DataContext.AutomationStartupDelayOptions, RelativeSource={RelativeSource AncestorType=Page}}" SelectedItem="{Binding StartupDelayMinutes, Mode=TwoWay}" SelectionChanged="AutomationRuleSetting_Changed" Width="90" Margin="0,0,8,8"/>
+                          <TextBlock Text="minute(s)" VerticalAlignment="Center" Margin="0,0,0,8"/>
+                        </WrapPanel>
+                        <WrapPanel Visibility="{Binding ScheduleKind, Converter={StaticResource EnumEqualsToVisibility}, ConverterParameter=Weekly}">
+                          <TextBlock Text="Run every" VerticalAlignment="Center" Margin="0,0,8,8"/>
+                          <ComboBox ItemsSource="{Binding DataContext.WeeklyTuneUpDayOptions, RelativeSource={RelativeSource AncestorType=Page}}" SelectedItem="{Binding ScheduleDay, Mode=TwoWay}" SelectionChanged="AutomationRuleSetting_Changed" Width="130" Margin="0,0,8,8"/>
+                          <TextBlock Text="at" VerticalAlignment="Center" Margin="0,0,8,8"/>
+                          <ComboBox ItemsSource="{Binding DataContext.WeeklyTuneUpTimeOptions, RelativeSource={RelativeSource AncestorType=Page}}" SelectedItem="{Binding ScheduleTime, Mode=TwoWay}" SelectionChanged="AutomationRuleSetting_Changed" Width="120" Margin="0,0,0,8"/>
+                        </WrapPanel>
+                        <TextBlock Text="This rule runs only when you start it manually." Style="{DynamicResource MetaText}" Visibility="{Binding ScheduleKind, Converter={StaticResource EnumEqualsToVisibility}, ConverterParameter=Manual}"/>
+                      </StackPanel>
+                    </Border>
+                    <WrapPanel Margin="0,4,0,0">
+                      <CheckBox Content="Run only when idle" IsChecked="{Binding RunOnlyWhenIdle, Mode=TwoWay}" Checked="AutomationRuleSetting_Changed" Unchecked="AutomationRuleSetting_Changed" Margin="0,0,12,8"/>
+                      <CheckBox Content="Skip on battery" IsChecked="{Binding SkipOnBattery, Mode=TwoWay}" Checked="AutomationRuleSetting_Changed" Unchecked="AutomationRuleSetting_Changed" Margin="0,0,12,8"/>
+                      <CheckBox Content="Skip on metered connection" IsChecked="{Binding SkipOnMeteredConnection, Mode=TwoWay}" Checked="AutomationRuleSetting_Changed" Unchecked="AutomationRuleSetting_Changed" Margin="0,0,12,8"/>
+                      <CheckBox Content="Notify only if issues are found" IsChecked="{Binding NotifyOnlyIfIssuesFound, Mode=TwoWay}" Checked="AutomationRuleSetting_Changed" Unchecked="AutomationRuleSetting_Changed" Margin="0,0,12,8"/>
+                      <CheckBox Content="Scan only" IsChecked="{Binding ScanOnly, Mode=TwoWay}" Checked="AutomationRuleSetting_Changed" Unchecked="AutomationRuleSetting_Changed" Margin="0,0,0,8" Visibility="{Binding SupportsScanOnly, Converter={StaticResource BoolVis}}"/>
+                    </WrapPanel>
+                    <WrapPanel Margin="0,6,0,0">
+                      <Button Content="Review" Tag="{Binding}" Click="AutomationRuleDetailsButton_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"
+                              automation:AutomationProperties.AutomationId="Card_Automation_Edit"/>
+                      <Button Content="Run Now" Tag="{Binding}" Click="AutomationRuleRun_Click" Style="{DynamicResource AccentButtonStyle}" Margin="0,0,8,8"
+                              automation:AutomationProperties.AutomationId="Card_Automation_RunNow"/>
+                      <Button Content="Pause Until Tomorrow" Tag="{Binding}" Click="AutomationRulePause_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"
+                              automation:AutomationProperties.AutomationId="Card_Automation_PauseUntilTomorrow"/>
+                      <Button Content="Save" Tag="{Binding}" Click="AutomationRuleSave_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8"/>
+                    </WrapPanel>
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock Text="No scheduled automations are available for the current profile." Style="{DynamicResource CardSub}" Visibility="{Binding HasScheduledAutomationRules, Converter={StaticResource InvBoolVis}}"/>
+        </StackPanel>
+      </Border>
+
+      <Border Grid.Row="7" Style="{DynamicResource InfoCard}" Margin="0,0,0,16">
+        <StackPanel>
+          <TextBlock Text="Watchers And Background Checks" Style="{DynamicResource PanelTitle}"/>
+          <TextBlock Text="Watchers stay read-only until attention is actually needed. They do not apply deep fixes on their own."
+                     Style="{DynamicResource CardSub}" Margin="0,4,0,12" TextWrapping="Wrap"/>
+          <ItemsControl ItemsSource="{Binding WatcherAutomationRules}" Visibility="{Binding HasWatcherAutomationRules, Converter={StaticResource BoolVis}}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate DataType="{x:Type m:AutomationRuleSettings}">
+                <Border Style="{DynamicResource FixCard}" Padding="12" Margin="0,0,0,8" Tag="{Binding}">
+                  <Border.ContextMenu>
+                    <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}"
+                                 automation:AutomationProperties.AutomationId="ContextMenu_Automation">
+                      <MenuItem Header="Review Watcher" Click="AutomationRuleDetails_Click" CommandParameter="{Binding}"
+                                automation:AutomationProperties.AutomationId="Card_Automation_Edit"/>
+                      <MenuItem Header="Run Check Now" Click="AutomationRuleRunMenu_Click" CommandParameter="{Binding}"
+                                automation:AutomationProperties.AutomationId="Card_Automation_RunNow"/>
+                      <MenuItem Header="Pause Until Tomorrow" Click="AutomationRulePauseMenu_Click" CommandParameter="{Binding}"
+                                automation:AutomationProperties.AutomationId="Card_Automation_PauseUntilTomorrow"/>
+                    </ContextMenu>
+                  </Border.ContextMenu>
+                  <DockPanel>
+                    <WrapPanel DockPanel.Dock="Right" Margin="12,0,0,0">
+                      <CheckBox Content="Enabled" IsChecked="{Binding Enabled, Mode=TwoWay}" Checked="AutomationRuleSetting_Changed" Unchecked="AutomationRuleSetting_Changed" Margin="0,0,8,8"/>
+                      <Button Content="Run Check" Tag="{Binding}" Click="AutomationRuleRun_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"
+                              automation:AutomationProperties.AutomationId="Card_Automation_RunNow"/>
+                      <Button Content="Pause" Tag="{Binding}" Click="AutomationRulePause_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8"
+                              automation:AutomationProperties.AutomationId="Card_Automation_PauseUntilTomorrow"/>
+                    </WrapPanel>
+                    <StackPanel>
+                      <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
+                      <TextBlock Text="{Binding Summary}" Style="{DynamicResource CardSub}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                      <TextBlock Text="{Binding StatusText}" Style="{DynamicResource MetaText}" Margin="0,6,0,0" TextWrapping="Wrap"/>
+                      <TextBlock Text="{Binding ConditionSummary}" Style="{DynamicResource MetaText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                    </StackPanel>
+                  </DockPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock Text="No watcher rules are active for the current profile."
+                     Style="{DynamicResource CardSub}"
+                     Visibility="{Binding HasWatcherAutomationRules, Converter={StaticResource InvBoolVis}}"/>
+        </StackPanel>
+      </Border>
+
+      <Border Grid.Row="8" Style="{DynamicResource InfoCard}" Margin="0,0,0,16">
+        <StackPanel>
+          <DockPanel Margin="0,0,0,12">
+            <StackPanel DockPanel.Dock="Left">
+              <TextBlock Text="Automation History" Style="{DynamicResource PanelTitle}"/>
+              <TextBlock Text="See what ran, why it ran, what changed, and what still needs attention."
+                         Style="{DynamicResource CardSub}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+            </StackPanel>
+            <WrapPanel DockPanel.Dock="Right" HorizontalAlignment="Right">
+              <ComboBox ItemsSource="{Binding AutomationHistoryFilterOptions}" SelectedItem="{Binding AutomationHistoryFilter, Mode=TwoWay}" Width="170" Margin="0,0,8,8"/>
+              <Button Content="Clear History" Click="ClearAutomationHistory_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8"/>
+            </WrapPanel>
+          </DockPanel>
+          <ItemsControl ItemsSource="{Binding FilteredAutomationHistoryEntries}" Visibility="{Binding HasFilteredAutomationHistoryEntries, Converter={StaticResource BoolVis}}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate DataType="{x:Type m:AutomationRunReceipt}">
+                <Border Style="{DynamicResource FixCard}" Padding="12" Margin="0,0,0,8" Tag="{Binding}" Focusable="True" automation:AutomationProperties.AutomationId="AutomationHistoryCard" MouseLeftButtonDown="AutomationReceiptCard_MouseLeftButtonDown">
+                  <Border.ContextMenu>
+                    <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}"
+                                 automation:AutomationProperties.AutomationId="ContextMenu_Receipt">
+                      <MenuItem Header="Open Details" Click="AutomationReceiptDetails_Click" CommandParameter="{Binding}"
+                                automation:AutomationProperties.AutomationId="Card_Receipt_Details"/>
+                      <MenuItem Header="Copy Summary" Click="AutomationReceiptCopy_Click" CommandParameter="{Binding}"
+                                automation:AutomationProperties.AutomationId="Card_Receipt_Copy"/>
+                      <Separator/>
+                      <MenuItem Header="Create Support Package" Click="AutomationReceiptSupport_Click" CommandParameter="{Binding}"
+                                automation:AutomationProperties.AutomationId="Card_Receipt_CreateSupportPackage"/>
+                    </ContextMenu>
+                  </Border.ContextMenu>
+                  <DockPanel>
+                    <WrapPanel DockPanel.Dock="Right" Margin="12,0,0,0">
+                      <Button Content="Details" Tag="{Binding}" Click="AutomationReceiptDetailsButton_Click" automation:AutomationProperties.AutomationId="Card_Receipt_Details" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
+                      <Button Content="Rerun" Tag="{Binding}" Click="AutomationReceiptRerun_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
+                      <Button Content="Support" Tag="{Binding}" Click="AutomationReceiptSupportButton_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8"
+                              automation:AutomationProperties.AutomationId="Card_Receipt_CreateSupportPackage"/>
+                    </WrapPanel>
+                    <StackPanel>
+                      <TextBlock Text="{Binding RuleTitle}" FontWeight="SemiBold"/>
+                      <TextBlock Text="{Binding Summary}" Style="{DynamicResource CardSub}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                      <TextBlock Style="{DynamicResource MetaText}" Margin="0,6,0,0">
+                        <Run Text="{Binding StartedAt, StringFormat='{}{0:g}'}"/>
+                        <Run Text="  •  "/>
+                        <Run Text="{Binding Outcome}"/>
+                        <Run Text="  •  "/>
+                        <Run Text="{Binding TriggerSource}"/>
+                      </TextBlock>
+                    </StackPanel>
+                  </DockPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock Text="No automation history has been recorded yet." Style="{DynamicResource CardSub}" Visibility="{Binding HasFilteredAutomationHistoryEntries, Converter={StaticResource InvBoolVis}}"/>
+        </StackPanel>
+      </Border>
+
+      <StackPanel Grid.Row="9">
+        <TextBlock Text="Guided Workflows" Style="{DynamicResource CardLabel}" Margin="0,0,0,8"/>
+        <ItemsControl ItemsSource="{Binding Runbooks}" IsEnabled="{Binding IsBundleRunning, Converter={StaticResource InvBool}}">
           <ItemsControl.ItemsPanel>
-            <ItemsPanelTemplate>
-              <WrapPanel/>
-            </ItemsPanelTemplate>
+            <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate DataType="{x:Type m:RunbookDefinition}">
               <Border Style="{DynamicResource InfoCard}" Width="290" Margin="0,0,12,12" Tag="{Binding}" MouseLeftButtonDown="RunbookCard_MouseLeftButtonDown">
                 <Border.ContextMenu>
-                  <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
-                    <MenuItem Header="Review Workflow" Click="RunbookDetails_Click" CommandParameter="{Binding}"/>
-                    <MenuItem Header="Copy Workflow Summary" Click="RunbookCopy_Click" CommandParameter="{Binding}"/>
+                  <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}"
+                               automation:AutomationProperties.AutomationId="ContextMenu_Runbook">
+                    <MenuItem Header="Review Workflow" Click="RunbookDetails_Click" CommandParameter="{Binding}"
+                              automation:AutomationProperties.AutomationId="Card_Runbook_Review"/>
+                    <MenuItem Header="Copy Workflow Summary" Click="RunbookCopy_Click" CommandParameter="{Binding}"
+                              automation:AutomationProperties.AutomationId="Card_Runbook_CopySummary"/>
                     <Separator/>
-                    <MenuItem Header="Start Workflow" Click="RunbookRunMenu_Click" CommandParameter="{Binding}"/>
+                    <MenuItem Header="Start Workflow" Click="RunbookRunMenu_Click" CommandParameter="{Binding}"
+                              automation:AutomationProperties.AutomationId="Card_Runbook_Start"/>
                   </ContextMenu>
                 </Border.ContextMenu>
                 <DockPanel>
                   <WrapPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
-                    <Button Tag="{Binding}"
-                            Click="RunbookDetailsButton_Click"
-                            Style="{DynamicResource SecondaryButton}"
-                            Margin="0,0,8,8"
-                            Cursor="Hand">
-                      <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Symbol="Info20" FontSize="14" Margin="0,0,8,0"/>
-                        <TextBlock Text="Review"/>
-                      </StackPanel>
+                    <Button Tag="{Binding}" Click="RunbookDetailsButton_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8" Cursor="Hand"
+                            automation:AutomationProperties.AutomationId="Card_Runbook_Review">
+                      <StackPanel Orientation="Horizontal"><ui:SymbolIcon Symbol="Info20" FontSize="14" Margin="0,0,8,0"/><TextBlock Text="Review"/></StackPanel>
                     </Button>
-                    <Button Tag="{Binding}"
-                            Click="RunbookRun_Click"
-                            Style="{DynamicResource SecondaryButton}"
-                            Margin="0,0,0,8"
-                            Cursor="Hand">
-                      <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Symbol="Play20" FontSize="14" Margin="0,0,8,0"/>
-                        <TextBlock Text="Start Workflow"/>
-                      </StackPanel>
+                    <Button Tag="{Binding}" Click="RunbookRun_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8" Cursor="Hand"
+                            automation:AutomationProperties.AutomationId="Card_Runbook_Start">
+                      <StackPanel Orientation="Horizontal"><ui:SymbolIcon Symbol="Play20" FontSize="14" Margin="0,0,8,0"/><TextBlock Text="Start Workflow"/></StackPanel>
                     </Button>
                   </WrapPanel>
                   <StackPanel>
                     <TextBlock Text="{Binding Title}" FontWeight="Bold" FontSize="14"/>
                     <TextBlock Text="{Binding Description}" Style="{DynamicResource CardSub}" TextWrapping="Wrap" Margin="0,6,0,10"/>
                     <WrapPanel>
-                      <Border Background="{DynamicResource BgCard2Brush}" CornerRadius="4" Padding="8,3" Margin="0,0,6,4">
-                        <TextBlock Style="{DynamicResource MetaText}">
-                          <Run Text="{Binding Steps.Count, Mode=OneWay}"/>
-                          <Run Text=" steps"/>
-                        </TextBlock>
-                      </Border>
-                      <Border Background="{DynamicResource BgCard2Brush}" CornerRadius="4" Padding="8,3" Margin="0,0,0,4">
-                        <TextBlock Text="{Binding EstTime}" Style="{DynamicResource MetaText}"/>
-                      </Border>
+                      <Border Background="{DynamicResource BgCard2Brush}" CornerRadius="4" Padding="8,3" Margin="0,0,6,4"><TextBlock Style="{DynamicResource MetaText}"><Run Text="{Binding Steps.Count, Mode=OneWay}"/><Run Text=" steps"/></TextBlock></Border>
+                      <Border Background="{DynamicResource BgCard2Brush}" CornerRadius="4" Padding="8,3" Margin="0,0,0,4"><TextBlock Text="{Binding EstTime}" Style="{DynamicResource MetaText}"/></Border>
                     </WrapPanel>
                   </StackPanel>
                 </DockPanel>
@@ -435,54 +519,28 @@
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
-
-        <TextBlock Text="Maintenance packs" Style="{DynamicResource CardLabel}" Margin="0,12,0,8"
-                   Visibility="{Binding HasVisibleBundles, Converter={StaticResource BoolVis}}"/>
-        <TextBlock Text="{Binding AdvancedAutomationAvailabilityText}" Style="{DynamicResource CardSub}" Margin="0,12,0,8"
-                   Visibility="{Binding HasVisibleBundles, Converter={StaticResource InvBoolVis}}"/>
-        <ItemsControl ItemsSource="{Binding Bundles}"
-                      Visibility="{Binding HasVisibleBundles, Converter={StaticResource BoolVis}}"
-                      IsEnabled="{Binding IsBundleRunning, Converter={StaticResource InvBool}}">
+        <TextBlock Text="Maintenance Packs" Style="{DynamicResource CardLabel}" Margin="0,12,0,8" Visibility="{Binding HasVisibleBundles, Converter={StaticResource BoolVis}}"/>
+        <TextBlock Text="{Binding AdvancedAutomationAvailabilityText}" Style="{DynamicResource CardSub}" Margin="0,12,0,8" Visibility="{Binding HasVisibleBundles, Converter={StaticResource InvBoolVis}}"/>
+        <ItemsControl ItemsSource="{Binding Bundles}" Visibility="{Binding HasVisibleBundles, Converter={StaticResource BoolVis}}" IsEnabled="{Binding IsBundleRunning, Converter={StaticResource InvBool}}">
           <ItemsControl.ItemsPanel>
-            <ItemsPanelTemplate>
-              <WrapPanel/>
-            </ItemsPanelTemplate>
+            <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate DataType="{x:Type m:FixBundle}">
               <Border Style="{DynamicResource InfoCard}" Width="290" Margin="0,0,12,12">
                 <DockPanel>
-                  <Button DockPanel.Dock="Bottom"
-                          Tag="{Binding}"
-                          Click="BundleRun_Click"
-                          Style="{DynamicResource AccentButtonStyle}"
-                          Margin="0,12,0,0"
-                          Cursor="Hand">
-                    <StackPanel Orientation="Horizontal">
-                      <ui:SymbolIcon Symbol="Play20" FontSize="14" Margin="0,0,8,0"/>
-                      <TextBlock Text="Run Maintenance Pack"/>
-                    </StackPanel>
+                  <Button DockPanel.Dock="Bottom" Tag="{Binding}" Click="BundleRun_Click" Style="{DynamicResource AccentButtonStyle}" Margin="0,12,0,0" Cursor="Hand">
+                    <StackPanel Orientation="Horizontal"><ui:SymbolIcon Symbol="Play20" FontSize="14" Margin="0,0,8,0"/><TextBlock Text="Run Maintenance Pack"/></StackPanel>
                   </Button>
                   <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                      <TextBlock Text="{Binding Icon}"
-                                 FontFamily="{DynamicResource IconFont}"
-                                 FontSize="20"
-                                 Margin="0,0,10,0"
-                                 VerticalAlignment="Center"/>
+                      <TextBlock Text="{Binding Icon}" FontFamily="{DynamicResource IconFont}" FontSize="20" Margin="0,0,10,0" VerticalAlignment="Center"/>
                       <TextBlock Text="{Binding Title}" FontWeight="Bold" FontSize="14" VerticalAlignment="Center"/>
                     </StackPanel>
                     <TextBlock Text="{Binding Description}" Style="{DynamicResource CardSub}" TextWrapping="Wrap" Margin="0,0,0,10"/>
                     <WrapPanel Margin="0,0,0,4">
-                      <Border Background="{DynamicResource BgCard2Brush}" CornerRadius="4" Padding="8,3" Margin="0,0,6,4">
-                        <TextBlock Style="{DynamicResource MetaText}">
-                          <Run Text="{Binding FixIds.Count, Mode=OneWay}"/>
-                          <Run Text=" fixes"/>
-                        </TextBlock>
-                      </Border>
-                      <Border Background="{DynamicResource BgCard2Brush}" CornerRadius="4" Padding="8,3" Margin="0,0,0,4">
-                        <TextBlock Text="{Binding EstTime}" Style="{DynamicResource MetaText}"/>
-                      </Border>
+                      <Border Background="{DynamicResource BgCard2Brush}" CornerRadius="4" Padding="8,3" Margin="0,0,6,4"><TextBlock Style="{DynamicResource MetaText}"><Run Text="{Binding FixIds.Count, Mode=OneWay}"/><Run Text=" fixes"/></TextBlock></Border>
+                      <Border Background="{DynamicResource BgCard2Brush}" CornerRadius="4" Padding="8,3" Margin="0,0,0,4"><TextBlock Text="{Binding EstTime}" Style="{DynamicResource MetaText}"/></Border>
                     </WrapPanel>
                   </StackPanel>
                 </DockPanel>

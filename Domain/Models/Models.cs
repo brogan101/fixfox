@@ -2,10 +2,11 @@ using System.ComponentModel;
 using System.IO;
 using System.Runtime.CompilerServices;
 using HelpDesk.Domain.Enums;
+using Newtonsoft.Json;
 
 namespace HelpDesk.Domain.Models;
 
-// ── Fix catalog models ─────────────────────────────────────────────────────
+// â”€â”€ Fix catalog models â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 public sealed class FixStep
 {
@@ -19,12 +20,18 @@ public sealed class FixItem : INotifyPropertyChanged
 {
     public string        Id             { get; init; } = Guid.NewGuid().ToString();
     public string        Title          { get; init; } = "";
-    public string        Description    { get; init; } = "";
+    public string        Category       { get; set; } = "";
+    public string        Description    { get; set; } = "";
+    public FixRiskLevel  RiskLevel      { get; init; } = FixRiskLevel.Safe;
     public FixType       Type           { get; init; } = FixType.Silent;
     public string?       Script         { get; init; }
     public List<FixStep> Steps          { get; init; } = [];
     public bool          RequiresAdmin  { get; init; }
-    public string        EstTime        { get; init; } = "";
+    public int           EstimatedDurationSeconds { get; set; }
+    public string        EstTime        { get; set; } = "";
+    public string        ExpandedDurationText { get; set; } = "";
+    public string        ExpandedWhatChanges { get; set; } = "";
+    public string        ExpandedFailureGuidance { get; set; } = "";
     /// <summary>Structured tags for category filtering.</summary>
     public string[]      Tags           { get; init; } = [];
     /// <summary>Plain-English phrases a non-technical user might type to find this fix.</summary>
@@ -35,6 +42,7 @@ public sealed class FixItem : INotifyPropertyChanged
     private string? _lastOutput;
     private bool _isFavorite;
     private bool _isPinned;
+    private bool _isExpanded;
 
     public FixStatus Status
     {
@@ -86,6 +94,17 @@ public sealed class FixItem : INotifyPropertyChanged
         }
     }
 
+    public bool IsExpanded
+    {
+        get => _isExpanded;
+        set
+        {
+            if (_isExpanded == value) return;
+            _isExpanded = value;
+            OnPropertyChanged();
+        }
+    }
+
     // Computed helpers for bindings
     public bool HasScript => !string.IsNullOrWhiteSpace(Script);
     public bool HasSteps  => Steps.Count > 0;
@@ -109,10 +128,11 @@ public sealed class FixItem : INotifyPropertyChanged
 
 public sealed class FixCategory
 {
-    public string        Id    { get; init; } = "";
-    public string        Icon  { get; init; } = "\uE90F";
-    public string        Title { get; init; } = "";
-    public List<FixItem> Fixes { get; init; } = [];
+    public string        Id       { get; init; } = "";
+    public string        Icon     { get; init; } = "\uE90F";
+    public string        Title    { get; init; } = "";
+    public string        Subtitle { get; set; } = "";
+    public List<FixItem> Fixes    { get; init; } = [];
 }
 
 public sealed class FixBundle
@@ -125,7 +145,7 @@ public sealed class FixBundle
     public List<string>  FixIds      { get; init; } = [];
 }
 
-// ── Scan / diagnostic models ───────────────────────────────────────────────
+// â”€â”€ Scan / diagnostic models â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 public sealed class ScanResult
 {
@@ -136,7 +156,7 @@ public sealed class ScanResult
     public string?       Suggestion { get; init; }
 }
 
-// ── Notification model ────────────────────────────────────────────────────
+// â”€â”€ Notification model â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 public sealed class AppNotification
 {
@@ -149,7 +169,7 @@ public sealed class AppNotification
     public string?    ActionFixId { get; init; }
 }
 
-// ── History / log model ───────────────────────────────────────────────────
+// â”€â”€ History / log model â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 public sealed class FixLogEntry
 {
@@ -161,7 +181,7 @@ public sealed class FixLogEntry
     public string   Output    { get; init; } = "";
 }
 
-// ── System snapshot model ─────────────────────────────────────────────────
+// â”€â”€ System snapshot model â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 public sealed record SystemSnapshot
 {
@@ -224,11 +244,24 @@ public sealed record SystemSnapshot
     public string   BiosVersion         { get; init; } = "";
 }
 
-// ── Settings model ────────────────────────────────────────────────────────
+// â”€â”€ Settings model â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 public sealed class AppSettings
 {
-    public int     SettingsSchemaVersion     { get; set; } = 4;
+    public int     SchemaVersion             { get; set; } = 1;
+
+    [JsonIgnore]
+    public int SettingsSchemaVersion
+    {
+        get => SchemaVersion;
+        set => SchemaVersion = value;
+    }
+
+    [JsonProperty("SettingsSchemaVersion")]
+    private int LegacySettingsSchemaVersion
+    {
+        set => SchemaVersion = value;
+    }
 
     // Appearance
     public string  Theme                     { get; set; } = "Dark";
@@ -267,10 +300,23 @@ public sealed class AppSettings
     public string  KnowledgeBaseConfigPath   { get; set; } = "";
     public string  DeploymentConfigPath      { get; set; } = "";
     public bool    RunFirstHealthCheckAfterSetup { get; set; } = true;
+    public bool    EnableBackgroundHealthMonitoring { get; set; } = true;
+    public bool    ShowHealthAlertTrayNotifications { get; set; } = true;
+    public bool    SendWeeklyHealthSummary { get; set; } = true;
+    public HealthAlertNotificationFrequency HealthAlertNotificationFrequency { get; set; } = HealthAlertNotificationFrequency.All;
+    public bool    HealthAlertLowDiskEnabled { get; set; } = true;
+    public bool    HealthAlertWindowsUpdateEnabled { get; set; } = true;
+    public bool    HealthAlertDefenderDefinitionsEnabled { get; set; } = true;
+    public bool    HealthAlertPendingRebootEnabled { get; set; } = true;
+    public bool    HealthAlertCrashDetectionEnabled { get; set; } = true;
+    public bool    HealthAlertStartupSlowdownEnabled { get; set; } = true;
     public DateTime? LastLaunchUtc           { get; set; }
+    public DateTime? LastAppInteractionUtc   { get; set; }
     public DateTime? LastCleanShutdownUtc    { get; set; }
     public bool    LastSessionEndedCleanly   { get; set; } = true;
     public string  LastLaunchedVersion       { get; set; } = "";
+    public long    StartupBaselineMilliseconds { get; set; }
+    public DateTime? LastWeeklyHealthSummaryUtc { get; set; }
     public AppEdition Edition                { get; set; } = AppEdition.Basic;
 
     // Scan thresholds
@@ -283,11 +329,24 @@ public sealed class AppSettings
     public string  LastFixCategory           { get; set; } = "";
     public List<string> FavoriteFixIds       { get; set; } = [];
     public List<string> PinnedFixIds         { get; set; } = [];
+    public List<string> PinnedToolKeys       { get; set; } = [];
+    public List<string> PinnedAutomationRuleIds { get; set; } = [];
+    public List<string> BrowserAllowlistedSites { get; set; } = [];
     public List<string> RecentSearches       { get; set; } = [];
+    public List<string> DismissedAutomationAttentionReceiptIds { get; set; } = [];
+    public List<DismissedDashboardSuggestion> DismissedDashboardSuggestions { get; set; } = [];
+    public List<DismissedHealthAlert> DismissedHealthAlerts { get; set; } = [];
 
     // First-launch
     public bool    OnboardingDismissed       { get; set; } = false;
     public bool    PrivacyNoticeDismissed    { get; set; } = false;
+    public bool    OnboardingChecklistDismissed { get; set; }
+    public bool    OnboardingCompletedHealthScan { get; set; }
+    public bool    OnboardingReviewedStartupItems { get; set; }
+    public bool    OnboardingConfiguredAutomation { get; set; }
+    public bool    OnboardingCreatedSupportPackage { get; set; }
+    public bool    SimplifiedMode          { get; set; }
+    public string  FirstRunExperienceMode  { get; set; } = "";
     public string  BehaviorProfile           { get; set; } = "Standard";
     public bool    AdvancedMode              { get; set; } = false;
     public string  DefaultLandingPage        { get; set; } = "Dashboard";
@@ -339,10 +398,16 @@ public sealed class TriageCandidate
     public string SafestFirstAction { get; init; } = "";
     public string StrongerNextAction { get; init; } = "";
     public string EscalationSignal { get; init; } = "";
+    public string RankingReason { get; set; } = "";
+    public int DisplayIndex { get; set; }
     public bool RecommendDiagnosticsFirst { get; init; }
     public bool IsHighConfidence => ConfidenceScore >= 75;
     public bool IsLowConfidence => ConfidenceScore < 45;
+    public string? PrimaryFixId { get; set; }
+    public string? GuidedCheckFixId { get; set; }
+    public string? PrimaryRunbookId { get; set; }
     public List<string> RecommendedFixIds { get; init; } = [];
+    public List<string> RecommendedRunbookIds { get; init; } = [];
 }
 
 public sealed class TriageResult
@@ -440,12 +505,27 @@ public sealed class RunbookDefinition
     public string Description { get; init; } = "";
     public string CategoryId { get; init; } = "";
     public string EstTime { get; init; } = "~2 min";
+    public int EstimatedDurationSeconds { get; init; } = 120;
+    public FixRiskLevel RiskLevel { get; init; } = FixRiskLevel.Safe;
+    public bool IsDestructive { get; init; }
     public bool RequiresAdmin { get; init; }
     public bool SupportsRollback { get; init; }
     public bool SupportsRestorePoint { get; init; }
     public AppEdition MinimumEdition { get; init; } = AppEdition.Basic;
     public string TriggerHint { get; init; } = "";
+    public List<string> IrreversibleActions { get; init; } = [];
+    public string NextStepIfFailed { get; init; } = "";
+    public string NextStepIfSucceeded { get; init; } = "";
     public List<RunbookStepDefinition> Steps { get; init; } = [];
+    public bool IsPreflightRequired => IsDestructive || RiskLevel is FixRiskLevel.MayRestart or FixRiskLevel.Advanced;
+    public IReadOnlyList<string> IrreversibleActionsOrDefault =>
+        IrreversibleActions.Count == 0 ? ["No irreversible changes"] : IrreversibleActions;
+    public string EstimatedDurationLabel =>
+        EstimatedDurationSeconds <= 0
+            ? EstTime
+            : EstimatedDurationSeconds < 60
+                ? $"~{EstimatedDurationSeconds} seconds"
+                : $"~{Math.Max(1, EstimatedDurationSeconds / 60)} minute{(EstimatedDurationSeconds / 60 == 1 ? "" : "s")}";
 }
 
 public sealed class VerificationResult
@@ -477,6 +557,9 @@ public sealed class RepairExecutionResult
     public string Summary { get; init; } = "";
     public string FailureSummary { get; init; } = "";
     public string NextStep { get; init; } = "";
+    public int ExitCode { get; init; }
+    public int StepCount { get; init; }
+    public int DurationMs { get; init; }
     public VerificationResult Verification { get; init; } = new();
     public RollbackInfo Rollback { get; init; } = new();
     public bool RestorePointAttempted { get; init; }
@@ -484,8 +567,10 @@ public sealed class RepairExecutionResult
     public bool RebootRecommended { get; init; }
 }
 
-public sealed class RepairHistoryEntry
+public sealed class RepairHistoryEntry : INotifyPropertyChanged
 {
+    private bool _isSelectedForComparison;
+
     public string Id { get; init; } = Guid.NewGuid().ToString("N");
     public DateTime Timestamp { get; init; } = DateTime.Now;
     public string Query { get; init; } = "";
@@ -514,6 +599,33 @@ public sealed class RepairHistoryEntry
     public string FailedStepId { get; init; } = "";
     public string FailedStepTitle { get; init; } = "";
     public string ChangedSummary { get; init; } = "";
+    public ReceiptKind ReceiptKind { get; init; } = ReceiptKind.Standard;
+    public WeeklySummary? WeeklySummary { get; init; }
+    public int DurationMs { get; init; }
+    public int? ExitCode { get; init; }
+    public int StepCount { get; init; }
+
+    [JsonIgnore]
+    public bool IsWeeklySummary => ReceiptKind == ReceiptKind.WeeklySummary && WeeklySummary is not null;
+
+    [JsonIgnore]
+    public string HistoryAutomationId => IsWeeklySummary
+        ? $"History_WeeklySummary_{Timestamp:yyyyMMdd}_Card"
+        : $"History_Receipt_{Id}_Card";
+
+    [JsonIgnore]
+    public bool IsSelectedForComparison
+    {
+        get => _isSelectedForComparison;
+        set
+        {
+            if (_isSelectedForComparison == value) return;
+            _isSelectedForComparison = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelectedForComparison)));
+        }
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
 }
 
 public sealed class RunbookExecutionSummary
@@ -523,9 +635,26 @@ public sealed class RunbookExecutionSummary
     public bool Success { get; init; }
     public int CompletedSteps { get; init; }
     public int TotalSteps { get; init; }
+    public ExecutionOutcome Outcome { get; init; } = ExecutionOutcome.Completed;
     public string Summary { get; init; } = "";
     public List<string> Timeline { get; init; } = [];
+    public List<RunbookStepResult> StepResults { get; init; } = [];
+    public List<string> ChangesMade { get; init; } = [];
+    public string NextStepText { get; init; } = "";
+    public RepairHistoryEntry? Receipt { get; init; }
     public List<RepairExecutionResult> RepairResults { get; init; } = [];
+    public bool IsPartial => !Success && CompletedSteps > 0;
+}
+
+public sealed class RunbookStepResult
+{
+    public string StepId { get; init; } = "";
+    public string Title { get; init; } = "";
+    public RunbookStepKind StepKind { get; init; } = RunbookStepKind.Message;
+    public bool Success { get; init; }
+    public string Summary { get; init; } = "";
+    public List<string> ChangesMade { get; init; } = [];
+    public string StatusLabel => Success ? "Passed" : "Failed";
 }
 
 public sealed class InterruptedOperationState
@@ -576,9 +705,73 @@ public sealed class GuidedRepairExecutionResult
 public sealed class EvidenceExportOptions
 {
     public EvidenceExportLevel Level { get; init; } = EvidenceExportLevel.Basic;
+    public SupportBundlePreset Preset { get; init; } = SupportBundlePreset.Standard;
     public bool RedactIpAddress { get; init; } = true;
     public bool IncludeNotifications { get; init; } = true;
     public bool IncludeTechnicalHistory { get; init; } = true;
+    public bool IncludeLogs { get; init; } = true;
+    public bool IncludeEnvironmentSnapshot { get; init; } = true;
+    public bool IncludeRepairHistory { get; init; } = true;
+    public bool IncludeAutomationHistory { get; init; } = true;
+    public bool IncludeAdvancedTraces { get; init; }
+
+    public int IncludedComponentCount =>
+        (IncludeLogs ? 1 : 0)
+        + (IncludeEnvironmentSnapshot ? 1 : 0)
+        + (IncludeRepairHistory ? 1 : 0)
+        + (IncludeAutomationHistory ? 1 : 0)
+        + (IncludeNotifications ? 1 : 0)
+        + (IncludeTechnicalHistory ? 1 : 0)
+        + (IncludeAdvancedTraces ? 1 : 0)
+        + 1;
+
+    public static EvidenceExportOptions CreateForPreset(
+        SupportBundlePreset preset,
+        bool allowTechnicianExports)
+    {
+        return preset switch
+        {
+            SupportBundlePreset.Quick => new EvidenceExportOptions
+            {
+                Preset = SupportBundlePreset.Quick,
+                Level = EvidenceExportLevel.Basic,
+                RedactIpAddress = true,
+                IncludeNotifications = false,
+                IncludeTechnicalHistory = false,
+                IncludeLogs = true,
+                IncludeEnvironmentSnapshot = false,
+                IncludeRepairHistory = false,
+                IncludeAutomationHistory = false,
+                IncludeAdvancedTraces = false
+            },
+            SupportBundlePreset.Technician when allowTechnicianExports => new EvidenceExportOptions
+            {
+                Preset = SupportBundlePreset.Technician,
+                Level = EvidenceExportLevel.Technician,
+                RedactIpAddress = false,
+                IncludeNotifications = true,
+                IncludeTechnicalHistory = true,
+                IncludeLogs = true,
+                IncludeEnvironmentSnapshot = true,
+                IncludeRepairHistory = true,
+                IncludeAutomationHistory = true,
+                IncludeAdvancedTraces = true
+            },
+            _ => new EvidenceExportOptions
+            {
+                Preset = SupportBundlePreset.Standard,
+                Level = allowTechnicianExports ? EvidenceExportLevel.Technician : EvidenceExportLevel.Basic,
+                RedactIpAddress = true,
+                IncludeNotifications = true,
+                IncludeTechnicalHistory = true,
+                IncludeLogs = true,
+                IncludeEnvironmentSnapshot = true,
+                IncludeRepairHistory = true,
+                IncludeAutomationHistory = true,
+                IncludeAdvancedTraces = false
+            }
+        };
+    }
 }
 
 public sealed class ProactiveRecommendation
@@ -687,6 +880,8 @@ public sealed class EvidenceBundleManifest
     public string TechnicalPath { get; init; } = "";
     public string BundleFolder { get; init; } = "";
     public string Headline { get; init; } = "";
+    public SupportBundlePreset Preset { get; init; } = SupportBundlePreset.Standard;
+    public List<string> GeneratedFiles { get; init; } = [];
 }
 
 public sealed class DashboardAlert
@@ -701,9 +896,55 @@ public sealed class DashboardAlert
     public Page? ActionPage { get; init; }
 }
 
+public sealed class HealthAlert
+{
+    public string Id { get; init; } = "";
+    public string Title { get; init; } = "";
+    public string Body { get; init; } = "";
+    public AlertSeverity Severity { get; init; } = AlertSeverity.Warning;
+    public string? ActionLabel { get; init; }
+    public string? ActionTarget { get; init; }
+    public DateTime DetectedUtc { get; init; } = DateTime.UtcNow;
+    public bool IsDismissed { get; set; }
+    public bool IsHighlighted { get; set; }
+}
+
+public sealed class DismissedHealthAlert
+{
+    public string AlertId { get; set; } = "";
+    public DateTime DismissedUntilUtc { get; set; }
+}
+
+public sealed class HealthAlertHistoryEntry
+{
+    public string AlertId { get; init; } = "";
+    public string Title { get; init; } = "";
+    public AlertSeverity Severity { get; init; } = AlertSeverity.Warning;
+    public DateTime DetectedUtc { get; init; } = DateTime.UtcNow;
+}
+
+public sealed class WeeklySummary
+{
+    public DateTime WeekEndingUtc { get; init; } = DateTime.UtcNow;
+    public int FixesRunCount { get; init; }
+    public List<string> FixesRunNames { get; init; } = [];
+    public int AlertsRaisedCount { get; init; }
+    public List<string> AlertTypes { get; init; } = [];
+    public int AutomationsCompletedCount { get; init; }
+    public int AutomationsSkippedCount { get; init; }
+    public int AutomationsFailedCount { get; init; }
+    public int CrashCount { get; init; }
+    public List<string> NotableEvents { get; init; } = [];
+    public string HealthScore { get; init; } = "A";
+    public string SummaryText { get; init; } = "";
+    public string ComparedToLastWeekText { get; init; } = "";
+}
+
 public sealed class ToolboxEntry : INotifyPropertyChanged
 {
+    private bool _isPinned;
     public string Title { get; init; } = "";
+    public string ToolKey { get; init; } = "";
     public string Description { get; init; } = "";
     public string SupportNote { get; init; } = "";
     public string LaunchTarget { get; init; } = "";
@@ -750,6 +991,17 @@ public sealed class ToolboxEntry : INotifyPropertyChanged
         {
             if (_lastLaunchedAt == value) return;
             _lastLaunchedAt = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public bool IsPinned
+    {
+        get => _isPinned;
+        set
+        {
+            if (_isPinned == value) return;
+            _isPinned = value;
             OnPropertyChanged();
         }
     }
@@ -824,6 +1076,7 @@ public sealed class AutomationRuleSettings
     public bool SupportsScheduling { get; set; }
     public bool SupportsScanOnly { get; set; }
     public AutomationScheduleKind ScheduleKind { get; set; } = AutomationScheduleKind.Manual;
+    public int IntervalDays { get; set; } = 1;
     public string ScheduleDay { get; set; } = DayOfWeek.Sunday.ToString();
     public string ScheduleTime { get; set; } = "09:00";
     public bool RunOnlyWhenIdle { get; set; }
@@ -838,6 +1091,9 @@ public sealed class AutomationRuleSettings
     public int StartupDelayMinutes { get; set; } = 3;
     public bool ScanOnly { get; set; }
     public DateTime? PausedUntilUtc { get; set; }
+    public bool SkipNextRun { get; set; }
+    public bool IsPinnedToTray { get; set; }
+    public DateTime? LastPinnedAtUtc { get; set; }
     public List<string> IncludedTasks { get; set; } = [];
     public SupportAction PrimaryAction { get; set; } = new();
     public SupportAction SecondaryAction { get; set; } = new();
@@ -849,6 +1105,25 @@ public sealed class AutomationRuleSettings
     public string ConditionSummary { get; set; } = "";
     public bool NeedsAttention { get; set; }
     public ScanSeverity Severity { get; set; } = ScanSeverity.Good;
+
+    public string RecurrenceSummary => ScheduleKind switch
+    {
+        AutomationScheduleKind.EveryXDays => IntervalDays <= 1 ? "Every day" : $"Every {IntervalDays} days",
+        AutomationScheduleKind.WeekdaysOnly => "Weekdays only",
+        AutomationScheduleKind.StartupDelay or AutomationScheduleKind.Startup => $"At startup after {Math.Max(1, StartupDelayMinutes)} minute(s)",
+        AutomationScheduleKind.Weekly => $"{ScheduleDay}s",
+        _ => "Manual only"
+    };
+
+    public string ScheduleExpression => ScheduleKind switch
+    {
+        AutomationScheduleKind.EveryXDays => $"FREQ=DAILY;INTERVAL={Math.Clamp(IntervalDays, 1, 30)}",
+        AutomationScheduleKind.WeekdaysOnly => "FREQ=WEEKDAY",
+        AutomationScheduleKind.StartupDelay or AutomationScheduleKind.Startup => $"STARTUP+{Math.Max(1, StartupDelayMinutes)}m",
+        AutomationScheduleKind.Weekly => $"FREQ=WEEKLY;BYDAY={ScheduleDay[..Math.Min(3, ScheduleDay.Length)].ToUpperInvariant()};AT={ScheduleTime}",
+        AutomationScheduleKind.Disabled => "DISABLED",
+        _ => "MANUAL"
+    };
 }
 
 public sealed class AutomationConditionEvaluation
@@ -883,16 +1158,141 @@ public sealed class AutomationRunReceipt
     public string RelatedSupportCenterId { get; init; } = "";
 }
 
+public sealed class AutomationAttentionItem
+{
+    public AutomationRunReceipt Receipt { get; init; } = new();
+    public string RelativeTimeText { get; init; } = "";
+    public string ReasonText { get; init; } = "";
+}
+
+public sealed class OnboardingChecklistItem : INotifyPropertyChanged
+{
+    private bool _isCompleted;
+
+    public string Key { get; init; } = "";
+    public string Title { get; init; } = "";
+    public string Description { get; init; } = "";
+    public string AutomationId { get; init; } = "";
+
+    public bool IsCompleted
+    {
+        get => _isCompleted;
+        set
+        {
+            if (_isCompleted == value) return;
+            _isCompleted = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsCompleted)));
+        }
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+}
+
+public sealed class ReceiptComparisonRow
+{
+    public string Label { get; init; } = "";
+    public string LeftValue { get; init; } = "";
+    public string RightValue { get; init; } = "";
+    public bool IsDifferent { get; init; }
+}
+
+public sealed class EvidenceBundleProgressUpdate
+{
+    public int? Percent { get; init; }
+    public string StatusMessage { get; init; } = "";
+}
+
 public sealed record StartupAppEntry(
     string Name,
     string Source,
     string Command,
     string LaunchTarget,
     bool RecommendedDisableCandidate,
-    string RecommendationReason)
+    string RecommendationReason,
+    int? EstimatedDelayMs = null,
+    StartupImpactLevel ImpactLevel = StartupImpactLevel.Unknown,
+    string WhatItDoes = "",
+    StartupItemClassification Classification = StartupItemClassification.Unrecognized,
+    string WhatMayBreakIfDisabled = "",
+    string StartupValueName = "",
+    string StartupApprovedScope = "",
+    string StartupApprovedSubKey = "",
+    string StartupApprovedValueName = "",
+    bool CanDisable = false)
 {
     public string LaunchTargetLabel => string.IsNullOrWhiteSpace(LaunchTarget) ? "" : Path.GetFileName(LaunchTarget);
     public bool HasLaunchTarget => !string.IsNullOrWhiteSpace(LaunchTarget);
+    public bool HasMeasuredImpact => EstimatedDelayMs.HasValue;
+    public string ImpactLabel => ImpactLevel switch
+    {
+        StartupImpactLevel.Low => "Low impact",
+        StartupImpactLevel.Medium => "Medium impact",
+        StartupImpactLevel.High => "High impact",
+        _ => "Unknown impact"
+    };
+    public string DelayLabel => EstimatedDelayMs.HasValue ? $"{EstimatedDelayMs.Value:N0} ms" : "Impact data unavailable";
+    public string ClassificationLabel => Classification switch
+    {
+        StartupItemClassification.MicrosoftComponent => "Microsoft component",
+        StartupItemClassification.KnownThirdParty => "Known third-party",
+        _ => "Unrecognized"
+    };
+    public bool IsUnrecognized => Classification == StartupItemClassification.Unrecognized;
+    public bool RequiresDisableConfirmation => ImpactLevel == StartupImpactLevel.High || IsUnrecognized;
+}
+
+public sealed class BrowserExtensionEntry
+{
+    public string BrowserName { get; init; } = "";
+    public string Name { get; init; } = "";
+    public string Description { get; init; } = "";
+    public string Version { get; init; } = "";
+    public bool IsEnabled { get; init; } = true;
+    public BrowserPermissionRisk RiskLevel { get; init; } = BrowserPermissionRisk.Low;
+    public List<string> Permissions { get; init; } = [];
+    public string RiskReason { get; init; } = "";
+    public string DisableUri { get; init; } = "";
+    public string EnabledStateText => IsEnabled ? "Enabled" : "Disabled";
+    public string RiskLabel => RiskLevel switch
+    {
+        BrowserPermissionRisk.High => "High risk",
+        BrowserPermissionRisk.Medium => "Medium risk",
+        _ => "Low risk"
+    };
+}
+
+public sealed class BrowserExtensionSection
+{
+    public string BrowserName { get; init; } = "";
+    public string LaunchPath { get; init; } = "";
+    public List<BrowserExtensionEntry> Extensions { get; init; } = [];
+    public bool IsExpanded { get; set; } = true;
+    public int ExtensionCount => Extensions.Count;
+}
+
+public sealed class WorkResourceDependencyHint
+{
+    public WorkResourceDependencyHintType Type { get; init; } = WorkResourceDependencyHintType.RequiresVpn;
+    public string Label => Type switch
+    {
+        WorkResourceDependencyHintType.RequiresVpn => "Requires VPN",
+        WorkResourceDependencyHintType.RequiresSpecificDns => "Requires specific DNS",
+        WorkResourceDependencyHintType.RequiresCredentialRefresh => "Requires credential refresh",
+        WorkResourceDependencyHintType.RequiresCertificate => "Requires certificate",
+        _ => Type.ToString()
+    };
+    public string AutomationSuffix => Type.ToString();
+    public string Explanation { get; init; } = "";
+}
+
+public sealed class WorkResourceCheckCard
+{
+    public string Title { get; init; } = "";
+    public string TargetHost { get; init; } = "";
+    public string Summary { get; init; } = "";
+    public string StatusText { get; init; } = "";
+    public bool IsHealthy { get; init; }
+    public List<WorkResourceDependencyHint> DependencyHints { get; init; } = [];
 }
 
 public sealed record StorageInsight(
@@ -913,18 +1313,145 @@ public sealed record StorageInsight(
         || LocationLabel.Contains("Documents", StringComparison.OrdinalIgnoreCase);
 }
 
-public sealed class CommandPaletteItem
+public sealed class CommandPaletteItem : INotifyPropertyChanged
 {
     public string Id { get; init; } = "";
     public string Title { get; init; } = "";
     public string Subtitle { get; init; } = "";
+    public string ResultTypeLabel { get; init; } = "";
     public string Section { get; init; } = "";
     public string Hint { get; init; } = "";
     public string Glyph { get; init; } = "\uE721";
     public string SearchText { get; init; } = "";
+    public string[] SearchTags { get; init; } = [];
     public CommandPaletteItemKind Kind { get; init; } = CommandPaletteItemKind.Page;
     public string TargetId { get; init; } = "";
     public Page? TargetPage { get; init; }
+    public DateTime? LastUsedUtc { get; init; }
+    public bool IsGroupHeader { get; init; }
+    public string GroupKey { get; init; } = "";
+    public string GroupTitle { get; init; } = "";
+    public int MatchTier { get; set; }
+    public string TooltipText { get; init; } = "";
+
+    private bool _isSelected;
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (_isSelected == value)
+                return;
+
+            _isSelected = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
+        }
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+}
+
+public sealed class CommandPaletteSearchContext
+{
+    public IReadOnlyList<FixItem> PinnedFixes { get; init; } = [];
+    public IReadOnlyList<FixItem> FavoriteFixes { get; init; } = [];
+    public IReadOnlyList<FixItem> RecentFixes { get; init; } = [];
+    public IReadOnlyList<RunbookDefinition> Runbooks { get; init; } = [];
+    public IReadOnlyList<MaintenanceProfileDefinition> MaintenanceProfiles { get; init; } = [];
+    public IReadOnlyList<SupportCenterDefinition> SupportCenters { get; init; } = [];
+    public IReadOnlyList<ToolboxGroup> ToolboxGroups { get; init; } = [];
+    public IReadOnlyList<RepairHistoryEntry> RecentReceipts { get; init; } = [];
+    public IReadOnlyList<AutomationRuleSettings> AutomationRules { get; init; } = [];
+    public IReadOnlyList<CommandPaletteItem> AdditionalItems { get; init; } = [];
+    public bool ExcludeAdvancedFixes { get; init; }
+}
+
+public sealed class SearchSynonymEntry
+{
+    public List<string> Terms { get; init; } = [];
+    public List<string> Tags { get; init; } = [];
+}
+
+public sealed class SearchSynonymDocument
+{
+    public List<SearchSynonymEntry> Entries { get; init; } = [];
+}
+
+public sealed class LabelVariantEntry
+{
+    [JsonProperty("technical")]
+    public string Technical { get; init; } = "";
+
+    [JsonProperty("simple")]
+    public string Simple { get; init; } = "";
+}
+
+public sealed class SimplifiedProblemOption
+{
+    public string Key { get; init; } = "";
+    public string Title { get; init; } = "";
+    public string Description { get; init; } = "";
+    public string Glyph { get; init; } = "";
+    public SupportActionKind ActionKind { get; init; } = SupportActionKind.None;
+    public string TargetId { get; init; } = "";
+    public string AutomationId { get; init; } = "";
+    public FixRiskLevel? RiskLevel { get; init; }
+    public bool RequiresAdmin { get; init; }
+    public bool RequiresGuidedQuestion { get; init; }
+}
+
+public sealed class DismissedDashboardSuggestion
+{
+    public string Key { get; set; } = "";
+    public DateTime DismissedUntilUtc { get; set; }
+}
+
+public sealed class DashboardSuggestion
+{
+    public string Key { get; init; } = "";
+    public string Title { get; init; } = "";
+    public string Summary { get; init; } = "";
+    public string Glyph { get; init; } = "\uE721";
+    public DashboardActionKind ActionKind { get; init; } = DashboardActionKind.None;
+    public string ActionTargetId { get; init; } = "";
+    public Page? ActionPage { get; init; }
+    public string RunButtonLabel { get; init; } = "Run now";
+    public FixRiskLevel? RiskLevel { get; init; }
+    public bool RequiresAdmin { get; init; }
+}
+
+public sealed class DashboardSuggestionSignals
+{
+    public TimeSpan? Uptime { get; init; }
+    public long? TempFolderBytes { get; init; }
+    public bool HasPendingWindowsUpdate { get; init; }
+    public bool HasRecentCriticalCrash { get; init; }
+    public int EnabledStartupItemCount { get; init; }
+    public bool HasAutomationRules { get; init; }
+    public DateTime? LastAutomationRunUtc { get; init; }
+    public double? SystemDriveFreePercent { get; init; }
+}
+
+public sealed class RecentQuickActionEntry
+{
+    public string ReceiptId { get; init; } = "";
+    public string DisplayTitle { get; init; } = "";
+    public string Glyph { get; init; } = "\uE90F";
+    public string FixId { get; init; } = "";
+    public string RunbookId { get; init; } = "";
+    public DateTime Timestamp { get; init; }
+    public FixRiskLevel? RiskLevel { get; init; }
+    public bool RequiresAdmin { get; init; }
+    public bool IsRunbook => !string.IsNullOrWhiteSpace(RunbookId);
+    public string RelativeTimestampText => Timestamp == default ? "" : $"{Timestamp:g}";
+    public string SearchText => $"{DisplayTitle} {(IsRunbook ? "runbook" : "fix")} {RelativeTimestampText}";
+}
+
+public sealed class KeyboardShortcutEntry
+{
+    public string Context { get; init; } = "";
+    public string Keys { get; init; } = "";
+    public string Action { get; init; } = "";
 }
 
 public sealed class HealthCategoryScore

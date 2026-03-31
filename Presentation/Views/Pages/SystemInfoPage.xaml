@@ -4,6 +4,7 @@
       xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
       xmlns:h="clr-namespace:HelpDesk.Presentation.Helpers"
       xmlns:m="clr-namespace:HelpDesk.Domain.Models"
+      xmlns:vm="clr-namespace:HelpDesk.Presentation.ViewModels"
       xmlns:svc="clr-namespace:HelpDesk.Infrastructure.Services"
       xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
       Background="{DynamicResource BgPrimaryBrush}">
@@ -14,6 +15,102 @@
     <h:InverseBoolToVisConverter x:Key="InvBoolVis"/>
     <h:PercentColorConverter x:Key="PctColor"/>
     <h:NullToCollapsedConverter x:Key="NullCollapsed"/>
+    <h:IndexAutomationIdConverter x:Key="IndexAutomationId"/>
+    <h:IndexedValueAutomationIdConverter x:Key="IndexedValueAutomationId"/>
+    <h:StartupImpactLevelBackgroundConverter x:Key="StartupImpactBg"/>
+    <h:StartupImpactLevelForegroundConverter x:Key="StartupImpactFg"/>
+    <h:BrowserPermissionRiskBackgroundConverter x:Key="BrowserRiskBg"/>
+    <h:BrowserPermissionRiskForegroundConverter x:Key="BrowserRiskFg"/>
+
+    <Style x:Key="DeviceHealthSectionToggleStyle" TargetType="ToggleButton">
+      <Setter Property="Background" Value="{DynamicResource BgCard2Brush}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Padding" Value="14,12"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="HorizontalAlignment" Value="Stretch"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ToggleButton">
+            <Border Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="10">
+              <ContentPresenter Margin="{TemplateBinding Padding}"/>
+            </Border>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style x:Key="DeviceHealthSectionContentStyle" TargetType="Border">
+      <Setter Property="ClipToBounds" Value="True"/>
+      <Setter Property="MaxHeight" Value="0"/>
+      <Setter Property="Opacity" Value="0"/>
+      <Setter Property="Margin" Value="0,8,0,16"/>
+      <Setter Property="IsHitTestVisible" Value="False"/>
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="True">
+          <Setter Property="IsHitTestVisible" Value="True"/>
+          <DataTrigger.EnterActions>
+            <BeginStoryboard>
+              <Storyboard>
+                <DoubleAnimation Storyboard.TargetProperty="MaxHeight" To="2400" Duration="0:0:0.15"/>
+                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.15"/>
+              </Storyboard>
+            </BeginStoryboard>
+          </DataTrigger.EnterActions>
+        </DataTrigger>
+        <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="False">
+          <Setter Property="IsHitTestVisible" Value="False"/>
+          <DataTrigger.EnterActions>
+            <BeginStoryboard>
+              <Storyboard>
+                <DoubleAnimation Storyboard.TargetProperty="MaxHeight" To="0" Duration="0:0:0.15"/>
+                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.15"/>
+              </Storyboard>
+            </BeginStoryboard>
+          </DataTrigger.EnterActions>
+        </DataTrigger>
+      </Style.Triggers>
+    </Style>
+
+    <DataTemplate x:Key="SupportCenterCardTemplate" DataType="{x:Type m:SupportCenterDefinition}">
+      <Border Style="{DynamicResource FixCard}" Width="340" Margin="0,0,12,12" Padding="14,12" Tag="{Binding}" MouseLeftButtonDown="SupportCenterCard_MouseLeftButtonDown">
+        <Border.ContextMenu>
+          <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}" automation:AutomationProperties.AutomationId="ContextMenu_SupportCenter">
+            <MenuItem Header="Run Primary Action" Click="SupportCenterPrimaryMenu_Click" CommandParameter="{Binding}" automation:AutomationProperties.AutomationId="Card_SupportCenter_RunPrimaryAction"/>
+            <MenuItem Header="Run Secondary Action" Click="SupportCenterSecondaryMenu_Click" CommandParameter="{Binding}" automation:AutomationProperties.AutomationId="Card_SupportCenter_RunSecondaryAction"/>
+            <Separator/>
+            <MenuItem Header="View Details" Click="SupportCenterDetails_Click" CommandParameter="{Binding}" automation:AutomationProperties.AutomationId="Card_SupportCenter_Details"/>
+            <MenuItem Header="Copy Summary" Click="SupportCenterCopy_Click" CommandParameter="{Binding}" automation:AutomationProperties.AutomationId="Card_SupportCenter_CopySummary"/>
+          </ContextMenu>
+        </Border.ContextMenu>
+        <StackPanel>
+          <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="14"/>
+          <TextBlock Text="{Binding Summary}" Style="{DynamicResource CardSub}" Margin="0,6,0,10" TextWrapping="Wrap"/>
+          <Border Background="{DynamicResource BgCard2Brush}" CornerRadius="8" Padding="10,8" Margin="0,0,0,10">
+            <TextBlock Text="{Binding StatusText}" Style="{DynamicResource MetaText}" TextWrapping="Wrap"/>
+          </Border>
+          <ItemsControl ItemsSource="{Binding Highlights}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <DockPanel Margin="0,0,0,6">
+                  <TextBlock Text="*" Margin="0,0,8,0" Foreground="{DynamicResource TextSecBrush}"/>
+                  <TextBlock Text="{Binding}" Style="{DynamicResource CardSub}" TextWrapping="Wrap"/>
+                </DockPanel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <WrapPanel Margin="0,10,0,0">
+            <Button Content="{Binding PrimaryAction.Label}" Tag="{Binding PrimaryAction}" Click="SupportAction_Click" Style="{DynamicResource AccentButtonStyle}" Margin="0,0,8,8" automation:AutomationProperties.AutomationId="Card_SupportCenter_RunPrimaryAction"/>
+            <Button Content="{Binding SecondaryAction.Label}" Tag="{Binding SecondaryAction}" Click="SupportAction_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8" automation:AutomationProperties.AutomationId="Card_SupportCenter_RunSecondaryAction"/>
+            <Button Content="Copy" Tag="{Binding}" Click="SupportCenterCopyButton_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8" automation:AutomationProperties.AutomationId="Card_SupportCenter_CopySummary"/>
+            <Button Content="Details" Tag="{Binding}" Click="SupportCenterDetails_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8" automation:AutomationProperties.AutomationId="Card_SupportCenter_Details"/>
+          </WrapPanel>
+        </StackPanel>
+      </Border>
+    </DataTemplate>
   </Page.Resources>
 
   <ScrollViewer>
@@ -21,30 +118,17 @@
       <Grid.RowDefinitions>
         <RowDefinition Height="Auto"/>
         <RowDefinition Height="Auto"/>
-        <RowDefinition Height="Auto"/>
-        <RowDefinition Height="Auto"/>
         <RowDefinition Height="*"/>
       </Grid.RowDefinitions>
 
       <DockPanel Grid.Row="0" Margin="0,0,0,20">
         <StackPanel DockPanel.Dock="Left">
-          <TextBlock Text="Device Health" Style="{DynamicResource PageTitle}"
-                     automation:AutomationProperties.AutomationId="SystemInfoPageMarker"/>
-          <TextBlock Text="Review the device baseline, then jump straight into the support center that matches the real problem."
-                     Style="{DynamicResource PageSubtitle}"/>
+          <TextBlock Text="Device Health" Style="{DynamicResource PageTitle}" automation:AutomationProperties.AutomationId="SystemInfoPageMarker"/>
+          <TextBlock Text="Review the device baseline, then jump straight into the support center that matches the real problem." Style="{DynamicResource PageSubtitle}"/>
         </StackPanel>
         <WrapPanel DockPanel.Dock="Right" ItemHeight="36">
-          <Button Content="Refresh Apps"
-                  automation:AutomationProperties.AutomationId="SystemInfoRefreshAppsButton"
-                  Click="RefreshPrograms_Click"
-                  Style="{DynamicResource SecondaryButton}"
-                  Margin="0,0,8,0"
-                  IsEnabled="{Binding InstalledProgramsLoading, Converter={StaticResource InvBool}}"/>
-          <Button Content="Refresh Snapshot"
-                  automation:AutomationProperties.AutomationId="SystemInfoRefreshSnapshotButton"
-                  Click="RefreshSysInfo_Click"
-                  Style="{DynamicResource AccentButtonStyle}"
-                  IsEnabled="{Binding SnapshotLoading, Converter={StaticResource InvBool}}"/>
+          <Button Content="Refresh Apps" Click="RefreshPrograms_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,0" IsEnabled="{Binding InstalledProgramsLoading, Converter={StaticResource InvBool}}" automation:AutomationProperties.AutomationId="SystemInfoRefreshAppsButton"/>
+          <Button Content="Refresh Snapshot" Click="RefreshSysInfo_Click" Style="{DynamicResource AccentButtonStyle}" IsEnabled="{Binding SnapshotLoading, Converter={StaticResource InvBool}}" automation:AutomationProperties.AutomationId="SystemInfoRefreshSnapshotButton"/>
         </WrapPanel>
       </DockPanel>
 
@@ -52,514 +136,583 @@
         <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,8">
           <TextBlock Text="{Binding HealthCheckSummaryText}" Style="{DynamicResource CardSub}" TextWrapping="Wrap"/>
         </Border>
-        <ProgressBar IsIndeterminate="True"
-                     Height="3"
-                     Foreground="{DynamicResource FoxOrangeBrush}"
-                     Background="Transparent"
-                     BorderThickness="0"
-                     Visibility="{Binding SnapshotLoading, Converter={StaticResource BoolVis}}"/>
+        <ProgressBar IsIndeterminate="True" Height="3" Foreground="{DynamicResource FoxOrangeBrush}" Background="Transparent" BorderThickness="0" Visibility="{Binding SnapshotLoading, Converter={StaticResource BoolVis}}"/>
       </StackPanel>
 
-      <WrapPanel Grid.Row="2">
-        <Border Style="{DynamicResource InfoCard}" Width="300">
-          <StackPanel>
-            <TextBlock Text="CPU" Style="{DynamicResource CardLabel}"/>
-            <TextBlock Text="{Binding Snapshot.CpuName, FallbackValue='-'}" Style="{DynamicResource CardValue}"/>
-            <TextBlock Text="{Binding Snapshot.CpuCores, StringFormat='{}{0} cores', FallbackValue=''}"
-                       Style="{DynamicResource CardSub}"/>
-            <TextBlock Text="UTILIZATION" Style="{DynamicResource CardLabel}" Margin="0,10,0,0"/>
-            <ProgressBar Value="{Binding Snapshot.CpuUsagePct, FallbackValue=0}"
-                         Maximum="100"
-                         Foreground="{Binding Snapshot.CpuUsagePct, Converter={StaticResource PctColor}}"
-                         Style="{DynamicResource MetricBar}"/>
-            <TextBlock Foreground="{Binding Snapshot.CpuUsagePct, Converter={StaticResource PctColor}}" FontSize="12">
-              <Run Text="{Binding Snapshot.CpuUsagePct, StringFormat='{}{0:N0}', FallbackValue='0'}"/>
-              <Run Text="%"/>
-            </TextBlock>
-          </StackPanel>
-        </Border>
-
-        <Border Style="{DynamicResource InfoCard}" Width="300">
-          <StackPanel>
-            <TextBlock Text="MEMORY" Style="{DynamicResource CardLabel}"/>
-            <TextBlock Text="{Binding Snapshot.RamTotalMb, StringFormat='{}{0:N0} MB Total', FallbackValue='-'}"
-                       Style="{DynamicResource CardValue}"/>
-            <TextBlock Text="{Binding Snapshot.RamFreeMb, StringFormat='{}{0:N0} MB free', FallbackValue=''}"
-                       Style="{DynamicResource CardSub}"/>
-            <TextBlock Text="USAGE" Style="{DynamicResource CardLabel}" Margin="0,10,0,0"/>
-            <ProgressBar Value="{Binding Snapshot.RamUsedPct, FallbackValue=0}"
-                         Maximum="100"
-                         Foreground="{Binding Snapshot.RamUsedPct, Converter={StaticResource PctColor}}"
-                         Style="{DynamicResource MetricBar}"/>
-            <TextBlock Foreground="{Binding Snapshot.RamUsedPct, Converter={StaticResource PctColor}}" FontSize="12">
-              <Run Text="{Binding Snapshot.RamUsedPct, StringFormat='{}{0:N0}', FallbackValue='0'}"/>
-              <Run Text="%"/>
-            </TextBlock>
-          </StackPanel>
-        </Border>
-
-        <Border Style="{DynamicResource InfoCard}" Width="300">
-          <StackPanel>
-            <TextBlock Text="DISK C:" Style="{DynamicResource CardLabel}"/>
-            <TextBlock Text="{Binding Snapshot.DiskTotalGb, StringFormat='{}{0:N0} GB Total', FallbackValue='-'}"
-                       Style="{DynamicResource CardValue}"/>
-            <TextBlock Text="{Binding Snapshot.DiskFreeGb, StringFormat='{}{0:N1} GB free', FallbackValue=''}"
-                       Style="{DynamicResource CardSub}"/>
-            <TextBlock Text="{Binding Snapshot.DiskType, FallbackValue=''}" Style="{DynamicResource CardSub}"/>
-            <TextBlock Text="USED" Style="{DynamicResource CardLabel}" Margin="0,10,0,0"/>
-            <ProgressBar Value="{Binding Snapshot.DiskUsedPct, FallbackValue=0}"
-                         Maximum="100"
-                         Foreground="{Binding Snapshot.DiskUsedPct, Converter={StaticResource PctColor}}"
-                         Style="{DynamicResource MetricBar}"/>
-          </StackPanel>
-        </Border>
-
-        <Border Style="{DynamicResource InfoCard}" Width="300">
-          <StackPanel>
-            <TextBlock Text="GPU" Style="{DynamicResource CardLabel}"/>
-            <TextBlock Text="{Binding Snapshot.GpuName, FallbackValue='-'}" Style="{DynamicResource CardValue}"/>
-            <TextBlock Text="{Binding Snapshot.GpuVramMb, StringFormat='{}{0:N0} MB VRAM', FallbackValue=''}"
-                       Style="{DynamicResource CardSub}"/>
-          </StackPanel>
-        </Border>
-
-        <Border Style="{DynamicResource InfoCard}" Width="300">
-          <StackPanel>
-            <TextBlock Text="OPERATING SYSTEM" Style="{DynamicResource CardLabel}"/>
-            <TextBlock Text="{Binding Snapshot.OsVersion, FallbackValue='-'}" Style="{DynamicResource CardValue}"/>
-            <TextBlock Text="{Binding Snapshot.OsBuild, StringFormat='Build {0}', FallbackValue=''}"
-                       Style="{DynamicResource CardSub}"/>
-            <TextBlock Text="{Binding Snapshot.Uptime, StringFormat='Uptime: {0}', FallbackValue=''}"
-                       Style="{DynamicResource CardSub}"/>
-            <TextBlock Text="{Binding Snapshot.MachineName, FallbackValue=''}" Style="{DynamicResource CardSub}"/>
-          </StackPanel>
-        </Border>
-
-        <Border Style="{DynamicResource InfoCard}" Width="300">
-          <StackPanel>
-            <TextBlock Text="NETWORK" Style="{DynamicResource CardLabel}"/>
-            <TextBlock Text="{Binding Snapshot.NetworkAdapterName, FallbackValue='-'}" Style="{DynamicResource CardValue}"/>
-            <TextBlock Text="{Binding Snapshot.IpAddress, FallbackValue=''}" Style="{DynamicResource CardSub}"/>
-            <TextBlock Text="{Binding Snapshot.NetworkType, FallbackValue=''}" Style="{DynamicResource CardSub}"/>
-          </StackPanel>
-        </Border>
-
-        <Border Style="{DynamicResource InfoCard}"
-                Width="300"
-                Visibility="{Binding Snapshot.HasBattery, Converter={StaticResource BoolVis}}">
-          <StackPanel>
-            <TextBlock Text="BATTERY" Style="{DynamicResource CardLabel}"/>
-            <TextBlock Text="{Binding Snapshot.BatteryPct, StringFormat='{}{0}%', FallbackValue='-'}"
-                       Style="{DynamicResource CardValue}"/>
-            <TextBlock Text="{Binding Snapshot.BatteryStatus, FallbackValue=''}" Style="{DynamicResource CardSub}"/>
-            <TextBlock Text="{Binding Snapshot.BatteryHealth, FallbackValue=''}" Style="{DynamicResource CardSub}"/>
-          </StackPanel>
-        </Border>
-
-        <Border Style="{DynamicResource InfoCard}" Width="300">
-          <StackPanel>
-            <TextBlock Text="SECURITY" Style="{DynamicResource CardLabel}"/>
-            <TextBlock Text="{Binding Snapshot.WindowsActivated, StringFormat='Windows activated: {0}', FallbackValue=''}"
-                       Style="{DynamicResource CardSub}"/>
-            <TextBlock Text="{Binding Snapshot.PendingUpdateCount, StringFormat='{}{0} pending update(s)', FallbackValue=''}"
-                       Style="{DynamicResource CardSub}"/>
-            <TextBlock Text="Defender: Active"
-                       Style="{DynamicResource CardSub}"
-                       Foreground="{DynamicResource AccentGreenBrush}"
-                       Visibility="{Binding Snapshot.DefenderEnabled, Converter={StaticResource BoolVis}}"/>
-          </StackPanel>
-        </Border>
-      </WrapPanel>
-
-      <Border Grid.Row="3" Style="{DynamicResource InfoCard}" Margin="0,20,0,0">
-        <StackPanel>
-          <TextBlock Text="Support Centers" Style="{DynamicResource PanelTitle}"/>
-          <TextBlock Text="Each center groups the right workflow, fixes, and Windows tools for a specific support problem."
-                     Style="{DynamicResource CardSub}" Margin="0,4,0,14"/>
-
-          <ItemsControl ItemsSource="{Binding SupportCenters}">
-            <ItemsControl.ItemsPanel>
-              <ItemsPanelTemplate>
-                <WrapPanel/>
-              </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
-              <DataTemplate DataType="{x:Type m:SupportCenterDefinition}">
-                <Border Style="{DynamicResource FixCard}" Width="340" Margin="0,0,12,12" Padding="14,12"
-                        Tag="{Binding}"
-                        MouseLeftButtonDown="SupportCenterCard_MouseLeftButtonDown">
-                  <Border.ContextMenu>
-                    <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
-                      <MenuItem Header="Run Primary Action" Click="SupportCenterPrimaryMenu_Click" CommandParameter="{Binding}"/>
-                      <MenuItem Header="Run Secondary Action" Click="SupportCenterSecondaryMenu_Click" CommandParameter="{Binding}"/>
-                      <Separator/>
-                      <MenuItem Header="View Details" Click="SupportCenterDetails_Click" CommandParameter="{Binding}"/>
-                      <MenuItem Header="Copy Summary" Click="SupportCenterCopy_Click" CommandParameter="{Binding}"/>
-                    </ContextMenu>
-                  </Border.ContextMenu>
-                  <StackPanel>
-                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="14"/>
-                    <TextBlock Text="{Binding Summary}" Style="{DynamicResource CardSub}" Margin="0,6,0,10" TextWrapping="Wrap"/>
-
-                    <Border Background="{DynamicResource BgCard2Brush}" CornerRadius="8" Padding="10,8" Margin="0,0,0,10">
-                      <TextBlock Text="{Binding StatusText}" Style="{DynamicResource MetaText}" TextWrapping="Wrap"/>
-                    </Border>
-
-                    <ItemsControl ItemsSource="{Binding Highlights}">
-                      <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                          <DockPanel Margin="0,0,0,6">
-                            <TextBlock Text="•" Margin="0,0,8,0" Foreground="{DynamicResource TextSecBrush}"/>
-                            <TextBlock Text="{Binding}" Style="{DynamicResource CardSub}" TextWrapping="Wrap"/>
-                          </DockPanel>
-                        </DataTemplate>
-                      </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-
-                    <WrapPanel Margin="0,10,0,0">
-                      <Button Content="{Binding PrimaryAction.Label}"
-                              Tag="{Binding PrimaryAction}"
-                              Click="SupportAction_Click"
-                              Style="{DynamicResource AccentButtonStyle}"
-                              Margin="0,0,8,8"/>
-                      <Button Content="{Binding SecondaryAction.Label}"
-                              Tag="{Binding SecondaryAction}"
-                              Click="SupportAction_Click"
-                              Style="{DynamicResource SecondaryButton}"
-                              Margin="0,0,8,8"/>
-                      <Button Content="Copy"
-                              Tag="{Binding}"
-                              Click="SupportCenterCopyButton_Click"
-                              Style="{DynamicResource SecondaryButton}"
-                              Margin="0,0,8,8"/>
-                      <Button Content="Details"
-                              Tag="{Binding}"
-                              Click="SupportCenterDetails_Click"
-                              Style="{DynamicResource SecondaryButton}"
-                              Margin="0,0,0,8"/>
-                    </WrapPanel>
-                  </StackPanel>
-                </Border>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </StackPanel>
-      </Border>
-
-      <Border Grid.Row="4" Style="{DynamicResource InfoCard}" Margin="0,20,0,0">
-        <DockPanel>
-          <Border DockPanel.Dock="Top" Style="{DynamicResource FixCard}" Margin="0,0,0,12">
-            <StackPanel>
-              <DockPanel Margin="0,0,0,12">
-                <StackPanel DockPanel.Dock="Left">
-                  <TextBlock Text="Storage Review" Style="{DynamicResource PanelTitle}"/>
-                  <TextBlock Text="{Binding StorageInsightsSummaryText}" Style="{DynamicResource CardSub}"/>
-                </StackPanel>
-                <WrapPanel DockPanel.Dock="Right" HorizontalAlignment="Right">
-                  <Button Content="Refresh Review"
-                          Click="RefreshStorageInsights_Click"
-                          Style="{DynamicResource SecondaryButton}"
-                          Margin="0,0,8,8"
-                          IsEnabled="{Binding StorageInsightsLoading, Converter={StaticResource InvBool}}"/>
-                  <Button Content="Open Storage"
-                          Click="OpenStorageSettings_Click"
-                          Style="{DynamicResource AccentButtonStyle}"
-                          Margin="0,0,0,8"/>
-                </WrapPanel>
-              </DockPanel>
-
-              <Grid>
-                <Border Style="{DynamicResource FixCard}"
-                        Visibility="{Binding StorageInsightsLoading, Converter={StaticResource BoolVis}}">
-                  <StackPanel>
-                    <TextBlock Text="Scanning large files and cleanup candidates..." Style="{DynamicResource CardSub}"/>
-                    <ProgressBar IsIndeterminate="True" Style="{DynamicResource IndeterminateBar}" Margin="0,8,0,0"/>
-                  </StackPanel>
-                </Border>
-
-                <Border Style="{DynamicResource FixCard}"
-                        Visibility="{Binding ShowStorageInsightsEmptyState, Converter={StaticResource BoolVis}}">
-                  <TextBlock Text="No storage review is loaded yet. Refresh the review to see large files, cleanup candidates, and safe-removal guidance."
-                             Style="{DynamicResource CardSub}" TextWrapping="Wrap"/>
-                </Border>
-
-                <ScrollViewer MaxHeight="220" Visibility="{Binding HasStorageInsights, Converter={StaticResource BoolVis}}">
-                  <ItemsControl ItemsSource="{Binding StorageInsights}">
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate DataType="{x:Type m:StorageInsight}">
-                        <Border Style="{DynamicResource FixCard}" Padding="14,10" Tag="{Binding}">
-                          <Border.ContextMenu>
-                            <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
-                              <MenuItem Header="View Details" Click="StorageDetails_Click" CommandParameter="{Binding}"/>
-                              <MenuItem Header="Copy Summary" Click="StorageCopy_Click" CommandParameter="{Binding}"/>
-                              <MenuItem Header="Open Containing Folder" Click="OpenStorageItemFolder_Click" CommandParameter="{Binding}"/>
-                            </ContextMenu>
-                          </Border.ContextMenu>
-                          <Grid>
-                            <Grid.ColumnDefinitions>
-                              <ColumnDefinition Width="*"/>
-                              <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0">
-                              <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="13"/>
-                              <WrapPanel Margin="0,2,0,0">
-                              <TextBlock Text="{Binding LocationLabel}" Style="{DynamicResource CardSub}"/>
-                              <TextBlock Text="  -  " Style="{DynamicResource CardSub}"/>
-                              <TextBlock Text="{Binding SizeLabel}" Style="{DynamicResource CardSub}"/>
-                            </WrapPanel>
-                            <TextBlock Text="{Binding SafeToRemoveSummary}" Style="{DynamicResource CardSub}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                            <TextBlock Text="{Binding Caution}" Style="{DynamicResource MetaText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                            </StackPanel>
-                            <WrapPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Top">
-                              <Button Content="Details"
-                                      Tag="{Binding}"
-                                      Click="StorageDetails_Click"
-                                      Style="{DynamicResource SecondaryButton}"
-                                      Margin="0,0,8,8"/>
-                              <Button Content="Copy"
-                                      Tag="{Binding}"
-                                      Click="StorageCopyButton_Click"
-                                      Style="{DynamicResource SecondaryButton}"
-                                      Margin="0,0,8,8"/>
-                              <Button Content="Open Folder"
-                                      Tag="{Binding}"
-                                      Click="OpenStorageItemFolder_Click"
-                                      Style="{DynamicResource SecondaryButton}"
-                                      Margin="0,0,0,8"/>
-                            </WrapPanel>
-                          </Grid>
-                        </Border>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                </ScrollViewer>
-              </Grid>
-            </StackPanel>
-          </Border>
-
-          <Border DockPanel.Dock="Top" Style="{DynamicResource FixCard}" Margin="0,0,0,12">
-            <StackPanel>
-              <DockPanel Margin="0,0,0,12">
-                <StackPanel DockPanel.Dock="Left">
-                  <TextBlock Text="Startup &amp; Background Review" Style="{DynamicResource PanelTitle}"/>
-                  <TextBlock Text="{Binding StartupAppsSummaryText}" Style="{DynamicResource CardSub}"/>
-                </StackPanel>
-                <WrapPanel DockPanel.Dock="Right" HorizontalAlignment="Right">
-                  <Button Content="Refresh Review"
-                          Click="RefreshStartupApps_Click"
-                          Style="{DynamicResource SecondaryButton}"
-                          Margin="0,0,8,8"
-                          IsEnabled="{Binding StartupAppsLoading, Converter={StaticResource InvBool}}"/>
-                  <Button Content="Open Startup Apps"
-                          Click="OpenStartupAppsSettings_Click"
-                          Style="{DynamicResource SecondaryButton}"
-                          Margin="0,0,8,8"/>
-                  <Button Content="Task Manager"
-                          Click="OpenTaskManager_Click"
-                          Style="{DynamicResource AccentButtonStyle}"
-                          Margin="0,0,0,8"/>
-                </WrapPanel>
-              </DockPanel>
-
-              <Grid>
-                <Border Style="{DynamicResource FixCard}"
-                        Visibility="{Binding StartupAppsLoading, Converter={StaticResource BoolVis}}">
-                  <StackPanel>
-                    <TextBlock Text="Reviewing startup entries and background pressure signals..." Style="{DynamicResource CardSub}"/>
-                    <ProgressBar IsIndeterminate="True" Style="{DynamicResource IndeterminateBar}" Margin="0,8,0,0"/>
-                  </StackPanel>
-                </Border>
-
-                <Border Style="{DynamicResource FixCard}"
-                        Visibility="{Binding ShowStartupAppsEmptyState, Converter={StaticResource BoolVis}}">
-                  <TextBlock Text="No startup review is loaded yet. Refresh the review to see startup entries, long-uptime hints, and recommended disable candidates."
-                             Style="{DynamicResource CardSub}" TextWrapping="Wrap"/>
-                </Border>
-
-                <ScrollViewer MaxHeight="220" Visibility="{Binding HasStartupApps, Converter={StaticResource BoolVis}}">
-                  <ItemsControl ItemsSource="{Binding StartupApps}">
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate DataType="{x:Type m:StartupAppEntry}">
-                        <Border Style="{DynamicResource FixCard}" Padding="14,10" Tag="{Binding}">
-                          <Border.ContextMenu>
-                            <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
-                              <MenuItem Header="View Details" Click="StartupDetails_Click" CommandParameter="{Binding}"/>
-                              <MenuItem Header="Copy Summary" Click="StartupCopy_Click" CommandParameter="{Binding}"/>
-                              <MenuItem Header="Open Launch Target" Click="OpenStartupTarget_Click" CommandParameter="{Binding}"/>
-                            </ContextMenu>
-                          </Border.ContextMenu>
-                          <Grid>
-                            <Grid.ColumnDefinitions>
-                              <ColumnDefinition Width="*"/>
-                              <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0">
-                              <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13"/>
-                              <WrapPanel Margin="0,2,0,0">
-                                <TextBlock Text="{Binding Source}" Style="{DynamicResource CardSub}"/>
-                                <TextBlock Text="  -  " Style="{DynamicResource CardSub}"/>
-                                <TextBlock Text="{Binding LaunchTargetLabel}" Style="{DynamicResource CardSub}"/>
-                              </WrapPanel>
-                              <TextBlock Text="{Binding RecommendationReason}" Style="{DynamicResource MetaText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                              <TextBlock Text="{Binding Command}" Style="{DynamicResource CardSub}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                            </StackPanel>
-                            <WrapPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Top">
-                              <Button Content="Details"
-                                      Tag="{Binding}"
-                                      Click="StartupDetails_Click"
-                                      Style="{DynamicResource SecondaryButton}"
-                                      Margin="0,0,8,8"/>
-                              <Button Content="Copy"
-                                      Tag="{Binding}"
-                                      Click="StartupCopyButton_Click"
-                                      Style="{DynamicResource SecondaryButton}"
-                                      Margin="0,0,8,8"/>
-                              <Button Content="Open Target"
-                                      Tag="{Binding}"
-                                      Click="OpenStartupTarget_Click"
-                                      Style="{DynamicResource SecondaryButton}"
-                                      Margin="0,0,0,8"
-                                      Visibility="{Binding HasLaunchTarget, Converter={StaticResource BoolVis}}"/>
-                            </WrapPanel>
-                          </Grid>
-                        </Border>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                </ScrollViewer>
-              </Grid>
-            </StackPanel>
-          </Border>
-
-          <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
-            <TextBlock Text="Installed apps" Style="{DynamicResource PanelTitle}"/>
-            <TextBlock Text="{Binding InstalledProgramsSummaryText}" Style="{DynamicResource CardSub}"/>
-          </StackPanel>
-
-          <DockPanel DockPanel.Dock="Top" Margin="0,0,0,12">
-            <Border DockPanel.Dock="Left"
-                    Style="{DynamicResource SearchBox}"
-                    Margin="0,0,8,0"
-                    MinWidth="240"
-                    MaxWidth="320">
-              <Grid>
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="Auto"/>
-                  <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                <ui:SymbolIcon Grid.Column="0"
-                               Symbol="Search20"
-                               FontSize="14"
-                               Foreground="{DynamicResource TextSecBrush}"
-                               Margin="0,0,8,0"
-                               VerticalAlignment="Center"/>
-                <TextBox Grid.Column="1"
-                         Text="{Binding InstalledProgramSearchText, UpdateSourceTrigger=PropertyChanged}"
-                         BorderThickness="0"
-                         Background="Transparent"
-                         VerticalContentAlignment="Center"/>
-              </Grid>
-            </Border>
-            <Button DockPanel.Dock="Right"
-                    Content="Open Installed Apps"
-                    Click="OpenAppsSettings_Click"
-                    Style="{DynamicResource SecondaryButton}"/>
-          </DockPanel>
-
+      <StackPanel Grid.Row="2">
+        <ToggleButton Style="{StaticResource DeviceHealthSectionToggleStyle}" Tag="SystemOverview" Click="DeviceHealthSectionToggle_Click" IsChecked="{Binding IsDeviceHealthSystemOverviewExpanded, Mode=OneWay}" automation:AutomationProperties.AutomationId="DeviceHealth_Section_SystemOverview_Toggle">
           <Grid>
-            <Border Style="{DynamicResource FixCard}"
-                    Visibility="{Binding InstalledProgramsLoading, Converter={StaticResource BoolVis}}">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <TextBlock Text="System Overview" Style="{DynamicResource PanelTitle}" VerticalAlignment="Center"/>
+            <TextBlock Grid.Column="1" Text="&#xE70D;" FontFamily="{DynamicResource IconFont}" VerticalAlignment="Center">
+              <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                  <Setter Property="RenderTransform"><Setter.Value><RotateTransform Angle="0"/></Setter.Value></Setter>
+                  <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+                  <Style.Triggers><DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="True"><Setter Property="RenderTransform"><Setter.Value><RotateTransform Angle="180"/></Setter.Value></Setter></DataTrigger></Style.Triggers>
+                </Style>
+              </TextBlock.Style>
+            </TextBlock>
+          </Grid>
+        </ToggleButton>
+
+        <Border Style="{StaticResource DeviceHealthSectionContentStyle}" Tag="{Binding IsDeviceHealthSystemOverviewExpanded}" automation:AutomationProperties.AutomationId="DeviceHealth_Section_SystemOverview_Content">
+          <WrapPanel>
+            <Border Style="{DynamicResource InfoCard}" Width="300"><StackPanel><TextBlock Text="CPU" Style="{DynamicResource CardLabel}"/><TextBlock Text="{Binding Snapshot.CpuName, FallbackValue=-}" Style="{DynamicResource CardValue}"/><TextBlock Text="{Binding Snapshot.CpuCores, StringFormat='{}{0} cores'}" Style="{DynamicResource CardSub}" Visibility="{Binding Snapshot.CpuCores, Converter={StaticResource NullCollapsed}}"/><TextBlock Text="Utilization" Style="{DynamicResource CardLabel}" Margin="0,10,0,0"/><ProgressBar Value="{Binding Snapshot.CpuUsagePct, FallbackValue=0}" Maximum="100" Foreground="{Binding Snapshot.CpuUsagePct, Converter={StaticResource PctColor}}" Style="{DynamicResource MetricBar}"/></StackPanel></Border>
+            <Border Style="{DynamicResource InfoCard}" Width="300"><StackPanel><TextBlock Text="Memory" Style="{DynamicResource CardLabel}"/><TextBlock Text="{Binding Snapshot.RamTotalMb, StringFormat='{}{0:N0} MB total', FallbackValue=-}" Style="{DynamicResource CardValue}"/><TextBlock Text="{Binding Snapshot.RamFreeMb, StringFormat='{}{0:N0} MB free'}" Style="{DynamicResource CardSub}" Visibility="{Binding Snapshot.RamFreeMb, Converter={StaticResource NullCollapsed}}"/><TextBlock Text="Usage" Style="{DynamicResource CardLabel}" Margin="0,10,0,0"/><ProgressBar Value="{Binding Snapshot.RamUsedPct, FallbackValue=0}" Maximum="100" Foreground="{Binding Snapshot.RamUsedPct, Converter={StaticResource PctColor}}" Style="{DynamicResource MetricBar}"/></StackPanel></Border>
+            <Border Style="{DynamicResource InfoCard}" Width="300"><StackPanel><TextBlock Text="Disk" Style="{DynamicResource CardLabel}"/><TextBlock Text="{Binding Snapshot.DiskTotalGb, StringFormat='{}{0:N0} GB total', FallbackValue=-}" Style="{DynamicResource CardValue}"/><TextBlock Text="{Binding Snapshot.DiskFreeGb, StringFormat='{}{0:N1} GB free'}" Style="{DynamicResource CardSub}" Visibility="{Binding Snapshot.DiskFreeGb, Converter={StaticResource NullCollapsed}}"/><TextBlock Text="{Binding Snapshot.DiskType}" Style="{DynamicResource CardSub}" Visibility="{Binding Snapshot.DiskType, Converter={StaticResource NullCollapsed}}"/><TextBlock Text="Used" Style="{DynamicResource CardLabel}" Margin="0,10,0,0"/><ProgressBar Value="{Binding Snapshot.DiskUsedPct, FallbackValue=0}" Maximum="100" Foreground="{Binding Snapshot.DiskUsedPct, Converter={StaticResource PctColor}}" Style="{DynamicResource MetricBar}"/></StackPanel></Border>
+            <Border Style="{DynamicResource InfoCard}" Width="300"><StackPanel><TextBlock Text="Operating System" Style="{DynamicResource CardLabel}"/><TextBlock Text="{Binding Snapshot.OsVersion, FallbackValue=-}" Style="{DynamicResource CardValue}"/><TextBlock Text="{Binding Snapshot.OsBuild, StringFormat='Build {0}'}" Style="{DynamicResource CardSub}" Visibility="{Binding Snapshot.OsBuild, Converter={StaticResource NullCollapsed}}"/><TextBlock Text="{Binding Snapshot.Uptime, StringFormat='Uptime: {0}'}" Style="{DynamicResource CardSub}" Visibility="{Binding Snapshot.Uptime, Converter={StaticResource NullCollapsed}}"/><TextBlock Text="{Binding Snapshot.MachineName}" Style="{DynamicResource CardSub}" Visibility="{Binding Snapshot.MachineName, Converter={StaticResource NullCollapsed}}"/></StackPanel></Border>
+            <Border Style="{DynamicResource InfoCard}" Width="300"><StackPanel><TextBlock Text="Network" Style="{DynamicResource CardLabel}"/><TextBlock Text="{Binding Snapshot.NetworkAdapterName, FallbackValue=-}" Style="{DynamicResource CardValue}"/><TextBlock Text="{Binding Snapshot.IpAddress}" Style="{DynamicResource CardSub}" Visibility="{Binding Snapshot.IpAddress, Converter={StaticResource NullCollapsed}}"/><TextBlock Text="{Binding Snapshot.NetworkType}" Style="{DynamicResource CardSub}" Visibility="{Binding Snapshot.NetworkType, Converter={StaticResource NullCollapsed}}"/></StackPanel></Border>
+            <Border Style="{DynamicResource InfoCard}" Width="300"><StackPanel><TextBlock Text="GPU" Style="{DynamicResource CardLabel}"/><TextBlock Text="{Binding Snapshot.GpuName, FallbackValue=-}" Style="{DynamicResource CardValue}"/><TextBlock Text="{Binding Snapshot.GpuVramMb, StringFormat='{}{0:N0} MB VRAM'}" Style="{DynamicResource CardSub}" Visibility="{Binding Snapshot.GpuVramMb, Converter={StaticResource NullCollapsed}}"/></StackPanel></Border>
+            <Border Style="{DynamicResource InfoCard}" Width="300" Visibility="{Binding Snapshot.HasBattery, Converter={StaticResource BoolVis}}"><StackPanel><TextBlock Text="Battery" Style="{DynamicResource CardLabel}"/><TextBlock Text="{Binding Snapshot.BatteryPct, StringFormat='{}{0}%'}" Style="{DynamicResource CardValue}"/><TextBlock Text="{Binding Snapshot.BatteryStatus}" Style="{DynamicResource CardSub}" Visibility="{Binding Snapshot.BatteryStatus, Converter={StaticResource NullCollapsed}}"/><TextBlock Text="{Binding Snapshot.BatteryHealth}" Style="{DynamicResource CardSub}" Visibility="{Binding Snapshot.BatteryHealth, Converter={StaticResource NullCollapsed}}"/></StackPanel></Border>
+          </WrapPanel>
+        </Border>        <ToggleButton Style="{StaticResource DeviceHealthSectionToggleStyle}" Tag="Storage" Click="DeviceHealthSectionToggle_Click" IsChecked="{Binding IsDeviceHealthStorageExpanded, Mode=OneWay}" automation:AutomationProperties.AutomationId="DeviceHealth_Section_Storage_Toggle">
+          <Grid>
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <TextBlock Text="Storage" Style="{DynamicResource PanelTitle}" VerticalAlignment="Center"/>
+            <TextBlock Grid.Column="1" Text="&#xE70D;" FontFamily="{DynamicResource IconFont}" VerticalAlignment="Center">
+              <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                  <Setter Property="RenderTransform"><Setter.Value><RotateTransform Angle="0"/></Setter.Value></Setter>
+                  <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+                  <Style.Triggers><DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="True"><Setter Property="RenderTransform"><Setter.Value><RotateTransform Angle="180"/></Setter.Value></Setter></DataTrigger></Style.Triggers>
+                </Style>
+              </TextBlock.Style>
+            </TextBlock>
+          </Grid>
+        </ToggleButton>
+
+        <Border Style="{StaticResource DeviceHealthSectionContentStyle}" Tag="{Binding IsDeviceHealthStorageExpanded}" automation:AutomationProperties.AutomationId="DeviceHealth_Section_Storage_Content">
+          <StackPanel>
+            <TextBlock Text="Storage Support"
+                       Style="{DynamicResource CardLabel}"
+                       Margin="0,0,0,8"
+                       automation:AutomationProperties.AutomationId="DeviceHealth_Section_Storage_Marker"/>
+            <ItemsControl ItemsSource="{Binding StorageSupportCenters}" ItemTemplate="{StaticResource SupportCenterCardTemplate}">
+              <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+            </ItemsControl>
+            <Border Style="{DynamicResource FixCard}" Visibility="{Binding StorageInsightsLoading, Converter={StaticResource BoolVis}}"><StackPanel><TextBlock Text="Scanning large files and cleanup candidates..." Style="{DynamicResource CardSub}"/><ProgressBar IsIndeterminate="True" Style="{DynamicResource IndeterminateBar}" Margin="0,8,0,0"/></StackPanel></Border>
+            <Border Style="{DynamicResource FixCard}" Visibility="{Binding ShowStorageInsightsEmptyState, Converter={StaticResource BoolVis}}"><TextBlock Text="No storage review is loaded yet. Refresh the review to see large files, cleanup candidates, and safe-removal guidance." Style="{DynamicResource CardSub}" TextWrapping="Wrap"/></Border>
+            <ItemsControl ItemsSource="{Binding StorageInsights}" Visibility="{Binding HasStorageInsights, Converter={StaticResource BoolVis}}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="{x:Type m:StorageInsight}">
+                  <Border Style="{DynamicResource FixCard}" Padding="14,10" Margin="0,0,0,8" Tag="{Binding}">
+                    <Border.ContextMenu>
+                      <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}" automation:AutomationProperties.AutomationId="ContextMenu_StorageItem">
+                        <MenuItem Header="View Details" Click="StorageDetails_Click" CommandParameter="{Binding}" automation:AutomationProperties.AutomationId="Card_StorageItem_Details"/>
+                        <MenuItem Header="Copy Summary" Click="StorageCopy_Click" CommandParameter="{Binding}" automation:AutomationProperties.AutomationId="Card_StorageItem_Copy"/>
+                        <MenuItem Header="Open Containing Folder" Click="OpenStorageItemFolder_Click" CommandParameter="{Binding}" automation:AutomationProperties.AutomationId="Card_StorageItem_OpenFolder"/>
+                      </ContextMenu>
+                    </Border.ContextMenu>
+                    <Grid>
+                      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                      <StackPanel Grid.Column="0">
+                        <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis"/>
+                        <WrapPanel Margin="0,2,0,0"><TextBlock Text="{Binding LocationLabel}" Style="{DynamicResource CardSub}"/><TextBlock Text=" - " Style="{DynamicResource CardSub}"/><TextBlock Text="{Binding SizeLabel}" Style="{DynamicResource CardSub}"/></WrapPanel>
+                        <TextBlock Text="{Binding SafeToRemoveSummary}" Style="{DynamicResource CardSub}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                        <TextBlock Text="{Binding Caution}" Style="{DynamicResource MetaText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                      </StackPanel>
+                      <WrapPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Top">
+                        <Button Content="Details" Tag="{Binding}" Click="StorageDetails_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8" automation:AutomationProperties.AutomationId="Card_StorageItem_Details"/>
+                        <Button Content="Copy" Tag="{Binding}" Click="StorageCopyButton_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8" automation:AutomationProperties.AutomationId="Card_StorageItem_Copy"/>
+                        <Button Content="Open Folder" Tag="{Binding}" Click="OpenStorageItemFolder_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8" automation:AutomationProperties.AutomationId="Card_StorageItem_OpenFolder"/>
+                      </WrapPanel>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+
+        <ToggleButton Style="{StaticResource DeviceHealthSectionToggleStyle}" Tag="StartupPerformance" Click="DeviceHealthSectionToggle_Click" IsChecked="{Binding IsDeviceHealthStartupPerformanceExpanded, Mode=OneWay}" automation:AutomationProperties.AutomationId="DeviceHealth_Section_StartupPerformance_Toggle">
+          <Grid>
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <TextBlock Text="Startup &amp; Performance" Style="{DynamicResource PanelTitle}" VerticalAlignment="Center"/>
+            <TextBlock Grid.Column="1" Text="&#xE70D;" FontFamily="{DynamicResource IconFont}" VerticalAlignment="Center">
+              <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                  <Setter Property="RenderTransform"><Setter.Value><RotateTransform Angle="0"/></Setter.Value></Setter>
+                  <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+                  <Style.Triggers><DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="True"><Setter Property="RenderTransform"><Setter.Value><RotateTransform Angle="180"/></Setter.Value></Setter></DataTrigger></Style.Triggers>
+                </Style>
+              </TextBlock.Style>
+            </TextBlock>
+          </Grid>
+        </ToggleButton>
+
+        <Border Style="{StaticResource DeviceHealthSectionContentStyle}" Tag="{Binding IsDeviceHealthStartupPerformanceExpanded}" automation:AutomationProperties.AutomationId="DeviceHealth_Section_StartupPerformance_Content">
+          <StackPanel>
+            <ItemsControl ItemsSource="{Binding StartupPerformanceSupportCenters}" ItemTemplate="{StaticResource SupportCenterCardTemplate}">
+              <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+            </ItemsControl>
+
+            <Border Style="{DynamicResource FixCard}" Visibility="{Binding StartupAppsLoading, Converter={StaticResource BoolVis}}">
+              <StackPanel>
+                <TextBlock Text="Reviewing startup entries and background pressure signals..." Style="{DynamicResource CardSub}"/>
+                <ProgressBar IsIndeterminate="True" Style="{DynamicResource IndeterminateBar}" Margin="0,8,0,0"/>
+              </StackPanel>
+            </Border>
+
+            <Border Style="{DynamicResource FixCard}" Visibility="{Binding ShowStartupAppsEmptyState, Converter={StaticResource BoolVis}}">
+              <TextBlock Text="No startup review is loaded yet. Refresh the review to see startup entries, impact guidance, and disable candidates." Style="{DynamicResource CardSub}" TextWrapping="Wrap"/>
+            </Border>
+
+            <ListBox x:Name="StartupAppsList"
+                     ItemsSource="{Binding StartupApps}" Visibility="{Binding HasStartupApps, Converter={StaticResource BoolVis}}" BorderThickness="0" Background="Transparent" AlternationCount="5000"
+                     automation:AutomationProperties.AutomationId="StartupApps_List">
+              <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem">
+                  <Setter Property="Padding" Value="0"/>
+                  <Setter Property="Margin" Value="0"/>
+                  <Setter Property="BorderThickness" Value="0"/>
+                  <Setter Property="Background" Value="Transparent"/>
+                  <Setter Property="Focusable" Value="False"/>
+                  <Setter Property="automation:AutomationProperties.AutomationId" Value="{Binding RelativeSource={RelativeSource Self}, Path=(ItemsControl.AlternationIndex), Converter={StaticResource IndexAutomationId}, ConverterParameter=Startup_Item_|_Container}"/>
+                </Style>
+              </ListBox.ItemContainerStyle>
+              <ListBox.ItemTemplate>
+                <DataTemplate DataType="{x:Type m:StartupAppEntry}">
+                  <Border Style="{DynamicResource FixCard}" Padding="14,10" Margin="0,0,0,8" Tag="{Binding}">
+                    <Border.ContextMenu>
+                      <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}" automation:AutomationProperties.AutomationId="ContextMenu_StartupItem">
+                        <MenuItem Header="View Details" Click="StartupDetails_Click" CommandParameter="{Binding}" automation:AutomationProperties.AutomationId="Card_StartupItem_Details"/>
+                        <MenuItem Header="Copy Summary" Click="StartupCopy_Click" CommandParameter="{Binding}" automation:AutomationProperties.AutomationId="Card_StartupItem_Copy"/>
+                        <MenuItem Header="Open Launch Target" Click="OpenStartupTarget_Click" CommandParameter="{Binding}" automation:AutomationProperties.AutomationId="Card_StartupItem_OpenTarget"/>
+                        <MenuItem Header="Disable At Startup" Click="DisableStartupItem_Click" CommandParameter="{Binding}" automation:AutomationProperties.AutomationId="Card_StartupItem_Disable"/>
+                      </ContextMenu>
+                    </Border.ContextMenu>
+                    <Grid>
+                      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                      <StackPanel Grid.Column="0">
+                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis"/>
+                        <WrapPanel Margin="0,4,0,0">
+                          <Border CornerRadius="999" Padding="8,3" Margin="0,0,8,8" Background="{Binding ImpactLevel, Converter={StaticResource StartupImpactBg}}">
+                            <TextBlock Text="{Binding ImpactLabel}" Foreground="{Binding ImpactLevel, Converter={StaticResource StartupImpactFg}}" FontSize="11" FontWeight="SemiBold" automation:AutomationProperties.AutomationId="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=(ItemsControl.AlternationIndex), Converter={StaticResource IndexAutomationId}, ConverterParameter=Startup_Item_|_ImpactChip}"/>
+                          </Border>
+                          <Border CornerRadius="999" Padding="8,3" Margin="0,0,8,8" Background="{DynamicResource BgCard2Brush}">
+                            <TextBlock Text="{Binding ClassificationLabel}" Foreground="{DynamicResource TextSecBrush}" FontSize="11" FontWeight="SemiBold"
+                                       automation:AutomationProperties.AutomationId="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=(ItemsControl.AlternationIndex), Converter={StaticResource IndexAutomationId}, ConverterParameter=Startup_Item_|_Classification_Badge}"/>
+                          </Border>
+                          <TextBlock Text="{Binding DelayLabel}" Style="{DynamicResource MetaText}" VerticalAlignment="Center"/>
+                        </WrapPanel>
+                        <TextBlock Text="{Binding RecommendationReason}" Style="{DynamicResource MetaText}" Margin="0,0,0,6" TextWrapping="Wrap"/>
+                        <Expander Header="Why this matters"
+                                  Margin="0,0,0,6"
+                                  automation:AutomationProperties.AutomationId="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=(ItemsControl.AlternationIndex), Converter={StaticResource IndexAutomationId}, ConverterParameter=Startup_Item_|_WhyMatters_Toggle}">
+                          <StackPanel Margin="0,8,0,0">
+                            <TextBlock Text="{Binding WhatItDoes}" Style="{DynamicResource CardSub}" TextWrapping="Wrap"/>
+                            <TextBlock Text="{Binding WhatMayBreakIfDisabled}" Style="{DynamicResource MetaText}" Margin="0,6,0,0" TextWrapping="Wrap"/>
+                          </StackPanel>
+                        </Expander>
+                        <TextBlock Text="{Binding Command}" Style="{DynamicResource CardSub}" TextWrapping="Wrap"/>
+                      </StackPanel>
+                      <WrapPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Top">
+                        <Button Content="Disable" Tag="{Binding}" Click="DisableStartupItem_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8" automation:AutomationProperties.AutomationId="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=(ItemsControl.AlternationIndex), Converter={StaticResource IndexAutomationId}, ConverterParameter=Startup_Item_|_DisableButton}"/>
+                        <Button Content="Details" Tag="{Binding}" Click="StartupDetails_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8" automation:AutomationProperties.AutomationId="Card_StartupItem_Details"/>
+                        <Button Content="Copy" Tag="{Binding}" Click="StartupCopyButton_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8" automation:AutomationProperties.AutomationId="Card_StartupItem_Copy"/>
+                        <Button Content="Open Target" Tag="{Binding}" Click="OpenStartupTarget_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8" Visibility="{Binding HasLaunchTarget, Converter={StaticResource BoolVis}}" automation:AutomationProperties.AutomationId="Card_StartupItem_OpenTarget"/>
+                      </WrapPanel>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+
+            <StackPanel Margin="0,8,0,10">
+              <TextBlock Text="Installed Apps" Style="{DynamicResource PanelTitle}"/>
+              <TextBlock Text="{Binding InstalledProgramsSummaryText}" Style="{DynamicResource CardSub}"/>
+            </StackPanel>
+
+            <DockPanel Margin="0,0,0,12">
+              <Border DockPanel.Dock="Left" Style="{DynamicResource SearchBox}" Margin="0,0,8,0" MinWidth="240" MaxWidth="320">
+                <Grid>
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                  <ui:SymbolIcon Grid.Column="0" Symbol="Search20" FontSize="14" Foreground="{DynamicResource TextSecBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                  <TextBox Grid.Column="1" Text="{Binding InstalledProgramSearchText, UpdateSourceTrigger=PropertyChanged}" BorderThickness="0" Background="Transparent" VerticalContentAlignment="Center"/>
+                </Grid>
+              </Border>
+              <Button DockPanel.Dock="Right" Content="Open Installed Apps" Click="OpenAppsSettings_Click" Style="{DynamicResource SecondaryButton}"/>
+            </DockPanel>
+
+            <Border Style="{DynamicResource FixCard}" Visibility="{Binding InstalledProgramsLoading, Converter={StaticResource BoolVis}}">
               <StackPanel>
                 <TextBlock Text="Loading installed programs..." Style="{DynamicResource CardSub}"/>
                 <ProgressBar IsIndeterminate="True" Style="{DynamicResource IndeterminateBar}" Margin="0,8,0,0"/>
               </StackPanel>
             </Border>
 
-            <Border Style="{DynamicResource FixCard}"
-                    Visibility="{Binding ShowInstalledProgramsEmptyState, Converter={StaticResource BoolVis}}">
-              <TextBlock Text="No app inventory is loaded yet. Click Refresh Apps to scan installed software."
-                         Style="{DynamicResource CardSub}"/>
+            <Border Style="{DynamicResource FixCard}" Visibility="{Binding ShowInstalledProgramsEmptyState, Converter={StaticResource BoolVis}}">
+              <TextBlock Text="No app inventory is loaded yet. Click Refresh Apps to scan installed software." Style="{DynamicResource CardSub}"/>
             </Border>
 
-            <ScrollViewer MaxHeight="360" Visibility="{Binding HasInstalledPrograms, Converter={StaticResource BoolVis}}">
-              <ItemsControl ItemsSource="{Binding InstalledPrograms}">
-                <ItemsControl.ItemTemplate>
+            <Grid Visibility="{Binding HasInstalledPrograms, Converter={StaticResource BoolVis}}">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="380"/>
+              </Grid.ColumnDefinitions>
+
+              <Border Grid.Column="0" Background="#01000000" Visibility="{Binding IsInstalledProgramDetailPaneOpen, Converter={StaticResource BoolVis}}" MouseLeftButtonDown="CloseProgramDetailOverlay_MouseLeftButtonDown"/>
+
+              <ListBox x:Name="InstalledProgramsList"
+                       Grid.Column="0"
+                       ItemsSource="{Binding InstalledPrograms}"
+                       SelectionChanged="InstalledProgramsList_SelectionChanged"
+                       BorderThickness="0"
+                       Background="Transparent"
+                       AlternationCount="5000">
+                <automation:AutomationProperties.AutomationId>AppCenter_List</automation:AutomationProperties.AutomationId>
+                <ListBox.ItemContainerStyle>
+                  <Style TargetType="ListBoxItem">
+                    <Setter Property="Padding" Value="0"/>
+                    <Setter Property="Margin" Value="0"/>
+                    <Setter Property="BorderThickness" Value="0"/>
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Setter Property="Focusable" Value="False"/>
+                    <Setter Property="automation:AutomationProperties.AutomationId" Value="{Binding RelativeSource={RelativeSource Self}, Path=(ItemsControl.AlternationIndex), Converter={StaticResource IndexAutomationId}, ConverterParameter=AppCenter_Item_|_Card}"/>
+                  </Style>
+                </ListBox.ItemContainerStyle>
+                <ListBox.ItemTemplate>
                   <DataTemplate DataType="{x:Type svc:InstalledProgram}">
-                    <Border Style="{DynamicResource FixCard}" Padding="14,10" Tag="{Binding}">
+                    <Border Style="{DynamicResource FixCard}" Padding="14,10" Margin="0,0,12,8" Tag="{Binding}" MouseLeftButtonDown="ProgramCard_MouseLeftButtonDown">
                       <Border.ContextMenu>
-                        <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
-                          <MenuItem Header="View Details" Click="ProgramDetails_Click" CommandParameter="{Binding}"/>
-                          <MenuItem Header="Copy Details" Click="CopyProgramDetails_Click" CommandParameter="{Binding}"/>
-                          <MenuItem Header="Open Install Location" Click="OpenProgramLocation_Click" CommandParameter="{Binding}"/>
-                          <MenuItem Header="Launch Uninstaller" Click="RunUninstall_Click" CommandParameter="{Binding}"/>
+                        <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}" automation:AutomationProperties.AutomationId="ContextMenu_Program">
+                          <MenuItem Header="View Details" Click="ProgramDetails_Click" CommandParameter="{Binding}" automation:AutomationProperties.AutomationId="Card_Program_Details"/>
+                          <MenuItem Header="Copy Details" Click="CopyProgramDetails_Click" CommandParameter="{Binding}" automation:AutomationProperties.AutomationId="Card_Program_Copy"/>
+                          <MenuItem Header="Open Install Location" Click="OpenProgramLocation_Click" CommandParameter="{Binding}" automation:AutomationProperties.AutomationId="Card_Program_OpenFolder"/>
+                          <MenuItem Header="Launch Uninstaller" Click="RunUninstall_Click" CommandParameter="{Binding}" automation:AutomationProperties.AutomationId="Card_Program_Uninstall"/>
                         </ContextMenu>
                       </Border.ContextMenu>
                       <Grid>
-                        <Grid.ColumnDefinitions>
-                          <ColumnDefinition Width="*"/>
-                          <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
-                          <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13"/>
-                          <WrapPanel>
-                            <TextBlock Text="{Binding Publisher}"
-                                       Style="{DynamicResource CardSub}"
-                                       Visibility="{Binding Publisher, Converter={StaticResource NullCollapsed}}"/>
-                            <TextBlock Text="  •  "
-                                       Style="{DynamicResource CardSub}"
-                                       Visibility="{Binding Publisher, Converter={StaticResource NullCollapsed}}"/>
-                            <TextBlock Text="{Binding Version}"
-                                       Style="{DynamicResource CardSub}"
-                                       Visibility="{Binding Version, Converter={StaticResource NullCollapsed}}"/>
-                            <TextBlock Text="  •  "
-                                       Style="{DynamicResource CardSub}"
-                                       Visibility="{Binding SizeLabel, Converter={StaticResource NullCollapsed}}"/>
-                            <TextBlock Text="{Binding SizeLabel}"
-                                       Style="{DynamicResource CardSub}"
-                                       Visibility="{Binding SizeLabel, Converter={StaticResource NullCollapsed}}"/>
+                          <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis"
+                                     automation:AutomationProperties.AutomationId="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=(ItemsControl.AlternationIndex), Converter={StaticResource IndexAutomationId}, ConverterParameter=AppCenter_Item_|_Card}"/>
+                          <WrapPanel Margin="0,4,0,0">
+                            <TextBlock Text="{Binding Publisher}" Style="{DynamicResource CardSub}" Visibility="{Binding Publisher, Converter={StaticResource NullCollapsed}}"/>
+                            <TextBlock Text=" - " Style="{DynamicResource CardSub}" Visibility="{Binding Publisher, Converter={StaticResource NullCollapsed}}"/>
+                            <TextBlock Text="{Binding Version}" Style="{DynamicResource CardSub}" Visibility="{Binding Version, Converter={StaticResource NullCollapsed}}"/>
+                            <TextBlock Text=" - " Style="{DynamicResource CardSub}" Visibility="{Binding InstallDateLabel, Mode=OneWay, Converter={StaticResource NullCollapsed}}"/>
+                            <TextBlock Text="{Binding InstallDateLabel, Mode=OneWay}" Style="{DynamicResource CardSub}" Visibility="{Binding InstallDateLabel, Mode=OneWay, Converter={StaticResource NullCollapsed}}"/>
                           </WrapPanel>
-                          <TextBlock Text="{Binding InstallDateLabel}"
-                                     Style="{DynamicResource CardSub}"
-                                     Visibility="{Binding InstallDateLabel, Converter={StaticResource NullCollapsed}}"/>
-                          <TextBlock Text="{Binding InstallLocation}"
-                                     Style="{DynamicResource MetaText}"
-                                     Margin="0,4,0,0"
-                                     TextWrapping="Wrap"
-                                     Visibility="{Binding HasInstallLocation, Converter={StaticResource BoolVis}}"/>
+                          <TextBlock Text="{Binding InstallLocation}" Style="{DynamicResource MetaText}" Margin="0,4,0,0" TextTrimming="CharacterEllipsis"/>
                         </StackPanel>
-                        <WrapPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Top">
-                          <Button Content="Details"
-                                  Tag="{Binding}"
-                                  Click="ProgramDetails_Click"
-                                  Style="{DynamicResource SecondaryButton}"
-                                  Margin="0,0,8,8"/>
-                          <Button Content="Copy"
-                                  Tag="{Binding}"
-                                  Click="CopyProgramDetailsButton_Click"
-                                  Style="{DynamicResource SecondaryButton}"
-                                  Margin="0,0,8,8"/>
-                          <Button Content="Open Folder"
-                                  Tag="{Binding}"
-                                  Click="OpenProgramLocation_Click"
-                                  Style="{DynamicResource SecondaryButton}"
-                                  Margin="0,0,8,8"
-                                  Visibility="{Binding HasInstallLocation, Converter={StaticResource BoolVis}}"/>
-                          <Button Content="Uninstall"
-                                  Tag="{Binding}"
-                                  Click="RunUninstall_Click"
-                                  Style="{DynamicResource SecondaryButton}"
-                                  Margin="0,0,0,8"
-                                  Visibility="{Binding UninstallCommand, Converter={StaticResource NullCollapsed}}"/>
-                        </WrapPanel>
+                        <Border Grid.Column="1" CornerRadius="999" Padding="8,3" Background="{DynamicResource BgCard2Brush}" Visibility="{Binding IsStale, Converter={StaticResource BoolVis}}">
+                          <TextBlock Text="Not recently used" Style="{DynamicResource MetaText}"
+                                     automation:AutomationProperties.AutomationId="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=(ItemsControl.AlternationIndex), Converter={StaticResource IndexAutomationId}, ConverterParameter=AppCenter_Item_|_StaleBadge}"/>
+                        </Border>
                       </Grid>
                     </Border>
                   </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-            </ScrollViewer>
+                </ListBox.ItemTemplate>
+              </ListBox>
+
+              <Border Grid.Column="1"
+                      Width="380"
+                      Background="{DynamicResource BgCard2Brush}"
+                      CornerRadius="12"
+                      Padding="18,16"
+                      Visibility="{Binding IsInstalledProgramDetailPaneOpen, Converter={StaticResource BoolVis}}">
+                <StackPanel automation:AutomationProperties.Name="App detail pane">
+                  <DockPanel Margin="0,0,0,12">
+                    <StackPanel DockPanel.Dock="Left">
+                      <TextBlock Text="{Binding SelectedInstalledProgram.Name}" Style="{DynamicResource PanelTitle}" TextTrimming="CharacterEllipsis"
+                                 automation:AutomationProperties.AutomationId="AppCenter_DetailPane"/>
+                      <TextBlock Text="{Binding SelectedInstalledProgram.Publisher}" Style="{DynamicResource CardSub}" TextTrimming="CharacterEllipsis"/>
+                      <TextBlock Style="{DynamicResource MetaText}">
+                        <Run Text="{Binding SelectedInstalledProgram.Version, Mode=OneWay}"/>
+                        <Run Text="  "/>
+                        <Run Text="{Binding SelectedInstalledProgram.InstallDateLabel, Mode=OneWay}"/>
+                      </TextBlock>
+                    </StackPanel>
+                    <Button DockPanel.Dock="Right" Content="Close" Click="CloseProgramDetailPane_Click" Style="{DynamicResource SecondaryButton}" automation:AutomationProperties.AutomationId="AppCenter_Detail_Close"/>
+                  </DockPanel>
+
+                  <TextBlock Text="Location" Style="{DynamicResource CardLabel}"/>
+                  <TextBlock Text="{Binding SelectedInstalledProgram.InstallLocation}" Style="{DynamicResource CardSub}" TextTrimming="CharacterEllipsis" ToolTip="{Binding SelectedInstalledProgram.InstallLocation}" Margin="0,4,0,8"/>
+                  <Button Content="Open In Explorer" Tag="{Binding SelectedInstalledProgram}" Click="OpenProgramLocation_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,0,12" automation:AutomationProperties.AutomationId="AppCenter_Detail_OpenLocation"/>
+
+                  <TextBlock Text="Repair" Style="{DynamicResource CardLabel}"/>
+                  <Button Content="Repair" Tag="{Binding SelectedInstalledProgram}" Click="RepairProgram_Click" Style="{DynamicResource SecondaryButton}" Margin="0,4,0,6" Visibility="{Binding SelectedInstalledProgram.IsRepairAvailable, Converter={StaticResource BoolVis}}" automation:AutomationProperties.AutomationId="AppCenter_Detail_Repair"/>
+                  <TextBlock Text="Repair not available for this app" Style="{DynamicResource MetaText}" Visibility="{Binding SelectedInstalledProgram.IsRepairAvailable, Converter={StaticResource InvBoolVis}}" Margin="0,0,0,12"/>
+
+                  <StackPanel Visibility="{Binding SelectedInstalledProgram.IsResetAvailable, Converter={StaticResource BoolVis}}">
+                    <TextBlock Text="Reset" Style="{DynamicResource CardLabel}"/>
+                    <Button Content="Reset App Data" Tag="{Binding SelectedInstalledProgram}" Click="ResetProgram_Click" Style="{DynamicResource SecondaryButton}" Margin="0,4,0,12" automation:AutomationProperties.AutomationId="AppCenter_Detail_Reset"/>
+                  </StackPanel>
+
+                  <TextBlock Text="Default Apps" Style="{DynamicResource CardLabel}"/>
+                  <ItemsControl ItemsSource="{Binding SelectedInstalledProgramAssociations}" Visibility="{Binding HasSelectedInstalledProgramAssociations, Converter={StaticResource BoolVis}}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding}" Style="{DynamicResource CardSub}" Margin="0,2,0,0"/>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <TextBlock Text="{Binding SelectedInstalledProgramAssociationOverflowText}" Style="{DynamicResource MetaText}" Visibility="{Binding HasSelectedInstalledProgramAssociationOverflow, Converter={StaticResource BoolVis}}" Margin="0,4,0,0"/>
+                  <Button Content="Change Defaults" Click="OpenDefaultApps_Click" Style="{DynamicResource SecondaryButton}" Margin="0,8,0,12" automation:AutomationProperties.AutomationId="AppCenter_Detail_DefaultApps"/>
+
+                  <TextBlock Text="Uninstall" Style="{DynamicResource CardLabel}"/>
+                  <Button Content="Uninstall" Tag="{Binding SelectedInstalledProgram}" Click="RunUninstall_Click" Style="{DynamicResource SecondaryButton}" Visibility="{Binding SelectedInstalledProgram.HasUninstallAction, Converter={StaticResource BoolVis}}" automation:AutomationProperties.AutomationId="AppCenter_Detail_Uninstall"/>
+                </StackPanel>
+              </Border>
+            </Grid>
+          </StackPanel>
+        </Border>
+
+        <ToggleButton Style="{StaticResource DeviceHealthSectionToggleStyle}" Tag="WindowsHealth" Click="DeviceHealthSectionToggle_Click" IsChecked="{Binding IsDeviceHealthWindowsHealthExpanded, Mode=OneWay}" automation:AutomationProperties.AutomationId="DeviceHealth_Section_WindowsHealth_Toggle">
+          <Grid>
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <TextBlock Text="Windows Health" Style="{DynamicResource PanelTitle}" VerticalAlignment="Center"/>
+            <TextBlock Grid.Column="1" Text="&#xE70D;" FontFamily="{DynamicResource IconFont}" VerticalAlignment="Center">
+              <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                  <Setter Property="RenderTransform"><Setter.Value><RotateTransform Angle="0"/></Setter.Value></Setter>
+                  <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+                  <Style.Triggers><DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="True"><Setter Property="RenderTransform"><Setter.Value><RotateTransform Angle="180"/></Setter.Value></Setter></DataTrigger></Style.Triggers>
+                </Style>
+              </TextBlock.Style>
+            </TextBlock>
           </Grid>
-        </DockPanel>
-      </Border>
+        </ToggleButton>
+
+        <Border Style="{StaticResource DeviceHealthSectionContentStyle}" Tag="{Binding IsDeviceHealthWindowsHealthExpanded}" automation:AutomationProperties.AutomationId="DeviceHealth_Section_WindowsHealth_Content">
+          <StackPanel>
+            <ItemsControl ItemsSource="{Binding WindowsHealthSupportCenters}" ItemTemplate="{StaticResource SupportCenterCardTemplate}">
+              <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+            </ItemsControl>
+            <Border Style="{DynamicResource FixCard}" Margin="0,0,0,16" automation:AutomationProperties.AutomationId="Recovery_DecisionTree">
+              <StackPanel>
+                <DockPanel Margin="0,0,0,12">
+                  <StackPanel DockPanel.Dock="Left">
+                    <TextBlock Text="Windows Recovery Decision Support" Style="{DynamicResource PanelTitle}" automation:AutomationProperties.AutomationId="Recovery_DecisionTree"/>
+                    <TextBlock Text="Use this flow when Windows itself is unstable and you need the next grounded recovery step instead of guesswork." Style="{DynamicResource CardSub}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                  </StackPanel>
+                  <Button DockPanel.Dock="Right" Content="Back" Click="RecoveryBack_Click" Style="{DynamicResource SecondaryButton}" Visibility="{Binding RecoveryDecisionTree.CanGoBack, Converter={StaticResource BoolVis}}" automation:AutomationProperties.AutomationId="Recovery_Back"/>
+                </DockPanel>
+                <Border Background="{DynamicResource BgCard2Brush}" CornerRadius="10" Padding="14,12" Margin="0,0,0,12" automation:AutomationProperties.AutomationId="{Binding RecoveryDecisionTree.CurrentStepAutomationId}">
+                  <StackPanel>
+                    <TextBlock Text="{Binding RecoveryDecisionTree.CurrentQuestion}" FontWeight="SemiBold" FontSize="14" TextWrapping="Wrap"/>
+                    <ItemsControl ItemsSource="{Binding RecoveryDecisionTree.Answers}" Margin="0,12,0,0">
+                      <ItemsControl.ItemTemplate><DataTemplate DataType="{x:Type vm:RecoveryDecisionAnswerOption}"><Button Content="{Binding Title}" Tag="{Binding Key}" Click="RecoveryAnswer_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8" automation:AutomationProperties.AutomationId="{Binding AutomationId}"/></DataTemplate></ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <ItemsControl ItemsSource="{Binding RecoveryDecisionTree.GuidanceNotes}" Margin="0,4,0,0">
+                      <ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding}" Style="{DynamicResource CardSub}" Margin="0,0,0,6" TextWrapping="Wrap"/></DataTemplate></ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+                </Border>
+                <ItemsControl ItemsSource="{Binding RecoveryDecisionTree.Recommendations}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type vm:RecoveryRecommendationCard}">
+                      <Border Style="{DynamicResource FixCard}" Margin="0,0,0,8"><DockPanel><Button DockPanel.Dock="Right" Content="{Binding ActionLabel}" Tag="{Binding}" Click="RecoveryRecommendation_Click" Style="{DynamicResource SecondaryButton}" Margin="12,0,0,0" automation:AutomationProperties.AutomationId="{Binding AutomationId}"/><StackPanel><TextBlock Text="{Binding Title}" FontWeight="SemiBold"/><TextBlock Text="{Binding WhatItWillDo}" Style="{DynamicResource CardSub}" Margin="0,4,0,0" TextWrapping="Wrap"/><TextBlock Text="{Binding DataRisk}" Style="{DynamicResource MetaText}" Margin="0,6,0,0" TextWrapping="Wrap"/><TextBlock Style="{DynamicResource MetaText}" Margin="0,4,0,0"><Run Text="Estimated time: "/><Run Text="{Binding EstimatedTime}"/></TextBlock></StackPanel></DockPanel></Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </Border>        <ToggleButton Style="{StaticResource DeviceHealthSectionToggleStyle}" Tag="Network" Click="DeviceHealthSectionToggle_Click" IsChecked="{Binding IsDeviceHealthNetworkExpanded, Mode=OneWay}" automation:AutomationProperties.AutomationId="DeviceHealth_Section_Network_Toggle">
+          <Grid>
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <TextBlock Text="Network" Style="{DynamicResource PanelTitle}" VerticalAlignment="Center"/>
+            <TextBlock Grid.Column="1" Text="&#xE70D;" FontFamily="{DynamicResource IconFont}" VerticalAlignment="Center">
+              <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                  <Setter Property="RenderTransform"><Setter.Value><RotateTransform Angle="0"/></Setter.Value></Setter>
+                  <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+                  <Style.Triggers><DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="True"><Setter Property="RenderTransform"><Setter.Value><RotateTransform Angle="180"/></Setter.Value></Setter></DataTrigger></Style.Triggers>
+                </Style>
+              </TextBlock.Style>
+            </TextBlock>
+          </Grid>
+        </ToggleButton>
+
+        <Border Style="{StaticResource DeviceHealthSectionContentStyle}" Tag="{Binding IsDeviceHealthNetworkExpanded}" automation:AutomationProperties.AutomationId="DeviceHealth_Section_Network_Content">
+          <StackPanel>
+            <ItemsControl ItemsSource="{Binding NetworkSupportCenters}" ItemTemplate="{StaticResource SupportCenterCardTemplate}">
+              <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+            </ItemsControl>
+
+            <Border Style="{DynamicResource FixCard}" Margin="0,0,0,12">
+              <StackPanel>
+                <DockPanel Margin="0,0,0,12">
+                  <StackPanel DockPanel.Dock="Left">
+                    <TextBlock Text="Browser Extension Review" Style="{DynamicResource PanelTitle}"/>
+                    <TextBlock Text="Review installed browser extensions, flag risky permissions, and keep important work sites signed in." Style="{DynamicResource CardSub}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                  </StackPanel>
+                  <Button DockPanel.Dock="Right" Content="Refresh Browser Review" Click="RefreshBrowserReview_Click" Style="{DynamicResource SecondaryButton}"/>
+                </DockPanel>
+
+                <Border Background="{DynamicResource BgCard2Brush}" CornerRadius="10" Padding="12" Margin="0,0,0,12" automation:AutomationProperties.AutomationId="Browser_AllowlistSection">
+                  <StackPanel>
+                    <DockPanel Margin="0,0,0,8">
+                      <TextBlock DockPanel.Dock="Left" Text="Keep signed in on these sites" Style="{DynamicResource CardLabel}" VerticalAlignment="Center"/>
+                      <Button DockPanel.Dock="Right" Content="+ Add Site" Click="AddBrowserAllowlistSite_Click" Style="{DynamicResource SecondaryButton}" automation:AutomationProperties.AutomationId="Browser_Allowlist_AddSite"/>
+                    </DockPanel>
+                    <TextBlock Text="Sites listed here are preserved when you run browser cleanup from this center." Style="{DynamicResource MetaText}" Margin="0,0,0,8" TextWrapping="Wrap"/>
+                    <ItemsControl ItemsSource="{Binding BrowserAllowlistedSites}" Visibility="{Binding HasBrowserAllowlistedSites, Converter={StaticResource BoolVis}}" AlternationCount="5000">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                          <DockPanel Margin="0,0,0,6">
+                            <Button DockPanel.Dock="Right" Content="Remove" Tag="{Binding}" Click="RemoveBrowserAllowlistSite_Click" Style="{DynamicResource SecondaryButton}" Margin="8,0,0,0" automation:AutomationProperties.AutomationId="{Binding RelativeSource={RelativeSource AncestorType=ContentPresenter}, Path=(ItemsControl.AlternationIndex), Converter={StaticResource IndexAutomationId}, ConverterParameter=Browser_Allowlist_Item_|_Remove}"/>
+                            <TextBlock Text="{Binding}" Style="{DynamicResource CardSub}" VerticalAlignment="Center"/>
+                          </DockPanel>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Text="No sites are allowlisted yet." Style="{DynamicResource MetaText}" Visibility="{Binding HasBrowserAllowlistedSites, Converter={StaticResource InvBoolVis}}"/>
+                  </StackPanel>
+                </Border>
+
+                <ItemsControl ItemsSource="{Binding BrowserExtensionSections}" Visibility="{Binding HasBrowserExtensionSections, Converter={StaticResource BoolVis}}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type m:BrowserExtensionSection}">
+                      <Expander IsExpanded="True" Margin="0,0,0,10" automation:AutomationProperties.AutomationId="{Binding BrowserName, StringFormat=Browser_{0}_Section}">
+                        <Expander.Header>
+                          <DockPanel>
+                            <TextBlock Text="{Binding BrowserName}" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding ExtensionCount, StringFormat='{}{0} extension(s)'}" Style="{DynamicResource MetaText}" Margin="10,0,0,0"/>
+                          </DockPanel>
+                        </Expander.Header>
+                        <ListBox ItemsSource="{Binding Extensions}" BorderThickness="0" Background="Transparent" AlternationCount="5000" automation:AutomationProperties.AutomationId="{Binding BrowserName, StringFormat=Browser_{0}_ExtensionList}">
+                          <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                              <Setter Property="Padding" Value="0"/>
+                              <Setter Property="Margin" Value="0"/>
+                              <Setter Property="BorderThickness" Value="0"/>
+                              <Setter Property="Background" Value="Transparent"/>
+                              <Setter Property="Focusable" Value="False"/>
+                            </Style>
+                          </ListBox.ItemContainerStyle>
+                          <ListBox.ItemTemplate>
+                            <DataTemplate DataType="{x:Type m:BrowserExtensionEntry}">
+                              <Border Background="{DynamicResource BgCard3Brush}" CornerRadius="10" Padding="12" Margin="0,8,0,0">
+                                <Grid>
+                                  <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                  <StackPanel Grid.Column="0">
+                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Text="{Binding Version}" Style="{DynamicResource MetaText}" Margin="0,2,0,0"/>
+                                    <TextBlock Text="{Binding Description}" Style="{DynamicResource CardSub}" TextTrimming="CharacterEllipsis" Margin="0,4,0,0"/>
+                                    <WrapPanel Margin="0,6,0,0">
+                                      <Border CornerRadius="999" Padding="8,3" Margin="0,0,8,0" Background="{Binding RiskLevel, Converter={StaticResource BrowserRiskBg}}" ToolTip="{Binding RiskReason}">
+                                        <TextBlock Text="{Binding RiskLabel}" Foreground="{Binding RiskLevel, Converter={StaticResource BrowserRiskFg}}" FontSize="11" FontWeight="SemiBold"
+                                                   automation:AutomationProperties.AutomationId="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=(ItemsControl.AlternationIndex), Converter={StaticResource IndexAutomationId}, ConverterParameter=Browser_Extension_|_RiskBadge}"/>
+                                      </Border>
+                                      <TextBlock Text="{Binding EnabledStateText}" Style="{DynamicResource MetaText}" VerticalAlignment="Center"/>
+                                    </WrapPanel>
+                                  </StackPanel>
+                                  <Button Grid.Column="1" Content="Disable In Browser" Tag="{Binding}" Click="OpenBrowserExtensionManager_Click" Style="{DynamicResource SecondaryButton}" Margin="12,0,0,0" automation:AutomationProperties.AutomationId="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=(ItemsControl.AlternationIndex), Converter={StaticResource IndexAutomationId}, ConverterParameter=Browser_Extension_|_DisableLink}"/>
+                                </Grid>
+                              </Border>
+                            </DataTemplate>
+                          </ListBox.ItemTemplate>
+                        </ListBox>
+                      </Expander>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <TextBlock Text="No supported browsers were detected on this device." Style="{DynamicResource CardSub}" Visibility="{Binding ShowBrowserExtensionEmptyState, Converter={StaticResource BoolVis}}"/>
+              </StackPanel>
+            </Border>
+
+            <Border Style="{DynamicResource FixCard}">
+              <StackPanel>
+                <DockPanel Margin="0,0,0,12">
+                  <StackPanel DockPanel.Dock="Left">
+                    <TextBlock Text="Work-From-Home Dependency Hints" Style="{DynamicResource PanelTitle}"/>
+                    <TextBlock Text="These checks look at mapped-drive paths and saved credentials so you can see whether VPN, DNS, credentials, or certificates are the real blocker." Style="{DynamicResource CardSub}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                  </StackPanel>
+                  <Button DockPanel.Dock="Right" Content="Refresh Work Checks" Click="RefreshWorkFromHomeChecks_Click" Style="{DynamicResource SecondaryButton}"/>
+                </DockPanel>
+
+                <ItemsControl ItemsSource="{Binding WorkFromHomeChecks}" Visibility="{Binding HasWorkFromHomeChecks, Converter={StaticResource BoolVis}}" AlternationCount="5000">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type m:WorkResourceCheckCard}">
+                      <Border Background="{DynamicResource BgCard2Brush}" CornerRadius="10" Padding="12" Margin="0,0,0,8">
+                        <StackPanel>
+                          <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                          <TextBlock Text="{Binding Summary}" Style="{DynamicResource CardSub}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                          <TextBlock Text="{Binding StatusText}" Style="{DynamicResource MetaText}" Margin="0,4,0,0"/>
+                          <ItemsControl ItemsSource="{Binding DependencyHints}" Margin="0,8,0,0" AlternationCount="5000">
+                            <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate DataType="{x:Type m:WorkResourceDependencyHint}">
+                                <Border CornerRadius="999" Padding="8,3" Margin="0,0,8,8" Background="{DynamicResource BgCard3Brush}" ToolTip="{Binding Explanation}">
+                                  <Border.Resources>
+                                    <Style TargetType="Border"/>
+                                  </Border.Resources>
+                                  <Border automation:AutomationProperties.AutomationId="{Binding RelativeSource={RelativeSource AncestorType=ContentPresenter}, Path=(ItemsControl.AlternationIndex), Converter={StaticResource IndexAutomationId}, ConverterParameter=WFH_Check_|_DependencyHint}">
+                                    <TextBlock Text="{Binding Label}" Style="{DynamicResource MetaText}"/>
+                                  </Border>
+                                </Border>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </StackPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <TextBlock Text="No mapped drives or work-resource checks are available yet on this device." Style="{DynamicResource CardSub}" Visibility="{Binding ShowWorkFromHomeChecksEmptyState, Converter={StaticResource BoolVis}}"/>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </Border>
+
+        <ToggleButton Style="{StaticResource DeviceHealthSectionToggleStyle}" Tag="DevicesPeripherals" Click="DeviceHealthSectionToggle_Click" IsChecked="{Binding IsDeviceHealthDevicesPeripheralsExpanded, Mode=OneWay}" automation:AutomationProperties.AutomationId="DeviceHealth_Section_DevicesPeripherals_Toggle">
+          <Grid>
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <TextBlock Text="Devices &amp; Peripherals" Style="{DynamicResource PanelTitle}" VerticalAlignment="Center"/>
+            <TextBlock Grid.Column="1" Text="&#xE70D;" FontFamily="{DynamicResource IconFont}" VerticalAlignment="Center">
+              <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                  <Setter Property="RenderTransform"><Setter.Value><RotateTransform Angle="0"/></Setter.Value></Setter>
+                  <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+                  <Style.Triggers><DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="True"><Setter Property="RenderTransform"><Setter.Value><RotateTransform Angle="180"/></Setter.Value></Setter></DataTrigger></Style.Triggers>
+                </Style>
+              </TextBlock.Style>
+            </TextBlock>
+          </Grid>
+        </ToggleButton>
+
+        <Border Style="{StaticResource DeviceHealthSectionContentStyle}" Tag="{Binding IsDeviceHealthDevicesPeripheralsExpanded}" automation:AutomationProperties.AutomationId="DeviceHealth_Section_DevicesPeripherals_Content">
+          <ItemsControl ItemsSource="{Binding DevicesSupportCenters}" ItemTemplate="{StaticResource SupportCenterCardTemplate}">
+            <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+          </ItemsControl>
+        </Border>
+
+        <ToggleButton Style="{StaticResource DeviceHealthSectionToggleStyle}" Tag="Security" Click="DeviceHealthSectionToggle_Click" IsChecked="{Binding IsDeviceHealthSecurityExpanded, Mode=OneWay}" automation:AutomationProperties.AutomationId="DeviceHealth_Section_Security_Toggle">
+          <Grid>
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <TextBlock Text="Security" Style="{DynamicResource PanelTitle}" VerticalAlignment="Center"/>
+            <TextBlock Grid.Column="1" Text="&#xE70D;" FontFamily="{DynamicResource IconFont}" VerticalAlignment="Center">
+              <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                  <Setter Property="RenderTransform"><Setter.Value><RotateTransform Angle="0"/></Setter.Value></Setter>
+                  <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+                  <Style.Triggers><DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="True"><Setter Property="RenderTransform"><Setter.Value><RotateTransform Angle="180"/></Setter.Value></Setter></DataTrigger></Style.Triggers>
+                </Style>
+              </TextBlock.Style>
+            </TextBlock>
+          </Grid>
+        </ToggleButton>
+
+        <Border Style="{StaticResource DeviceHealthSectionContentStyle}" Tag="{Binding IsDeviceHealthSecurityExpanded}" automation:AutomationProperties.AutomationId="DeviceHealth_Section_Security_Content">
+          <WrapPanel>
+            <Border Style="{DynamicResource InfoCard}" Width="320">
+              <StackPanel>
+                <TextBlock Text="Security Signals" Style="{DynamicResource CardLabel}"/>
+                <TextBlock Text="{Binding Snapshot.WindowsActivated, StringFormat='Windows activated: {0}'}" Style="{DynamicResource CardSub}"/>
+                <TextBlock Text="{Binding Snapshot.PendingUpdateCount, StringFormat='{}{0} pending update(s)'}" Style="{DynamicResource CardSub}"/>
+                <TextBlock Text="Defender active" Style="{DynamicResource CardSub}" Foreground="{DynamicResource AccentGreenBrush}" Visibility="{Binding Snapshot.DefenderEnabled, Converter={StaticResource BoolVis}}"/>
+                <TextBlock Text="Defender needs review" Style="{DynamicResource CardSub}" Foreground="{DynamicResource AccentRedBrush}" Visibility="{Binding Snapshot.DefenderEnabled, Converter={StaticResource InvBoolVis}}"/>
+              </StackPanel>
+            </Border>
+          </WrapPanel>
+        </Border>
+      </StackPanel>
     </Grid>
   </ScrollViewer>
 </Page>

@@ -1,0 +1,16 @@
+{
+  "entries": [
+    { "terms": ["wifi", "wi-fi", "wireless", "internet"], "tags": ["network"] },
+    { "terms": ["slow", "sluggish", "lag", "startup"], "tags": ["performance", "startup"] },
+    { "terms": ["printer", "printing", "scanner"], "tags": ["printer"] },
+    { "terms": ["outlook", "office", "email"], "tags": ["outlook"] },
+    { "terms": ["teams", "meeting", "webcam"], "tags": ["teams", "devices", "audio"] },
+    { "terms": ["blue screen", "bsod", "crash"], "tags": ["bsod"] },
+    { "terms": ["virus", "malware", "defender"], "tags": ["security"] },
+    { "terms": ["storage", "disk full", "space", "disk"], "tags": ["storage"] },
+    { "terms": ["sound", "audio", "microphone", "mic"], "tags": ["audio"] },
+    { "terms": ["display", "monitor", "screen"], "tags": ["display"] },
+    { "terms": ["vpn", "remote", "work from home"], "tags": ["vpn"] },
+    { "terms": ["password", "sign in", "login", "account"], "tags": ["accounts"] }
+  ]
+}

@@ -6,6 +6,7 @@
         xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
         automation:AutomationProperties.AutomationId="MainWindow"
         Title="{Binding ProductDisplayName}"
+        Icon="pack://application:,,,/FixFoxLogo.ico"
         MinWidth="960" MinHeight="620"
         Width="{Binding Settings.WindowWidth,  Mode=TwoWay}"
         Height="{Binding Settings.WindowHeight, Mode=TwoWay}"
@@ -35,6 +36,11 @@
     <h:SidebarWidthConverter       x:Key="SidebarWidth"/>
     <h:SidebarAlignConverter       x:Key="SidebarAlign"/>
     <h:SidebarPaddingConverter     x:Key="SidebarPad"/>
+    <CollectionViewSource x:Key="KeyboardShortcutsView" Source="{Binding KeyboardShortcuts}">
+      <CollectionViewSource.GroupDescriptions>
+        <PropertyGroupDescription PropertyName="Context"/>
+      </CollectionViewSource.GroupDescriptions>
+    </CollectionViewSource>
   </ui:FluentWindow.Resources>
 
   <Grid>
@@ -45,7 +51,7 @@
       <RowDefinition Height="28"/>  <!-- Status bar -->
     </Grid.RowDefinitions>
 
-    <!-- ════════════════════ TITLE BAR ════════════════════ -->
+    <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• TITLE BAR â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
     <Grid Grid.Row="0" Background="{DynamicResource TitleBarBrush}"
           MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
       <Grid.ColumnDefinitions>
@@ -57,6 +63,8 @@
       <!-- Logo + name -->
       <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
         <Image x:Name="LogoImage" Width="32" Height="32" Margin="0,0,8,0"
+               automation:AutomationProperties.AutomationId="AppTitleBarIcon"
+               automation:AutomationProperties.Name="FixFox app icon"
                RenderOptions.BitmapScalingMode="HighQuality" VerticalAlignment="Center"/>
         <TextBlock Text="{Binding ProductDisplayName}" FontSize="14" FontWeight="Bold"
                    Foreground="{DynamicResource FoxOrangeBrush}" VerticalAlignment="Center"/>
@@ -72,7 +80,7 @@
           <WrapPanel>
             <TextBlock Text="{Binding CurrentPageLabel}" FontSize="12" FontWeight="SemiBold"
                        Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
-            <TextBlock Text="  •  " FontSize="11" Foreground="{DynamicResource TextSecBrush}" VerticalAlignment="Center"/>
+            <TextBlock Text="  â€¢  " FontSize="11" Foreground="{DynamicResource TextSecBrush}" VerticalAlignment="Center"/>
             <TextBlock Text="{Binding CurrentPageSummaryText}" FontSize="11"
                        Foreground="{DynamicResource TextSecBrush}" VerticalAlignment="Center"
                        TextTrimming="CharacterEllipsis"/>
@@ -92,6 +100,7 @@
       <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Stretch">
         <Button x:Name="OpenCommandPaletteButton"
                 automation:AutomationProperties.AutomationId="OpenCommandPaletteButton"
+                automation:AutomationProperties.Name="Open command palette"
                 Style="{DynamicResource TitleBarButtonStyle}"
                 ToolTip="Quick Command  Ctrl+K"
                 Click="OpenCommandPaletteButton_Click">
@@ -99,6 +108,7 @@
         </Button>
         <Button x:Name="NotificationsToggle"
                 automation:AutomationProperties.AutomationId="NotificationsToggle"
+                automation:AutomationProperties.Name="Open notifications"
                 Style="{DynamicResource TitleBarButtonStyle}"
                 Click="NotificationsToggle_Click">
           <Grid Width="30" Height="28">
@@ -122,20 +132,28 @@
             </Border>
           </Grid>
         </Button>
-        <Button Style="{DynamicResource TitleBarButtonStyle}" Click="WinMin_Click">
+        <Button Style="{DynamicResource TitleBarButtonStyle}"
+                automation:AutomationProperties.AutomationId="WindowMinimizeButton"
+                automation:AutomationProperties.Name="Minimize window"
+                Click="WinMin_Click">
           <ui:SymbolIcon Symbol="Subtract16" FontSize="9"/>
         </Button>
         <Button x:Name="BtnMaxRestore" Style="{DynamicResource TitleBarButtonStyle}"
+                automation:AutomationProperties.AutomationId="WindowMaxRestoreButton"
+                automation:AutomationProperties.Name="Maximize or restore window"
                 Click="WinMaxRestore_Click">
           <ui:SymbolIcon x:Name="MaxRestoreIcon" Symbol="Maximize16" FontSize="9"/>
         </Button>
-        <Button Style="{DynamicResource TitleBarCloseButtonStyle}" Click="WinClose_Click">
+        <Button Style="{DynamicResource TitleBarCloseButtonStyle}"
+                automation:AutomationProperties.AutomationId="WindowCloseButton"
+                automation:AutomationProperties.Name="Close window"
+                Click="WinClose_Click">
           <ui:SymbolIcon Symbol="Dismiss16" FontSize="9"/>
         </Button>
       </StackPanel>
     </Grid>
 
-    <!-- ════════════════════ BREADCRUMB ════════════════════ -->
+    <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• BREADCRUMB â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
     <Border Grid.Row="1" Background="{DynamicResource BgSurfaceBrush}"
             BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1"
             Padding="16,4">
@@ -149,7 +167,7 @@
       </ui:BreadcrumbBar>
     </Border>
 
-    <!-- ════════════════════ MAIN AREA (sidebar + content) ════════════════════ -->
+    <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• MAIN AREA (sidebar + content) â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
     <Grid Grid.Row="2">
       <Grid.ColumnDefinitions>
         <ColumnDefinition x:Name="SidebarColumn"
@@ -158,7 +176,7 @@
         <ColumnDefinition Width="*"/>
       </Grid.ColumnDefinitions>
 
-      <!-- ══ SIDEBAR ══ -->
+      <!-- â•â• SIDEBAR â•â• -->
       <Border Grid.Column="0" Background="{DynamicResource BgSurfaceBrush}"
               BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0">
         <DockPanel ClipToBounds="True">
@@ -177,6 +195,8 @@
 
           <!-- Collapse toggle button at bottom of nav -->
           <Button DockPanel.Dock="Bottom" Click="SidebarToggle_Click"
+                  automation:AutomationProperties.AutomationId="SidebarToggleButton"
+                  automation:AutomationProperties.Name="Toggle sidebar"
                   Style="{DynamicResource NavButtonStyle}"
                   ToolTip="Collapse/Expand sidebar" ToolTipService.InitialShowDelay="400"
                   Padding="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarPad}}"
@@ -200,6 +220,7 @@
                 <ItemsControl.ItemTemplate>
                   <DataTemplate>
                     <Button Tag="{Binding}" Click="Category_Click"
+                            automation:AutomationProperties.Name="{Binding Title, StringFormat=Open {0} category}"
                             Style="{DynamicResource NavButtonStyle}"
                             Padding="{Binding DataContext.IsSidebarCollapsed,
                                      RelativeSource={RelativeSource AncestorType=Window},
@@ -235,7 +256,9 @@
 
               <Button x:Name="NavDashboard" Tag="Dashboard" Click="Nav_Click"
                       automation:AutomationProperties.AutomationId="NavDashboard"
+                      automation:AutomationProperties.Name="Home"
                       Style="{DynamicResource NavButtonStyle}"
+                      Visibility="{Binding ShowNavDashboard, Converter={StaticResource BoolVis}}"
                       Padding="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarPad}}"
                       HorizontalContentAlignment="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarAlign}}"
                       ToolTip="Home  Ctrl+1" ToolTipService.InitialShowDelay="400" Cursor="Hand">
@@ -248,7 +271,9 @@
 
               <Button x:Name="NavSymptomChecker" Tag="SymptomChecker" Click="Nav_Click"
                       automation:AutomationProperties.AutomationId="NavSymptomChecker"
+                      automation:AutomationProperties.Name="Guided Diagnosis"
                       Style="{DynamicResource NavButtonStyle}"
+                      Visibility="{Binding ShowNavSymptomChecker, Converter={StaticResource BoolVis}}"
                       Padding="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarPad}}"
                       HorizontalContentAlignment="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarAlign}}"
                       ToolTip="Guided Diagnosis  Ctrl+2" ToolTipService.InitialShowDelay="400" Cursor="Hand">
@@ -261,20 +286,24 @@
 
               <Button x:Name="NavFixes" Tag="Fixes" Click="Nav_Click"
                       automation:AutomationProperties.AutomationId="NavFixes"
+                      automation:AutomationProperties.Name="{Binding FixNavAutomationName}"
                       Style="{DynamicResource NavButtonStyle}"
+                      Visibility="{Binding ShowNavFixes, Converter={StaticResource BoolVis}}"
                       Padding="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarPad}}"
                       HorizontalContentAlignment="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarAlign}}"
-                      ToolTip="Repair Library  Ctrl+3" ToolTipService.InitialShowDelay="400" Cursor="Hand">
+                      ToolTip="{Binding FixNavLabel, StringFormat={}{0}  Ctrl+3}" ToolTipService.InitialShowDelay="400" Cursor="Hand">
                 <StackPanel Orientation="Horizontal">
                   <ui:SymbolIcon Symbol="Wrench20" FontSize="16" Width="18" VerticalAlignment="Center"/>
-                  <TextBlock Text="Repair Library" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12"
+                  <TextBlock Text="{Binding FixNavLabel}" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12"
                              Visibility="{Binding IsSidebarCollapsed, Converter={StaticResource InvBoolVis}}"/>
                 </StackPanel>
               </Button>
 
               <Button x:Name="NavBundles" Tag="Bundles" Click="Nav_Click"
                       automation:AutomationProperties.AutomationId="NavBundles"
+                      automation:AutomationProperties.Name="Automation"
                       Style="{DynamicResource NavButtonStyle}"
+                      Visibility="{Binding ShowNavBundles, Converter={StaticResource BoolVis}}"
                       Padding="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarPad}}"
                       HorizontalContentAlignment="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarAlign}}"
                       ToolTip="Automation  Ctrl+4" ToolTipService.InitialShowDelay="400" Cursor="Hand">
@@ -284,16 +313,27 @@
                              Visibility="{Binding IsSidebarCollapsed, Converter={StaticResource InvBoolVis}}"/>
                 </StackPanel>
               </Button>
+              <Button Content="?"
+                      Click="SimpleHelp_Click"
+                      Tag="Automated maintenance tasks that run on a schedule to keep your PC healthy without you having to remember.|Help_Automation_Popover"
+                      Style="{DynamicResource SecondaryButton}"
+                      Width="30"
+                      Height="30"
+                      Margin="12,0,0,8"
+                      Visibility="{Binding ShowSimpleHelp, Converter={StaticResource BoolVis}}"
+                      automation:AutomationProperties.AutomationId="Help_Automation_Trigger"/>
 
-              <Separator Margin="12,4"/>
+              <Separator Margin="12,4" Visibility="{Binding SimplifiedModeEnabled, Converter={StaticResource InvBoolVis}}"/>
 
               <!-- SUPPORT -->
               <TextBlock Text="SUPPORT" Style="{DynamicResource SectionLabelStyle}"
-                         Visibility="{Binding IsSidebarCollapsed, Converter={StaticResource InvBoolVis}}"/>
+                         Visibility="{Binding SimplifiedModeEnabled, Converter={StaticResource InvBoolVis}}"/>
 
               <Button x:Name="NavSystemInfo" Tag="SystemInfo" Click="Nav_Click"
                       automation:AutomationProperties.AutomationId="NavSystemInfo"
+                      automation:AutomationProperties.Name="Device Health"
                       Style="{DynamicResource NavButtonStyle}"
+                      Visibility="{Binding ShowNavSystemInfo, Converter={StaticResource BoolVis}}"
                       Padding="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarPad}}"
                       HorizontalContentAlignment="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarAlign}}"
                       ToolTip="Device Health  Ctrl+5" ToolTipService.InitialShowDelay="400" Cursor="Hand">
@@ -306,7 +346,9 @@
 
               <Button x:Name="NavToolbox" Tag="Toolbox" Click="Nav_Click"
                       automation:AutomationProperties.AutomationId="NavToolbox"
+                      automation:AutomationProperties.Name="Windows Tools"
                       Style="{DynamicResource NavButtonStyle}"
+                      Visibility="{Binding ShowNavToolbox, Converter={StaticResource BoolVis}}"
                       Padding="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarPad}}"
                       HorizontalContentAlignment="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarAlign}}"
                       ToolTip="Windows Tools  Ctrl+8" ToolTipService.InitialShowDelay="400" Cursor="Hand">
@@ -319,7 +361,9 @@
 
               <Button x:Name="NavHandoff" Tag="Handoff" Click="Nav_Click"
                       automation:AutomationProperties.AutomationId="NavHandoff"
+                      automation:AutomationProperties.Name="Support Package"
                       Style="{DynamicResource NavButtonStyle}"
+                      Visibility="{Binding ShowNavHandoff, Converter={StaticResource BoolVis}}"
                       Padding="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarPad}}"
                       HorizontalContentAlignment="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarAlign}}"
                       ToolTip="Support Package  Ctrl+6" ToolTipService.InitialShowDelay="400" Cursor="Hand">
@@ -329,10 +373,21 @@
                              Visibility="{Binding IsSidebarCollapsed, Converter={StaticResource InvBoolVis}}"/>
                 </StackPanel>
               </Button>
+              <Button Content="?"
+                      Click="SimpleHelp_Click"
+                      Tag="A file you can send to a technician or support team that contains information about your PC's current state. It never sends anything automatically.|Help_SupportPackage_Popover"
+                      Style="{DynamicResource SecondaryButton}"
+                      Width="30"
+                      Height="30"
+                      Margin="12,0,0,8"
+                      Visibility="{Binding ShowSimpleHelp, Converter={StaticResource BoolVis}}"
+                      automation:AutomationProperties.AutomationId="Help_SupportPackage_Trigger"/>
 
               <Button x:Name="NavHistory" Tag="History" Click="Nav_Click"
                       automation:AutomationProperties.AutomationId="NavHistory"
+                      automation:AutomationProperties.Name="Activity"
                       Style="{DynamicResource NavButtonStyle}"
+                      Visibility="{Binding ShowNavHistory, Converter={StaticResource BoolVis}}"
                       Padding="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarPad}}"
                       HorizontalContentAlignment="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarAlign}}"
                       ToolTip="Activity  Ctrl+7" ToolTipService.InitialShowDelay="400" Cursor="Hand">
@@ -343,15 +398,17 @@
                 </StackPanel>
               </Button>
 
-              <Separator Margin="12,4"/>
+              <Separator Margin="12,4" Visibility="{Binding SimplifiedModeEnabled, Converter={StaticResource InvBoolVis}}"/>
 
               <!-- APP -->
               <TextBlock Text="APP" Style="{DynamicResource SectionLabelStyle}"
-                         Visibility="{Binding IsSidebarCollapsed, Converter={StaticResource InvBoolVis}}"/>
+                         Visibility="{Binding SimplifiedModeEnabled, Converter={StaticResource InvBoolVis}}"/>
 
               <Button x:Name="NavSettings" Tag="Settings" Click="Nav_Click"
                       automation:AutomationProperties.AutomationId="NavSettings"
+                      automation:AutomationProperties.Name="Settings"
                       Style="{DynamicResource NavButtonStyle}"
+                      Visibility="{Binding ShowNavSettings, Converter={StaticResource BoolVis}}"
                       Padding="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarPad}}"
                       HorizontalContentAlignment="{Binding IsSidebarCollapsed, Converter={StaticResource SidebarAlign}}"
                       ToolTip="Settings  Ctrl+9" ToolTipService.InitialShowDelay="400" Cursor="Hand">
@@ -367,14 +424,14 @@
         </DockPanel>
       </Border>
 
-      <!-- ══ PAGE CONTENT ══ -->
+      <!-- â•â• PAGE CONTENT â•â• -->
       <Frame x:Name="PageFrame" Grid.Column="1"
              automation:AutomationProperties.AutomationId="MainPageFrame"
              NavigationUIVisibility="Hidden"
              Background="{DynamicResource BgPrimaryBrush}"/>
     </Grid>
 
-    <!-- ════════════════════ STATUS BAR ════════════════════ -->
+    <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• STATUS BAR â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
     <Border Grid.Row="3" Background="{DynamicResource StatusBarBrush}"
             BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
       <DockPanel Margin="12,0" LastChildFill="False">
@@ -397,7 +454,7 @@
       </DockPanel>
     </Border>
 
-    <!-- ════════════════════ COMMAND PALETTE OVERLAY ════════════════════ -->
+    <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• COMMAND PALETTE OVERLAY â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
     <Grid Grid.Row="0" Grid.RowSpan="4" Grid.ColumnSpan="2"
           Visibility="{Binding IsCommandPaletteOpen, Converter={StaticResource BoolVis}}">
       <!-- Backdrop -->
@@ -420,7 +477,7 @@
                              Foreground="{DynamicResource TextSecBrush}" Margin="0,0,10,0"
                              VerticalAlignment="Center"/>
               <TextBox Grid.Column="1" x:Name="CommandPaletteBox"
-                       automation:AutomationProperties.AutomationId="CommandPaletteBox"
+                       automation:AutomationProperties.AutomationId="GlobalSearch_Input"
                        Text="{Binding CommandPaletteQuery, UpdateSourceTrigger=PropertyChanged}"
                        BorderThickness="0" Background="Transparent"
                        FontSize="15" VerticalContentAlignment="Center"
@@ -448,9 +505,34 @@
             </Grid>
           </Border>
           <Separator DockPanel.Dock="Top"/>
+          <StackPanel DockPanel.Dock="Top"
+                      Margin="16,12,16,0"
+                      Visibility="{Binding ShowGlobalSearchRecentQueries, Converter={StaticResource BoolVis}}">
+            <TextBlock Text="Recent searches"
+                       Style="{DynamicResource CardLabel}"
+                       Margin="0,0,0,8"/>
+            <ItemsControl ItemsSource="{Binding GlobalSearchRecentQueries}" AlternationCount="8">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <WrapPanel/>
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Button Content="{Binding}"
+                          Tag="{Binding}"
+                          Click="RecentSearchChip_Click"
+                          Style="{DynamicResource SecondaryButton}"
+                          Margin="0,0,8,8"
+                          automation:AutomationProperties.AutomationId="{Binding RelativeSource={RelativeSource AncestorType=ContentPresenter}, Path=(ItemsControl.AlternationIndex), StringFormat=GlobalSearch_RecentQuery_{0}}"/>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Separator Margin="0,4,0,0"/>
+          </StackPanel>
           <Border DockPanel.Dock="Bottom" Padding="16,8" Background="{DynamicResource BgSurfaceBrush}">
             <StackPanel Orientation="Horizontal">
-              <TextBlock Text="↵ open or run" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" Margin="0,0,12,0"/>
+              <TextBlock Text="â†µ open or run" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" Margin="0,0,12,0"/>
               <TextBlock Text="Esc closes search" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" Margin="0,0,12,0"/>
               <TextBlock Text="Ctrl+Shift+M runs safe maintenance" FontSize="10" Foreground="{DynamicResource TextMutedBrush}"/>
             </StackPanel>
@@ -458,6 +540,7 @@
           <ScrollViewer VerticalScrollBarVisibility="Auto">
             <Grid>
               <ItemsControl ItemsSource="{Binding CommandPaletteResults}"
+                            AlternationCount="32"
                             VirtualizingStackPanel.IsVirtualizing="True"
                             VirtualizingStackPanel.VirtualizationMode="Recycling"
                             Visibility="{Binding HasCommandPaletteResults, Converter={StaticResource BoolVis}}">
@@ -468,36 +551,66 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                   <DataTemplate>
-                    <Button Tag="{Binding}" Click="PaletteRun_Click"
-                            automation:AutomationProperties.AutomationId="{Binding Id}"
-                            HorizontalContentAlignment="Stretch" Cursor="Hand"
-                            Background="Transparent" BorderThickness="0" Padding="16,8">
-                      <Grid>
-                        <Grid.ColumnDefinitions>
-                          <ColumnDefinition Width="Auto"/>
-                          <ColumnDefinition Width="*"/>
-                          <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0"
-                                   Text="{Binding Glyph}"
-                                   FontFamily="{DynamicResource IconFont}"
-                                   FontSize="15"
-                                   Foreground="{DynamicResource TextSecBrush}"
-                                   VerticalAlignment="Top"
-                                   Margin="0,2,12,0"/>
-                        <StackPanel Grid.Column="1">
-                          <TextBlock Text="{Binding Section}" Style="{DynamicResource CardLabel}"/>
-                          <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="Medium"/>
-                          <TextBlock Text="{Binding Subtitle}" FontSize="11"
-                                     Foreground="{DynamicResource TextSecBrush}" TextTrimming="CharacterEllipsis"/>
-                        </StackPanel>
-                        <StackPanel Grid.Column="2" Margin="12,0,0,0" VerticalAlignment="Center">
-                          <TextBlock Text="{Binding Hint}" Style="{DynamicResource MetaText}" HorizontalAlignment="Right"/>
-                          <ui:SymbolIcon Symbol="ArrowRight20" FontSize="14"
-                                         Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
-                        </StackPanel>
-                      </Grid>
-                    </Button>
+                    <Grid>
+                      <Border x:Name="GroupHeader"
+                              Background="{DynamicResource BgSurfaceBrush}"
+                              Padding="16,8"
+                              Visibility="Collapsed">
+                        <TextBlock Text="{Binding Title}" Style="{DynamicResource CardLabel}"/>
+                      </Border>
+                      <Button x:Name="ResultButton"
+                              Tag="{Binding}"
+                              Click="PaletteRun_Click"
+                              ToolTip="{Binding TooltipText}"
+                              automation:AutomationProperties.AutomationId="{Binding RelativeSource={RelativeSource AncestorType=ContentPresenter}, Path=(ItemsControl.AlternationIndex), StringFormat=GlobalSearch_Result_{0}}"
+                              HorizontalContentAlignment="Stretch"
+                              Cursor="Hand"
+                              Background="Transparent"
+                              BorderThickness="0"
+                              Padding="16,8">
+                        <Grid>
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                          </Grid.ColumnDefinitions>
+                          <TextBlock Grid.Column="0"
+                                     Text="{Binding Glyph}"
+                                     FontFamily="{DynamicResource IconFont}"
+                                     FontSize="15"
+                                     Foreground="{DynamicResource TextSecBrush}"
+                                     VerticalAlignment="Top"
+                                     Margin="0,2,12,0"/>
+                          <StackPanel Grid.Column="1">
+                            <TextBlock Text="{Binding ResultTypeLabel}"
+                                       Style="{DynamicResource CardLabel}"
+                                       automation:AutomationProperties.AutomationId="{Binding RelativeSource={RelativeSource AncestorType=ContentPresenter}, Path=(ItemsControl.AlternationIndex), StringFormat=GlobalSearch_ResultType_{0}}"/>
+                            <TextBlock Text="{Binding Title}"
+                                       FontSize="13"
+                                       FontWeight="Medium"
+                                       automation:AutomationProperties.AutomationId="{Binding RelativeSource={RelativeSource AncestorType=ContentPresenter}, Path=(ItemsControl.AlternationIndex), StringFormat=GlobalSearch_ResultLabel_{0}}"/>
+                            <TextBlock Text="{Binding Section}"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource TextSecBrush}"
+                                       TextTrimming="CharacterEllipsis"/>
+                          </StackPanel>
+                          <StackPanel Grid.Column="2" Margin="12,0,0,0" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Hint}" Style="{DynamicResource MetaText}" HorizontalAlignment="Right"/>
+                            <ui:SymbolIcon Symbol="ArrowRight20" FontSize="14"
+                                           Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                          </StackPanel>
+                        </Grid>
+                      </Button>
+                    </Grid>
+                    <DataTemplate.Triggers>
+                      <DataTrigger Binding="{Binding IsGroupHeader}" Value="True">
+                        <Setter TargetName="GroupHeader" Property="Visibility" Value="Visible"/>
+                        <Setter TargetName="ResultButton" Property="Visibility" Value="Collapsed"/>
+                      </DataTrigger>
+                      <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                        <Setter TargetName="ResultButton" Property="Background" Value="#14FFFFFF"/>
+                      </DataTrigger>
+                    </DataTemplate.Triggers>
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
@@ -515,7 +628,65 @@
       </Border>
     </Grid>
 
-    <!-- ════════════════════ PRIVACY NOTICE OVERLAY ════════════════════ -->
+    <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• PRIVACY NOTICE OVERLAY â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+    <Grid Grid.Row="0" Grid.RowSpan="4"
+          Visibility="{Binding IsKeyboardShortcutsDialogOpen, Converter={StaticResource BoolVis}}">
+      <Border Background="#99000000"
+              MouseLeftButtonDown="KeyboardShortcutsBg_Click"/>
+      <Border Background="{DynamicResource BgCardBrush}"
+              CornerRadius="10"
+              Width="720"
+              MaxWidth="800"
+              MaxHeight="560"
+              Padding="24"
+              HorizontalAlignment="Center"
+              VerticalAlignment="Center"
+              automation:AutomationProperties.AutomationId="KeyboardShortcuts_Dialog">
+        <DockPanel>
+          <DockPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+            <TextBlock Text="Keyboard shortcuts" Style="{DynamicResource PanelTitle}" DockPanel.Dock="Left"/>
+            <Button DockPanel.Dock="Right"
+                    Content="Close"
+                    Click="KeyboardShortcutsClose_Click"
+                    Style="{DynamicResource SecondaryButton}"/>
+          </DockPanel>
+          <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding Source={StaticResource KeyboardShortcutsView}}">
+              <ItemsControl.GroupStyle>
+                <GroupStyle>
+                  <GroupStyle.HeaderTemplate>
+                    <DataTemplate>
+                      <TextBlock Text="{Binding Name}"
+                                 Style="{DynamicResource CardLabel}"
+                                 Margin="0,12,0,8"/>
+                    </DataTemplate>
+                  </GroupStyle.HeaderTemplate>
+                </GroupStyle>
+              </ItemsControl.GroupStyle>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="160"/>
+                      <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0"
+                            Background="{DynamicResource BgCard2Brush}"
+                            CornerRadius="8"
+                            Padding="10,6"
+                            Margin="0,0,12,0">
+                      <TextBlock Text="{Binding Keys}" FontWeight="SemiBold"/>
+                    </Border>
+                    <TextBlock Grid.Column="1" Text="{Binding Action}" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </DockPanel>
+      </Border>
+    </Grid>
+
     <Grid Grid.Row="0" Grid.RowSpan="4"
           Visibility="{Binding ShowPrivacyNotice, Converter={StaticResource BoolVis}}">
       <Border Background="#CC000000"/>
@@ -527,112 +698,256 @@
           <Image x:Name="PrivacyLogoImage" Width="48" Height="48"
                  HorizontalAlignment="Left" Margin="0,0,0,16"
                  RenderOptions.BitmapScalingMode="HighQuality"/>
-          <TextBlock Text="{Binding OnboardingTitleText}" FontSize="22" FontWeight="SemiBold"
-                     Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8"/>
-          <TextBlock Text="{Binding OnboardingSummaryText}"
-                     Foreground="{DynamicResource TextSecBrush}" FontSize="13" TextWrapping="Wrap" Margin="0,0,0,18"/>
-          <Grid Margin="0,0,0,16">
-            <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="*"/>
-              <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-            <Border Grid.Column="0" Style="{DynamicResource InfoCard}" Margin="0,0,8,0">
-              <StackPanel>
-                <TextBlock Text="What This Build Handles" Style="{DynamicResource PanelTitle}"/>
-                <TextBlock Text="{Binding OnboardingCapabilitySummaryText}"
-                           Style="{DynamicResource CardSub}" Margin="0,6,0,0" TextWrapping="Wrap"/>
-              </StackPanel>
-            </Border>
-            <Border Grid.Column="1" Style="{DynamicResource InfoCard}" Margin="8,0,0,0">
-              <StackPanel>
-                <TextBlock Text="Local data and recovery" Style="{DynamicResource PanelTitle}"/>
-                <TextBlock Text="{Binding OnboardingPrivacySummaryText}"
-                           Style="{DynamicResource CardSub}" Margin="0,6,0,0" TextWrapping="Wrap"/>
-              </StackPanel>
-            </Border>
-          </Grid>
-          <TextBlock Text="Behavior profile" Style="{DynamicResource CardLabel}" Margin="0,0,0,8"/>
-          <WrapPanel Margin="0,0,0,8" IsEnabled="{Binding CanEditBehaviorProfile}">
-            <Button Content="Quiet" Tag="Quiet" Click="OnboardingProfile_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"
-                    automation:AutomationProperties.AutomationId="OnboardingProfileQuietButton"/>
-            <Button Content="Standard" Tag="Standard" Click="OnboardingProfile_Click" Style="{DynamicResource AccentButtonStyle}" Margin="0,0,8,8"
-                    automation:AutomationProperties.AutomationId="OnboardingProfileStandardButton"/>
-            <Button Content="Power User" Tag="Power User" Click="OnboardingProfile_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"
-                    automation:AutomationProperties.AutomationId="OnboardingProfilePowerUserButton"
-                    Visibility="{Binding CanToggleAdvancedMode, Converter={StaticResource BoolVis}}"/>
-            <Button Content="Work Laptop" Tag="Work Laptop" Click="OnboardingProfile_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"
-                    automation:AutomationProperties.AutomationId="OnboardingProfileWorkLaptopButton"/>
-            <Button Content="Home PC" Tag="Home PC" Click="OnboardingProfile_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8"
-                    automation:AutomationProperties.AutomationId="OnboardingProfileHomePcButton"/>
-          </WrapPanel>
-          <TextBlock Text="{Binding ManagedPolicySummaryText}" Style="{DynamicResource MetaText}" Margin="0,0,0,16" TextWrapping="Wrap"
-                     Visibility="{Binding HasManagedRestrictions, Converter={StaticResource BoolVis}}"/>
-          <Grid Margin="0,0,0,16">
-            <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="*"/>
-              <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-            <Border Grid.Column="0" Style="{DynamicResource InfoCard}" Margin="0,0,8,0">
-              <StackPanel>
-                <TextBlock Text="Baseline" Style="{DynamicResource PanelTitle}"/>
-                <TextBlock Text="{Binding FirstRunSummaryText}" Style="{DynamicResource CardSub}" Margin="0,6,0,0" TextWrapping="Wrap"/>
-              </StackPanel>
-            </Border>
-            <Border Grid.Column="1" Style="{DynamicResource InfoCard}" Margin="8,0,0,0">
-              <StackPanel>
-                <TextBlock Text="Startup defaults" Style="{DynamicResource PanelTitle}" Margin="0,0,0,8"/>
-                <CheckBox Content="Run a quick scan when this app opens"
-                          IsChecked="{Binding Settings.RunQuickScanOnLaunch, Mode=TwoWay}"
-                          Checked="OnboardingToggle_Changed" Unchecked="OnboardingToggle_Changed"
-                          Margin="0,0,0,8"/>
-                <CheckBox Content="Run the first health check after setup"
-                          IsChecked="{Binding RunHealthCheckAfterSetup, Mode=TwoWay}"
-                          Margin="0,0,0,8"/>
-                <CheckBox Content="Keep this app in the tray when closed"
-                          IsChecked="{Binding Settings.MinimizeToTray, Mode=TwoWay}"
-                          Checked="OnboardingToggle_Changed" Unchecked="OnboardingToggle_Changed"
-                          Margin="0,0,0,8"/>
-                <CheckBox Content="Start this app with Windows"
-                          IsChecked="{Binding Settings.RunAtStartup, Mode=TwoWay}"
-                          Checked="OnboardingRunAtStartup_Changed" Unchecked="OnboardingRunAtStartup_Changed"/>
-                <TextBlock Text="Notification mode" Style="{DynamicResource CardLabel}" Margin="0,12,0,6"/>
-                <ComboBox ItemsSource="{Binding NotificationModeOptions}"
-                          SelectedItem="{Binding SelectedNotificationMode, Mode=TwoWay}"
-                          SelectionChanged="OnboardingToggle_Changed"
-                          IsEnabled="{Binding CanEditNotificationMode}"
-                          Width="180"/>
-                <CheckBox Content="Prefer the safest maintenance workflow by default"
-                          IsChecked="{Binding Settings.PreferSafeMaintenanceDefaults, Mode=TwoWay}"
-                          Checked="OnboardingToggle_Changed" Unchecked="OnboardingToggle_Changed"
-                          Margin="0,12,0,0"/>
-              </StackPanel>
-            </Border>
-          </Grid>
-          <DockPanel>
-            <WrapPanel DockPanel.Dock="Left" Margin="0,0,12,0">
-              <Button Content="Quick Start" Click="OnboardingQuickStart_Click"
-                      Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"
-                      automation:AutomationProperties.AutomationId="OnboardingQuickStartButton"/>
-              <Button Content="Privacy Notes" Click="OnboardingPrivacy_Click"
-                      Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"
-                      automation:AutomationProperties.AutomationId="OnboardingPrivacyNotesButton"/>
-            </WrapPanel>
-            <StackPanel DockPanel.Dock="Right" HorizontalAlignment="Right">
-              <TextBlock Text="You can change every setup choice later in Settings."
-                         Style="{DynamicResource CardSub}"
-                         Margin="0,0,0,8"
-                         HorizontalAlignment="Right"/>
-              <Button Content="Finish Setup" Click="PrivacyOk_Click"
-                      Style="{DynamicResource AccentButtonStyle}"
-                      HorizontalAlignment="Right" Padding="24,10" Cursor="Hand"
-                      automation:AutomationProperties.AutomationId="OnboardingFinishButton"/>
+          <Grid Visibility="{Binding IsOnboardingModeSelectionVisible, Converter={StaticResource BoolVis}}">
+            <StackPanel>
+              <TextBlock Text="How would you like to use FixFox?"
+                         FontSize="22"
+                         FontWeight="SemiBold"
+                         Foreground="{DynamicResource TextPrimaryBrush}"
+                         Margin="0,0,0,8"/>
+              <TextBlock Text="Choose the view that feels right. You can switch later in Settings."
+                         Foreground="{DynamicResource TextSecBrush}"
+                         FontSize="13"
+                         TextWrapping="Wrap"
+                         Margin="0,0,0,18"/>
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Border Grid.Column="0" Style="{DynamicResource InfoCard}" Margin="0,0,8,0">
+                  <StackPanel>
+                    <TextBlock Text="Simple" Style="{DynamicResource PanelTitle}"/>
+                    <TextBlock Text="Just fix my PC. Recommended for most people."
+                               Style="{DynamicResource CardSub}"
+                               Margin="0,6,0,12"
+                               TextWrapping="Wrap"/>
+                    <Button Content="Choose Simple"
+                            Tag="Simple"
+                            Click="SimplifiedModeChoice_Click"
+                            Style="{DynamicResource AccentButtonStyle}"
+                            automation:AutomationProperties.AutomationId="OnboardingModeSimpleButton"/>
+                  </StackPanel>
+                </Border>
+                <Border Grid.Column="1" Style="{DynamicResource InfoCard}" Margin="8,0,0,0">
+                  <StackPanel>
+                    <TextBlock Text="Full" Style="{DynamicResource PanelTitle}"/>
+                    <TextBlock Text="Show every page, tool, and technical detail."
+                               Style="{DynamicResource CardSub}"
+                               Margin="0,6,0,12"
+                               TextWrapping="Wrap"/>
+                    <Button Content="Choose Full"
+                            Tag="Full"
+                            Click="SimplifiedModeChoice_Click"
+                            Style="{DynamicResource SecondaryButton}"
+                            automation:AutomationProperties.AutomationId="OnboardingModeFullButton"/>
+                  </StackPanel>
+                </Border>
+              </Grid>
             </StackPanel>
-          </DockPanel>
+          </Grid>
+
+          <Grid Visibility="{Binding IsSimpleOnboardingVisible, Converter={StaticResource BoolVis}}">
+            <StackPanel>
+              <TextBlock Text="Welcome to FixFox"
+                         FontSize="22"
+                         FontWeight="SemiBold"
+                         Foreground="{DynamicResource TextPrimaryBrush}"
+                         Margin="0,0,0,8"
+                         Visibility="{Binding IsSimplifiedOnboardingStep1, Converter={StaticResource BoolVis}}"/>
+              <TextBlock Text="Here's how it works"
+                         FontSize="22"
+                         FontWeight="SemiBold"
+                         Foreground="{DynamicResource TextPrimaryBrush}"
+                         Margin="0,0,0,8"
+                         Visibility="{Binding IsSimplifiedOnboardingStep2, Converter={StaticResource BoolVis}}"/>
+              <TextBlock Text="A few quick things to know"
+                         FontSize="22"
+                         FontWeight="SemiBold"
+                         Foreground="{DynamicResource TextPrimaryBrush}"
+                         Margin="0,0,0,8"
+                         Visibility="{Binding IsSimplifiedOnboardingStep3, Converter={StaticResource BoolVis}}"/>
+
+              <StackPanel Visibility="{Binding IsSimplifiedOnboardingStep1, Converter={StaticResource BoolVis}}">
+                <TextBlock Text="FixFox helps you fix common PC problems yourself - safely and quickly. You don't need to be a tech expert."
+                           Foreground="{DynamicResource TextSecBrush}"
+                           FontSize="13"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,18"/>
+                <Button Content="Let's go"
+                        Click="SimplifiedOnboardingNext_Click"
+                        Style="{DynamicResource AccentButtonStyle}"
+                        HorizontalAlignment="Right"/>
+              </StackPanel>
+
+              <StackPanel Visibility="{Binding IsSimplifiedOnboardingStep2, Converter={StaticResource BoolVis}}">
+                <Grid Margin="0,0,0,18">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                  </Grid.ColumnDefinitions>
+                  <Border Grid.Column="0" Style="{DynamicResource InfoCard}" Margin="0,0,8,0">
+                    <StackPanel>
+                      <TextBlock Text="&#xE721;" FontFamily="{DynamicResource IconFont}" FontSize="22"/>
+                      <TextBlock Text="Tell us what's wrong" Style="{DynamicResource CardLabel}" Margin="0,10,0,6"/>
+                      <TextBlock Text="Pick your problem from a simple list."
+                                 Style="{DynamicResource CardSub}"
+                                 TextWrapping="Wrap"/>
+                    </StackPanel>
+                  </Border>
+                  <Border Grid.Column="1" Style="{DynamicResource InfoCard}" Margin="8,0">
+                    <StackPanel>
+                      <TextBlock Text="&#xE90F;" FontFamily="{DynamicResource IconFont}" FontSize="22"/>
+                      <TextBlock Text="We'll fix it" Style="{DynamicResource CardLabel}" Margin="0,10,0,6"/>
+                      <TextBlock Text="FixFox runs a safe repair automatically."
+                                 Style="{DynamicResource CardSub}"
+                                 TextWrapping="Wrap"/>
+                    </StackPanel>
+                  </Border>
+                  <Border Grid.Column="2" Style="{DynamicResource InfoCard}" Margin="8,0,0,0">
+                    <StackPanel>
+                      <TextBlock Text="&#xE81C;" FontFamily="{DynamicResource IconFont}" FontSize="22"/>
+                      <TextBlock Text="See what happened" Style="{DynamicResource CardLabel}" Margin="0,10,0,6"/>
+                      <TextBlock Text="You'll get a plain-English summary of what changed."
+                                 Style="{DynamicResource CardSub}"
+                                 TextWrapping="Wrap"/>
+                    </StackPanel>
+                  </Border>
+                </Grid>
+                <Button Content="Got it"
+                        Click="SimplifiedOnboardingNext_Click"
+                        Style="{DynamicResource AccentButtonStyle}"
+                        HorizontalAlignment="Right"/>
+              </StackPanel>
+
+              <StackPanel Visibility="{Binding IsSimplifiedOnboardingStep3, Converter={StaticResource BoolVis}}">
+                <Border Style="{DynamicResource InfoCard}" Margin="0,0,0,18">
+                  <StackPanel>
+                    <TextBlock Text="FixFox never changes anything without showing you first." Style="{DynamicResource CardSub}" Margin="0,0,0,8" TextWrapping="Wrap"/>
+                    <TextBlock Text="Your files and photos are never touched." Style="{DynamicResource CardSub}" Margin="0,0,0,8" TextWrapping="Wrap"/>
+                    <TextBlock Text="Everything stays on your PC. Nothing is sent anywhere." Style="{DynamicResource CardSub}" TextWrapping="Wrap"/>
+                  </StackPanel>
+                </Border>
+                <Button Content="Start using FixFox"
+                        Click="PrivacyOk_Click"
+                        Style="{DynamicResource AccentButtonStyle}"
+                        HorizontalAlignment="Right"
+                        automation:AutomationProperties.AutomationId="OnboardingFinishButton"/>
+              </StackPanel>
+            </StackPanel>
+          </Grid>
+
+          <Grid Visibility="{Binding IsFullOnboardingVisible, Converter={StaticResource BoolVis}}">
+            <StackPanel>
+              <TextBlock Text="{Binding OnboardingTitleText}" FontSize="22" FontWeight="SemiBold"
+                         Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8"/>
+              <TextBlock Text="{Binding OnboardingSummaryText}"
+                         Foreground="{DynamicResource TextSecBrush}" FontSize="13" TextWrapping="Wrap" Margin="0,0,0,18"/>
+              <Grid Margin="0,0,0,16">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Border Grid.Column="0" Style="{DynamicResource InfoCard}" Margin="0,0,8,0">
+                  <StackPanel>
+                    <TextBlock Text="What This Build Handles" Style="{DynamicResource PanelTitle}"/>
+                    <TextBlock Text="{Binding OnboardingCapabilitySummaryText}"
+                               Style="{DynamicResource CardSub}" Margin="0,6,0,0" TextWrapping="Wrap"/>
+                  </StackPanel>
+                </Border>
+                <Border Grid.Column="1" Style="{DynamicResource InfoCard}" Margin="8,0,0,0">
+                  <StackPanel>
+                    <TextBlock Text="Local data and recovery" Style="{DynamicResource PanelTitle}"/>
+                    <TextBlock Text="{Binding OnboardingPrivacySummaryText}"
+                               Style="{DynamicResource CardSub}" Margin="0,6,0,0" TextWrapping="Wrap"/>
+                  </StackPanel>
+                </Border>
+              </Grid>
+              <TextBlock Text="Behavior profile" Style="{DynamicResource CardLabel}" Margin="0,0,0,8"/>
+              <WrapPanel Margin="0,0,0,8" IsEnabled="{Binding CanEditBehaviorProfile}">
+                <Button Content="Quiet" Tag="Quiet" Click="OnboardingProfile_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"
+                        automation:AutomationProperties.AutomationId="OnboardingProfileQuietButton"/>
+                <Button Content="Standard" Tag="Standard" Click="OnboardingProfile_Click" Style="{DynamicResource AccentButtonStyle}" Margin="0,0,8,8"
+                        automation:AutomationProperties.AutomationId="OnboardingProfileStandardButton"/>
+                <Button Content="Power User" Tag="Power User" Click="OnboardingProfile_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"
+                        automation:AutomationProperties.AutomationId="OnboardingProfilePowerUserButton"
+                        Visibility="{Binding CanToggleAdvancedMode, Converter={StaticResource BoolVis}}"/>
+                <Button Content="Work Laptop" Tag="Work Laptop" Click="OnboardingProfile_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"
+                        automation:AutomationProperties.AutomationId="OnboardingProfileWorkLaptopButton"/>
+                <Button Content="Home PC" Tag="Home PC" Click="OnboardingProfile_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8"
+                        automation:AutomationProperties.AutomationId="OnboardingProfileHomePcButton"/>
+              </WrapPanel>
+              <TextBlock Text="{Binding ManagedPolicySummaryText}" Style="{DynamicResource MetaText}" Margin="0,0,0,16" TextWrapping="Wrap"
+                         Visibility="{Binding HasManagedRestrictions, Converter={StaticResource BoolVis}}"/>
+              <Grid Margin="0,0,0,16">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Border Grid.Column="0" Style="{DynamicResource InfoCard}" Margin="0,0,8,0">
+                  <StackPanel>
+                    <TextBlock Text="Baseline" Style="{DynamicResource PanelTitle}"/>
+                    <TextBlock Text="{Binding FirstRunSummaryText}" Style="{DynamicResource CardSub}" Margin="0,6,0,0" TextWrapping="Wrap"/>
+                  </StackPanel>
+                </Border>
+                <Border Grid.Column="1" Style="{DynamicResource InfoCard}" Margin="8,0,0,0">
+                  <StackPanel>
+                    <TextBlock Text="Startup defaults" Style="{DynamicResource PanelTitle}" Margin="0,0,0,8"/>
+                    <CheckBox Content="Run a quick scan when this app opens"
+                              IsChecked="{Binding Settings.RunQuickScanOnLaunch, Mode=TwoWay}"
+                              Checked="OnboardingToggle_Changed" Unchecked="OnboardingToggle_Changed"
+                              Margin="0,0,0,8"/>
+                    <CheckBox Content="Run the first health check after setup"
+                              IsChecked="{Binding RunHealthCheckAfterSetup, Mode=TwoWay}"
+                              Margin="0,0,0,8"/>
+                    <CheckBox Content="Keep this app in the tray when closed"
+                              IsChecked="{Binding Settings.MinimizeToTray, Mode=TwoWay}"
+                              Checked="OnboardingToggle_Changed" Unchecked="OnboardingToggle_Changed"
+                              Margin="0,0,0,8"/>
+                    <CheckBox Content="Start this app with Windows"
+                              IsChecked="{Binding Settings.RunAtStartup, Mode=TwoWay}"
+                              Checked="OnboardingRunAtStartup_Changed" Unchecked="OnboardingRunAtStartup_Changed"/>
+                    <TextBlock Text="Notification mode" Style="{DynamicResource CardLabel}" Margin="0,12,0,6"/>
+                    <ComboBox ItemsSource="{Binding NotificationModeOptions}"
+                              SelectedItem="{Binding SelectedNotificationMode, Mode=TwoWay}"
+                              SelectionChanged="OnboardingToggle_Changed"
+                              IsEnabled="{Binding CanEditNotificationMode}"
+                              Width="180"/>
+                    <CheckBox Content="Prefer the safest maintenance workflow by default"
+                              IsChecked="{Binding Settings.PreferSafeMaintenanceDefaults, Mode=TwoWay}"
+                              Checked="OnboardingToggle_Changed" Unchecked="OnboardingToggle_Changed"
+                              Margin="0,12,0,0"/>
+                  </StackPanel>
+                </Border>
+              </Grid>
+              <DockPanel>
+                <WrapPanel DockPanel.Dock="Left" Margin="0,0,12,0">
+                  <Button Content="Quick Start" Click="OnboardingQuickStart_Click"
+                          Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"
+                          automation:AutomationProperties.AutomationId="OnboardingQuickStartButton"/>
+                  <Button Content="Privacy Notes" Click="OnboardingPrivacy_Click"
+                          Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"
+                          automation:AutomationProperties.AutomationId="OnboardingPrivacyNotesButton"/>
+                </WrapPanel>
+                <StackPanel DockPanel.Dock="Right" HorizontalAlignment="Right">
+                  <TextBlock Text="You can change every setup choice later in Settings."
+                             Style="{DynamicResource CardSub}"
+                             Margin="0,0,0,8"
+                             HorizontalAlignment="Right"/>
+                  <Button Content="Finish Setup" Click="PrivacyOk_Click"
+                          Style="{DynamicResource AccentButtonStyle}"
+                          HorizontalAlignment="Right" Padding="24,10" Cursor="Hand"
+                          automation:AutomationProperties.AutomationId="OnboardingFinishButton"/>
+                </StackPanel>
+              </DockPanel>
+            </StackPanel>
+          </Grid>
         </StackPanel>
       </Border>
     </Grid>
 
-    <!-- ════════════════════ SNACKBAR HOST ════════════════════ -->
+    <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• SNACKBAR HOST â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
     <ui:SnackbarPresenter x:Name="MainSnackbarPresenter"
                           Grid.Row="2"
                           VerticalAlignment="Bottom"

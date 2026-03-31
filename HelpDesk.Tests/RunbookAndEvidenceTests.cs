@@ -248,4 +248,43 @@ public sealed class RunbookAndEvidenceTests
         Assert.Contains("<redacted>", technicalText);
         Assert.DoesNotContain("192.168.1.10", technicalText, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public void RunbookDefinition_SafeRiskLevel_SkipsPreflight()
+    {
+        var runbook = new RunbookDefinition
+        {
+            Id = "safe-runbook",
+            Title = "Safe Runbook",
+            RiskLevel = FixRiskLevel.Safe
+        };
+
+        Assert.False(runbook.IsPreflightRequired);
+    }
+
+    [Fact]
+    public void RunbookDefinition_MayRestart_RequiresPreflight()
+    {
+        var runbook = new RunbookDefinition
+        {
+            Id = "restart-runbook",
+            Title = "Restart Runbook",
+            RiskLevel = FixRiskLevel.MayRestart
+        };
+
+        Assert.True(runbook.IsPreflightRequired);
+    }
+
+    [Fact]
+    public void RunbookDefinition_WithoutIrreversibleActions_ShowsSafeDefaultText()
+    {
+        var runbook = new RunbookDefinition
+        {
+            Id = "safe-runbook",
+            Title = "Safe Runbook",
+            IrreversibleActions = []
+        };
+
+        Assert.Equal("No irreversible changes", Assert.Single(runbook.IrreversibleActionsOrDefault));
+    }
 }

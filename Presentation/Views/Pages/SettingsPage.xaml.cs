@@ -16,12 +16,14 @@ namespace HelpDesk.Presentation.Views.Pages;
 public partial class SettingsPage : Page
 {
     private readonly MainViewModel _vm;
+    private bool _eventsReady;
 
     public SettingsPage(MainViewModel vm)
     {
         InitializeComponent();
         _vm = vm;
         DataContext = _vm;
+        Loaded += (_, _) => _eventsReady = true;
     }
 
     private void ThemeToggle_Changed(object sender, RoutedEventArgs e)
@@ -32,16 +34,37 @@ public partial class SettingsPage : Page
     }
 
     private void SettingsToggle_Changed(object sender, RoutedEventArgs e)
-        => _vm.SaveSettingsLight();
+    {
+        _vm.SaveSettingsLight();
+        WarnIfManaged(sender as FrameworkElement);
+    }
 
     private void BehaviorProfile_Changed(object sender, SelectionChangedEventArgs e)
-    { }
+        => WarnIfManaged(sender as FrameworkElement);
 
     private void LandingPage_Changed(object sender, SelectionChangedEventArgs e)
-    { }
+        => WarnIfManaged(sender as FrameworkElement);
 
     private void SettingsCombo_Changed(object sender, SelectionChangedEventArgs e)
-    { }
+        => WarnIfManaged(sender as FrameworkElement);
+
+    private void AdvancedMode_Changed(object sender, RoutedEventArgs e)
+        => WarnIfManaged(sender as FrameworkElement);
+
+    private void HealthAlertFrequency_Checked(object sender, RoutedEventArgs e)
+    {
+        if (!_eventsReady)
+            return;
+
+        if (sender is not System.Windows.Controls.RadioButton { Tag: string mode })
+            return;
+
+        if (!Enum.TryParse<HelpDesk.Domain.Enums.HealthAlertNotificationFrequency>(mode, ignoreCase: true, out var frequency))
+            return;
+
+        _vm.Settings.HealthAlertNotificationFrequency = frequency;
+        _vm.SaveSettingsLight();
+    }
 
     private void ResetSuppressed_Click(object sender, RoutedEventArgs e)
         => _vm.ResetSuppressedItems();
@@ -53,6 +76,7 @@ public partial class SettingsPage : Page
         SetRunAtStartupForShell(enable, _vm.ProductDisplayName);
         _vm.Settings.RunAtStartup = enable;
         _vm.SaveSettingsLight();
+        WarnIfManaged(ts);
     }
 
     public static void SetRunAtStartupForShell(bool enable, string? valueName = null)
@@ -109,6 +133,13 @@ public partial class SettingsPage : Page
 
     private void OpenTroubleshootingGuide_Click(object sender, RoutedEventArgs e)
         => OpenPath(_vm.TroubleshootingGuidePath, openParentIfMissing: true);
+
+    private void OpenKeyboardShortcuts_Click(object sender, RoutedEventArgs e)
+    {
+        var shell = Window.GetWindow(this) as MainWindow
+            ?? System.Windows.Application.Current?.MainWindow as MainWindow;
+        shell?.OpenKeyboardShortcutsDialog();
+    }
 
     private void OpenReleaseNotes_Click(object sender, RoutedEventArgs e)
         => OpenPath(_vm.ReleaseNotesPath, openParentIfMissing: true);
@@ -186,5 +217,24 @@ public partial class SettingsPage : Page
     {
         if (!string.IsNullOrWhiteSpace(value))
             System.Windows.Clipboard.SetText(value);
+    }
+
+    private void WarnIfManaged(FrameworkElement? element)
+    {
+        if (!_eventsReady)
+            return;
+
+        var settingKey = element?.Tag as string;
+        if (string.IsNullOrWhiteSpace(settingKey))
+            return;
+
+        if (!_vm.ShouldWarnManagedSetting(settingKey))
+            return;
+
+        MessageBox.Show(
+            "This setting may be overridden at next policy refresh.",
+            $"{_vm.ProductDisplayName} - Managed Setting",
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
     }
 }

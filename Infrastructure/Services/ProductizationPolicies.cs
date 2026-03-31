@@ -5,7 +5,7 @@ namespace HelpDesk.Infrastructure.Services;
 
 internal static class ProductizationPolicies
 {
-    internal const int CurrentSettingsSchemaVersion = 4;
+    internal const int CurrentSettingsSchemaVersion = 1;
 
     private static readonly HashSet<string> ValidThemes = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -62,11 +62,11 @@ internal static class ProductizationPolicies
         migrationApplied = false;
         validationApplied = false;
 
-        if (settings.SettingsSchemaVersion < CurrentSettingsSchemaVersion)
+        if (settings.SchemaVersion < CurrentSettingsSchemaVersion)
         {
             migrationApplied = true;
             notes?.Add($"Settings were migrated to schema v{CurrentSettingsSchemaVersion}.");
-            settings.SettingsSchemaVersion = CurrentSettingsSchemaVersion;
+            settings.SchemaVersion = CurrentSettingsSchemaVersion;
         }
 
         validationApplied |= NormalizeTheme(settings);
@@ -76,6 +76,7 @@ internal static class ProductizationPolicies
         validationApplied |= NormalizeLandingPage(settings);
         validationApplied |= NormalizeSchedule(settings);
         validationApplied |= NormalizeAutomation(settings);
+        validationApplied |= NormalizeHealthMonitoring(settings);
         validationApplied |= ClampThresholds(settings);
         validationApplied |= ClampWindowBounds(settings);
 
@@ -220,6 +221,105 @@ internal static class ProductizationPolicies
         };
     }
 
+    public static PolicyState GetPolicyState(
+        DeploymentConfiguration deployment,
+        AppSettings settings,
+        string settingKey)
+    {
+        settingKey = settingKey?.Trim() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(settingKey))
+            return PolicyState.None;
+
+        var state = settingKey switch
+        {
+            "BehaviorProfile" => !string.IsNullOrWhiteSpace(deployment.ForceBehaviorProfile)
+                ? PolicyState.Locked
+                : PolicyState.None,
+            "NotificationMode" => !string.IsNullOrWhiteSpace(deployment.ForceNotificationMode)
+                ? PolicyState.Locked
+                : IsInheritedFromProfile(settings, deployment, settingKey),
+            "SupportBundleExportLevel" => deployment.RestrictTechnicianExports || !string.IsNullOrWhiteSpace(deployment.ForceSupportBundleExportLevel)
+                ? PolicyState.Locked
+                : IsInheritedFromProfile(settings, deployment, settingKey),
+            "LandingPage" => !string.IsNullOrWhiteSpace(deployment.ForceLandingPage)
+                ? PolicyState.Locked
+                : IsInheritedFromProfile(settings, deployment, settingKey),
+            "AdvancedMode" => !deployment.AllowAdvancedMode
+                ? PolicyState.Locked
+                : IsInheritedFromProfile(settings, deployment, settingKey),
+            "MinimizeToTray" => deployment.ForceMinimizeToTray.HasValue
+                ? PolicyState.Locked
+                : IsInheritedFromProfile(settings, deployment, settingKey),
+            "RunAtStartup" => deployment.ForceRunAtStartup.HasValue
+                ? PolicyState.Locked
+                : PolicyState.None,
+            "ShowNotifications" => deployment.ForceShowNotifications.HasValue
+                ? PolicyState.Locked
+                : IsInheritedFromProfile(settings, deployment, settingKey),
+            "PreferSafeMaintenanceDefaults" => deployment.ForceSafeMaintenanceDefaults.HasValue
+                ? PolicyState.Locked
+                : IsInheritedFromProfile(settings, deployment, settingKey),
+            "RunQuickScanOnLaunch" => IsInheritedFromProfile(settings, deployment, settingKey),
+            "ShowTrayBalloons" => IsInheritedFromProfile(settings, deployment, settingKey),
+            "CheckForUpdatesOnLaunch" => IsInheritedFromProfile(settings, deployment, settingKey),
+            _ => PolicyState.None
+        };
+
+        if (state == PolicyState.None && IsManagedEditableSetting(deployment, settingKey))
+            return PolicyState.Managed;
+
+        return state;
+    }
+
+    private static bool IsManagedEditableSetting(DeploymentConfiguration deployment, string settingKey)
+    {
+        if (!deployment.ManagedMode)
+            return false;
+
+        return settingKey switch
+        {
+            "BehaviorProfile" or
+            "NotificationMode" or
+            "SupportBundleExportLevel" or
+            "LandingPage" or
+            "AdvancedMode" or
+            "RunAtStartup" or
+            "MinimizeToTray" or
+            "ShowNotifications" or
+            "PreferSafeMaintenanceDefaults" or
+            "RunQuickScanOnLaunch" or
+            "ShowTrayBalloons" or
+            "CheckForUpdatesOnLaunch" => true,
+            _ => false
+        };
+    }
+
+    private static PolicyState IsInheritedFromProfile(AppSettings settings, DeploymentConfiguration deployment, string settingKey)
+    {
+        var profile = string.IsNullOrWhiteSpace(settings.BehaviorProfile)
+            ? string.IsNullOrWhiteSpace(deployment.DefaultBehaviorProfile) ? "Standard" : deployment.DefaultBehaviorProfile
+            : settings.BehaviorProfile;
+
+        var baseline = CreateDefaultSettings();
+        ApplyBehaviorProfile(baseline, profile);
+
+        return settingKey switch
+        {
+            "NotificationMode" when string.Equals(settings.NotificationMode, baseline.NotificationMode, StringComparison.OrdinalIgnoreCase) => PolicyState.Inherited,
+            "SupportBundleExportLevel" when string.Equals(settings.SupportBundleExportLevel, baseline.SupportBundleExportLevel, StringComparison.OrdinalIgnoreCase) => PolicyState.Inherited,
+            "LandingPage" when string.Equals(settings.DefaultLandingPage, baseline.DefaultLandingPage, StringComparison.OrdinalIgnoreCase) => PolicyState.Inherited,
+            "AdvancedMode" when settings.AdvancedMode == baseline.AdvancedMode => PolicyState.Inherited,
+            "MinimizeToTray" when settings.MinimizeToTray == baseline.MinimizeToTray => PolicyState.Inherited,
+            "ShowNotifications" when settings.ShowNotifications == baseline.ShowNotifications => PolicyState.Inherited,
+            "PreferSafeMaintenanceDefaults" when settings.PreferSafeMaintenanceDefaults == baseline.PreferSafeMaintenanceDefaults => PolicyState.Inherited,
+            "RunQuickScanOnLaunch" when settings.RunQuickScanOnLaunch == baseline.RunQuickScanOnLaunch => PolicyState.Inherited,
+            "ShowTrayBalloons" when settings.ShowTrayBalloons == baseline.ShowTrayBalloons => PolicyState.Inherited,
+            "CheckForUpdatesOnLaunch" when settings.CheckForUpdatesOnLaunch == baseline.CheckForUpdatesOnLaunch => PolicyState.Inherited,
+            _ => PolicyState.None
+        };
+    }
+
     private static bool NormalizeTheme(AppSettings settings)
     {
         if (ValidThemes.Contains(settings.Theme))
@@ -305,6 +405,20 @@ internal static class ProductizationPolicies
             changed = true;
         }
 
+        return changed;
+    }
+
+    private static bool NormalizeHealthMonitoring(AppSettings settings)
+    {
+        var changed = false;
+
+        if (!Enum.IsDefined(settings.HealthAlertNotificationFrequency))
+        {
+            settings.HealthAlertNotificationFrequency = HealthAlertNotificationFrequency.All;
+            changed = true;
+        }
+
+        settings.DismissedHealthAlerts ??= [];
         return changed;
     }
 

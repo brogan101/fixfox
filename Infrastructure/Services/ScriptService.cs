@@ -11,11 +11,11 @@ namespace HelpDesk.Infrastructure.Services;
 /// <summary>
 /// Executes PowerShell fix scripts in isolated temp directories.
 /// Security guarantees:
-///   • Each run gets its own temp subdirectory — scripts cannot reference each other.
-///   • Script file is deleted immediately after process exits.
-///   • Output is capped at 8 KB to prevent UI flooding.
-///   • 90-second hard timeout with graceful kill.
-///   • No shell-execute unless admin elevation is explicitly required.
+///   â€¢ Each run gets its own temp subdirectory â€” scripts cannot reference each other.
+///   â€¢ Script file is deleted immediately after process exits.
+///   â€¢ Output is capped at 8 KB to prevent UI flooding.
+///   â€¢ 90-second hard timeout with graceful kill.
+///   â€¢ No shell-execute unless admin elevation is explicitly required.
 /// </summary>
 public sealed class ScriptService : IScriptService
 {
@@ -111,7 +111,7 @@ public sealed class ScriptService : IScriptService
             : output;
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────
+    // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     private static ProcessStartInfo BuildPsi(string path, bool admin, bool captureOutput)
     {

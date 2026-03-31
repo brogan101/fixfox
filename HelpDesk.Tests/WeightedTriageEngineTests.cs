@@ -118,4 +118,66 @@ public sealed class WeightedTriageEngineTests
         Assert.NotEmpty(result.Candidates);
         Assert.Contains("Escalate", result.Candidates[0].EscalationSignal, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public void Analyze_WithThreeCandidates_PopulatesRunnerUpRankingReasons()
+    {
+        var catalog = new FakeRepairCatalogService
+        {
+            MasterCategories =
+            [
+                new MasterCategoryDefinition { Id = "network", Title = "Internet & Connectivity" },
+                new MasterCategoryDefinition { Id = "performance", Title = "Performance & Speed" },
+                new MasterCategoryDefinition { Id = "devices", Title = "Devices & Peripherals" }
+            ],
+            Repairs =
+            [
+                new RepairDefinition
+                {
+                    Id = "flush-dns",
+                    Title = "Flush DNS cache",
+                    ShortDescription = "Fixes website and network name resolution problems.",
+                    MasterCategoryId = "network",
+                    SearchPhrases = ["wifi not working"],
+                    Synonyms = ["wifi", "internet"],
+                    SupportedSubIssues = ["dns failure"],
+                    WhatWillHappen = "FixFox will reset DNS and verify connectivity.",
+                    Fix = new FixItem { Id = "flush-dns", Title = "Flush DNS cache", Description = "Flush DNS." }
+                },
+                new RepairDefinition
+                {
+                    Id = "clear-temp-files",
+                    Title = "Clear temp files",
+                    ShortDescription = "Reduces temporary file pressure when the PC feels slow.",
+                    MasterCategoryId = "performance",
+                    SearchPhrases = ["computer slow"],
+                    Synonyms = ["slow", "lagging"],
+                    SupportedSubIssues = ["temp bloat"],
+                    WhatWillHappen = "FixFox will clear temporary files and summarize the cleanup.",
+                    Fix = new FixItem { Id = "clear-temp-files", Title = "Clear temp files", Description = "Cleanup." }
+                },
+                new RepairDefinition
+                {
+                    Id = "fix-webcam",
+                    Title = "Check webcam",
+                    ShortDescription = "Checks whether the camera is present and usable.",
+                    MasterCategoryId = "devices",
+                    SearchPhrases = ["camera issue"],
+                    Synonyms = ["camera", "webcam"],
+                    SupportedSubIssues = ["camera blocked"],
+                    WhatWillHappen = "FixFox will inspect camera state and privacy access.",
+                    Fix = new FixItem { Id = "fix-webcam", Title = "Check webcam", Description = "Camera check." }
+                }
+            ]
+        };
+
+        var engine = new WeightedTriageEngine(catalog, new FakeRepairHistoryService());
+
+        var result = engine.Analyze("wifi not working and computer slow after a camera issue");
+
+        Assert.Equal(3, result.Candidates.Count);
+        Assert.Equal(result.Candidates[0], result.Candidates.OrderByDescending(candidate => candidate.ConfidenceScore).First());
+        Assert.False(string.IsNullOrWhiteSpace(result.Candidates[1].RankingReason));
+        Assert.False(string.IsNullOrWhiteSpace(result.Candidates[2].RankingReason));
+    }
 }

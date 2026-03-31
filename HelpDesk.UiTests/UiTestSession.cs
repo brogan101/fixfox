@@ -1,5 +1,7 @@
 using System.Diagnostics;
+using System.Linq;
 using System.Runtime.InteropServices;
+using FlaUI.Core.Definitions;
 using FlaUI.Core.Input;
 using FlaUI.Core.AutomationElements;
 using FlaUI.UIA3;
@@ -78,16 +80,26 @@ internal sealed class UiTestSession : IDisposable
     }
 
     public ToggleButton FindToggle(string automationId)
-        => WaitForElement(() => MainWindow.FindFirstDescendant(cf => cf.ByAutomationId(automationId))?.AsToggleButton(),
+        => WaitForElement(() => FindByAutomationId(automationId)?.AsToggleButton(),
             $"toggle {automationId}");
 
     public TextBox FindTextBox(string automationId)
-        => WaitForElement(() => MainWindow.FindFirstDescendant(cf => cf.ByAutomationId(automationId))?.AsTextBox(),
+        => WaitForElement(() => FindByAutomationId(automationId)?.AsTextBox(),
             $"textbox {automationId}");
 
+    public AutomationElement FindElement(string automationId)
+        => WaitForElement(() => FindByAutomationId(automationId),
+            $"element {automationId}");
+
+    public AutomationElement? TryFindElement(string automationId)
+        => FindByAutomationId(automationId);
+
     public Button FindButton(string automationId)
-        => WaitForElement(() => MainWindow.FindFirstDescendant(cf => cf.ByAutomationId(automationId))?.AsButton(),
+        => WaitForElement(() => FindByAutomationId(automationId)?.AsButton(),
             $"button {automationId}");
+
+    public void RightClick(string automationId)
+        => RightClick(FindElement(automationId));
 
     public Window WaitForMainWindow()
     {
@@ -113,10 +125,48 @@ internal sealed class UiTestSession : IDisposable
 
     public void WaitForPage(string markerAutomationId, int timeoutSeconds = 40)
     {
-        WaitForElement(
-            () => MainWindow.FindFirstDescendant(cf => cf.ByAutomationId(markerAutomationId)),
-            $"page marker {markerAutomationId}",
-            timeoutSeconds);
+        var deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
+        var lastNavAttemptUtc = DateTime.MinValue;
+
+        while (DateTime.UtcNow < deadline)
+        {
+            try
+            {
+                var marker = FindByAutomationId(markerAutomationId);
+                if (marker is not null)
+                    return;
+            }
+            catch (COMException)
+            {
+                // Retry while the WPF tree is rebuilding.
+            }
+            catch (InvalidOperationException)
+            {
+                // Retry while the WPF tree is rebuilding.
+            }
+
+            if (TryGetNavAutomationId(markerAutomationId, out var navAutomationId)
+                && DateTime.UtcNow - lastNavAttemptUtc > TimeSpan.FromSeconds(2))
+            {
+                try
+                {
+                    var nav = FindByAutomationId(navAutomationId)?.AsButton();
+                    if (nav is not null)
+                    {
+                        Click(nav);
+                        lastNavAttemptUtc = DateTime.UtcNow;
+                    }
+                }
+                catch
+                {
+                    // Keep waiting; the shell may still be settling.
+                }
+            }
+
+            Thread.Sleep(200);
+        }
+
+        throw new TimeoutException($"Timed out waiting for page marker {markerAutomationId}.{Environment.NewLine}{BuildWindowDiagnosticSnapshot()}");
     }
 
     public void ClickNav(string automationId, string pageMarkerAutomationId)
@@ -131,7 +181,7 @@ internal sealed class UiTestSession : IDisposable
     public void WaitForControl(string automationId, int timeoutSeconds = 30)
     {
         WaitForElement(
-            () => MainWindow.FindFirstDescendant(cf => cf.ByAutomationId(automationId)),
+            () => FindByAutomationId(automationId),
             $"control {automationId}",
             timeoutSeconds);
     }
@@ -142,7 +192,7 @@ internal sealed class UiTestSession : IDisposable
         FlaUI.Core.Input.Keyboard.TypeSimultaneously(
             FlaUI.Core.WindowsAPI.VirtualKeyShort.CONTROL,
             FlaUI.Core.WindowsAPI.VirtualKeyShort.KEY_K);
-        FindTextBox("CommandPaletteBox").Focus();
+        FindTextBox("GlobalSearch_Input").Focus();
     }
 
     public void OpenPageWithShortcut(int digit, string pageMarkerAutomationId)
@@ -161,6 +211,50 @@ internal sealed class UiTestSession : IDisposable
     {
         MainWindow.Focus();
         FlaUI.Core.Input.Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.ESCAPE);
+    }
+
+    public void PageDown()
+    {
+        try
+        {
+            MainWindow.Focus();
+            FlaUI.Core.Input.Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.NEXT);
+        }
+        catch
+        {
+        }
+
+        try
+        {
+            var scrollTarget = MainWindow.FindAllDescendants()
+                .FirstOrDefault(element =>
+                {
+                    try
+                    {
+                        return element.Patterns.Scroll.IsSupported;
+                    }
+                    catch
+                    {
+                        return false;
+                    }
+                });
+
+            if (scrollTarget?.Patterns.Scroll.IsSupported == true)
+            {
+                scrollTarget.Patterns.Scroll.Pattern.Scroll(FlaUI.Core.Definitions.ScrollAmount.NoAmount, FlaUI.Core.Definitions.ScrollAmount.LargeIncrement);
+            }
+        }
+        catch
+        {
+        }
+
+        try
+        {
+            Mouse.Scroll(-10);
+        }
+        catch
+        {
+        }
     }
 
     public void CloseModalIfPresent(string titleContains, string buttonText = "OK", int timeoutSeconds = 5)
@@ -216,6 +310,21 @@ internal sealed class UiTestSession : IDisposable
             // Focus can fail when WPF has just rebuilt the visual tree; continue with invoke/click.
         }
 
+        if (element.ControlType == ControlType.ListItem)
+        {
+            try
+            {
+                var point = element.GetClickablePoint();
+                Mouse.MoveTo(point);
+                Mouse.Click(MouseButton.Left);
+                return;
+            }
+            catch
+            {
+                // Fall through to selection/invoke patterns.
+            }
+        }
+
         if (element.Patterns.Invoke.IsSupported)
         {
             element.Patterns.Invoke.Pattern.Invoke();
@@ -241,6 +350,30 @@ internal sealed class UiTestSession : IDisposable
         }
 
         throw new InvalidOperationException($"Element '{element.Name}' could not be clicked.");
+    }
+
+    public static void RightClick(AutomationElement element)
+    {
+        try
+        {
+            element.Focus();
+        }
+        catch
+        {
+        }
+
+        try
+        {
+            var point = element.GetClickablePoint();
+            Mouse.MoveTo(point);
+            Mouse.Click(MouseButton.Right);
+            return;
+        }
+        catch
+        {
+        }
+
+        throw new InvalidOperationException($"Element '{element.Name}' could not be right-clicked.");
     }
 
     public void Dispose()
@@ -361,17 +494,87 @@ internal sealed class UiTestSession : IDisposable
         throw new TimeoutException($"Timed out waiting for {description}.{Environment.NewLine}{BuildWindowDiagnosticSnapshot()}");
     }
 
+    private AutomationElement? FindByAutomationId(string automationId)
+    {
+        try
+        {
+            var inMainWindow = MainWindow.FindFirstDescendant(cf => cf.ByAutomationId(automationId));
+            if (inMainWindow is not null)
+                return inMainWindow;
+        }
+        catch (COMException)
+        {
+        }
+        catch (InvalidOperationException)
+        {
+        }
+
+        try
+        {
+            return Automation.GetDesktop()
+                .FindAllDescendants()
+                .FirstOrDefault(element =>
+                {
+                    try
+                    {
+                        return element.Properties.ProcessId.ValueOrDefault == Application.ProcessId
+                            && string.Equals(element.AutomationId, automationId, StringComparison.Ordinal);
+                    }
+                    catch
+                    {
+                        return false;
+                    }
+                });
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static bool TryGetNavAutomationId(string markerAutomationId, out string navAutomationId)
+    {
+        navAutomationId = markerAutomationId switch
+        {
+            "DashboardPageMarker" => "NavDashboard",
+            "FixCenterPageMarker" => "NavFixes",
+            "BundlesPageMarker" => "NavBundles",
+            "SystemInfoPageMarker" => "NavSystemInfo",
+            "SymptomCheckerPageMarker" => "NavSymptomChecker",
+            "ToolboxPageMarker" => "NavToolbox",
+            "HistoryPageMarker" => "NavHistory",
+            "HandoffPageMarker" => "NavHandoff",
+            "SettingsPageMarker" => "NavSettings",
+            _ => string.Empty
+        };
+
+        return !string.IsNullOrWhiteSpace(navAutomationId);
+    }
+
     private string BuildWindowDiagnosticSnapshot()
     {
         try
         {
-            var descendants = MainWindow.FindAllDescendants();
+            var descendants = Automation.GetDesktop()
+                .FindAllDescendants()
+                .Where(element =>
+                {
+                    try
+                    {
+                        return element.Properties.ProcessId.ValueOrDefault == Application.ProcessId;
+                    }
+                    catch
+                    {
+                        return false;
+                    }
+                })
+                .ToList();
             var interesting = descendants
                 .Select(element => new
                 {
-                    Id = element.AutomationId,
-                    Name = element.Name,
-                    ControlType = element.ControlType.ToString()
+                    Id = SafeRead(() => element.AutomationId),
+                    Name = SafeRead(() => element.Name),
+                    ControlType = SafeRead(() => element.ControlType.ToString())
                 })
                 .Where(item => !string.IsNullOrWhiteSpace(item.Id) || !string.IsNullOrWhiteSpace(item.Name))
                 .Take(80)
@@ -382,6 +585,18 @@ internal sealed class UiTestSession : IDisposable
         catch (Exception ex)
         {
             return $"UI snapshot unavailable: {ex.GetType().Name}: {ex.Message}";
+        }
+    }
+
+    private static string SafeRead(Func<string> getter)
+    {
+        try
+        {
+            return getter();
+        }
+        catch
+        {
+            return string.Empty;
         }
     }
 }

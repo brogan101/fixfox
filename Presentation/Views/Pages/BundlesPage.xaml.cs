@@ -2,9 +2,15 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
+using System.Windows.Media;
+using System.Diagnostics;
+using HelpDesk.Application.Interfaces;
 using HelpDesk.Domain.Models;
 using HelpDesk.Presentation.ViewModels;
 using Button = System.Windows.Controls.Button;
+using CheckBox = System.Windows.Controls.CheckBox;
+using RadioButton = System.Windows.Controls.RadioButton;
+using AutomationScheduleKind = HelpDesk.Domain.Enums.AutomationScheduleKind;
 using Clipboard = System.Windows.Clipboard;
 using MessageBox = System.Windows.MessageBox;
 
@@ -13,21 +19,37 @@ namespace HelpDesk.Presentation.Views.Pages;
 public partial class BundlesPage : Page
 {
     private readonly MainViewModel _vm;
+    private readonly IAppLogger _logger;
     private bool _automationRuleAutoSaveEnabled;
 
-    public BundlesPage(MainViewModel vm)
+    public BundlesPage(MainViewModel vm, IAppLogger logger)
     {
         InitializeComponent();
         _vm = vm;
+        _logger = logger;
         DataContext = _vm;
         Loaded += OnLoaded;
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
+        var stopwatch = Stopwatch.StartNew();
         Dispatcher.BeginInvoke(
-            () => _automationRuleAutoSaveEnabled = true,
+            () =>
+            {
+                _automationRuleAutoSaveEnabled = true;
+                _logger.Info($"Automation page became interactive in {stopwatch.ElapsedMilliseconds} ms.");
+            },
             DispatcherPriority.ApplicationIdle);
+
+        if (_vm.PreferAutomationAttentionTab)
+        {
+            AttentionSection.BringIntoView();
+            _vm.ClearAutomationAttentionViewRequest();
+        }
+
+        if (_vm.ConsumePendingAutomationReceiptInspection() is { } pendingReceipt)
+            ShowAutomationReceiptDetails(pendingReceipt);
     }
 
     private void MaintenanceProfileDetailsButton_Click(object sender, RoutedEventArgs e)
@@ -232,6 +254,52 @@ public partial class BundlesPage : Page
             _vm.SaveAutomationRule(rule);
     }
 
+    private async void AutomationAttentionRetry_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: AutomationAttentionItem item })
+            await _vm.RetryAutomationAttentionItemAsync(item);
+    }
+
+    private void AutomationAttentionSkip_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: AutomationAttentionItem item })
+            _vm.SkipAutomationAttentionItemOnce(item);
+    }
+
+    private void AutomationAttentionDismiss_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: AutomationAttentionItem item })
+            _vm.DismissAutomationAttentionItem(item);
+    }
+
+    private void AutomationAttentionViewReceipt_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: AutomationAttentionItem item })
+            ShowAutomationReceiptDetails(item.Receipt);
+    }
+
+    private void AutomationRulePin_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is CheckBox { DataContext: AutomationRuleSettings rule })
+            _vm.ToggleAutomationRulePin(rule);
+    }
+
+    private void AutomationRecurrenceMode_Checked(object sender, RoutedEventArgs e)
+    {
+        if (sender is not RadioButton { DataContext: AutomationRuleSettings rule, Tag: string modeText })
+            return;
+
+        if (!Enum.TryParse<AutomationScheduleKind>(modeText, ignoreCase: true, out var mode))
+            return;
+
+        if (rule.ScheduleKind == mode)
+            return;
+
+        rule.ScheduleKind = mode;
+        if (ShouldAutoSaveAutomationRuleChange(sender as FrameworkElement))
+            _vm.SaveAutomationRule(rule);
+    }
+
     private void AutomationReceiptCard_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (e.ClickCount != 2 || sender is not Border { Tag: AutomationRunReceipt receipt })
@@ -308,18 +376,7 @@ public partial class BundlesPage : Page
     }
 
     private async Task RunRunbookWithConfirmationAsync(RunbookDefinition runbook)
-    {
-        var result = MessageBox.Show(
-            $"Run \"{runbook.Title}\"?\n\n" +
-            $"{runbook.Description}\n\n" +
-            $"This workflow contains {runbook.Steps.Count} step(s).",
-            $"{_vm.ProductDisplayName} - Start Workflow",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Question);
-
-        if (result == MessageBoxResult.Yes)
-            await _vm.RunRunbookAsync(runbook);
-    }
+        => await _vm.RunRunbookAsync(runbook);
 
     private void ShowMaintenanceProfileDetails(MaintenanceProfileDefinition profile)
     {
@@ -366,5 +423,26 @@ public partial class BundlesPage : Page
                || ReferenceEquals(Keyboard.FocusedElement, element)
                || Mouse.LeftButton == MouseButtonState.Pressed
                || Mouse.RightButton == MouseButtonState.Pressed;
+    }
+
+    public void FocusFirstAutomationRule()
+    {
+        var button = FindVisualChildren<Button>(this)
+            .FirstOrDefault(candidate => candidate.Tag is AutomationRuleSettings);
+        button?.Focus();
+    }
+
+    private static IEnumerable<T> FindVisualChildren<T>(DependencyObject root) where T : DependencyObject
+    {
+        var count = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is T typed)
+                yield return typed;
+
+            foreach (var descendant in FindVisualChildren<T>(child))
+                yield return descendant;
+        }
     }
 }

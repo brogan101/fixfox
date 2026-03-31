@@ -476,7 +476,7 @@ internal static class CatalogProjection
         "office" or "apps" => "Open the target app and confirm sign-in, cache, or launch behavior is stable.",
         "updates" => "Restart if Windows recommends it, then re-check update health before escalating.",
         "files" or "remote" => "Retry the internal path, VPN resource, or mapped drive before escalating to permissions support.",
-        _ => "Validate the user’s original problem before closing the issue."
+        _ => "Validate the userâ€™s original problem before closing the issue."
     };
 
     private static string BuildNextStepOnFailure(string categoryId, FixItem fix) => categoryId switch
@@ -551,6 +551,8 @@ public sealed class BuiltInFixCatalogProvider : IFixCatalogProvider
             Description = bundle.Description,
             CategoryId = "bundle",
             EstTime = bundle.EstTime,
+            EstimatedDurationSeconds = Math.Max(120, bundle.FixIds.Count * 90),
+            RiskLevel = FixRiskLevel.Safe,
             RequiresAdmin = bundle.FixIds
                 .Select(id => Repairs.FirstOrDefault(r => string.Equals(r.Id, id, StringComparison.OrdinalIgnoreCase)))
                 .Any(r => r?.RequiresAdmin == true),
@@ -562,6 +564,9 @@ public sealed class BuiltInFixCatalogProvider : IFixCatalogProvider
                 .Any(r => r?.SupportsRestorePoint == true),
             MinimumEdition = AppEdition.Pro,
             TriggerHint = $"Recommended when you want to run the {bundle.Title.ToLowerInvariant()} pack end to end.",
+            IrreversibleActions = [],
+            NextStepIfSucceeded = "Review the workflow result and confirm the original symptom is gone before you move on.",
+            NextStepIfFailed = "Review the failed step, then switch to Support Package if the bundled repair path did not finish cleanly.",
             Steps = bundle.FixIds.Select((id, index) => new RunbookStepDefinition
             {
                 Id = $"{bundle.Id}-step-{index + 1}",
@@ -925,10 +930,9 @@ public sealed class WeightedTriageEngine : ITriageEngine
                 var category = _repairCatalog.MasterCategories.FirstOrDefault(c => string.Equals(c.Id, group.Key, StringComparison.OrdinalIgnoreCase));
                 var secondScore = ranked.Skip(1).FirstOrDefault()?.Score ?? 0;
                 var score = Math.Min(100, best.Score);
-                var label = score >= 75 ? "High confidence"
-                    : score >= 60 ? "Likely"
-                    : score >= 45 ? "Possible"
-                    : "Low confidence";
+                var label = score >= 75 ? "High"
+                    : score >= 55 ? "Medium"
+                    : "Low";
                 var reasons = best.Reasons.Take(3).ToList();
                 var probableSubIssue = best.MatchedSubIssue
                     ?? "General support issue";
@@ -944,6 +948,14 @@ public sealed class WeightedTriageEngine : ITriageEngine
                     ?? ranked.Select(x => x.Repair).Skip(1).FirstOrDefault()
                     ?? safestRepair;
                 var diagnosticsFirst = score < 65 || (score - secondScore) < 12;
+                var relatedRunbooks = best.Repair.RelatedRunbooks
+                    .Where(id => !string.IsNullOrWhiteSpace(id))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Take(2)
+                    .ToList();
+                var guidedCheckFix = ranked
+                    .Select(x => x.Repair.Fix)
+                    .FirstOrDefault(fix => fix.HasSteps);
 
                 return new TriageCandidate
                 {
@@ -962,12 +974,25 @@ public sealed class WeightedTriageEngine : ITriageEngine
                     StrongerNextAction = BuildStrongerActionText(safestRepair, deeperRepair),
                     EscalationSignal = BuildEscalationSignal(normalizedQuery, context, best.Repair, score, secondScore),
                     RecommendDiagnosticsFirst = diagnosticsFirst,
-                    RecommendedFixIds = ranked.Select(x => x.Repair.Id).Distinct(StringComparer.OrdinalIgnoreCase).Take(4).ToList()
+                    PrimaryFixId = safestRepair.Id,
+                    GuidedCheckFixId = guidedCheckFix?.Id,
+                    PrimaryRunbookId = relatedRunbooks.FirstOrDefault(),
+                    RecommendedFixIds = ranked.Select(x => x.Repair.Id).Distinct(StringComparer.OrdinalIgnoreCase).Take(4).ToList(),
+                    RecommendedRunbookIds = relatedRunbooks
                 };
             })
             .OrderByDescending(c => c.ConfidenceScore)
             .Take(3)
             .ToList();
+
+        if (candidates.Count > 0)
+        {
+            var topCandidate = candidates[0];
+            topCandidate.RankingReason = BuildTopRankingReason(topCandidate);
+
+            for (var index = 1; index < candidates.Count; index++)
+                candidates[index].RankingReason = BuildRunnerUpRankingReason(candidates[index], topCandidate);
+        }
 
         return new TriageResult
         {
@@ -1131,6 +1156,26 @@ public sealed class WeightedTriageEngine : ITriageEngine
         return "Escalate if the recommended first action fails or the problem returns immediately.";
     }
 
+    private static string BuildTopRankingReason(TriageCandidate candidate)
+    {
+        if (!string.IsNullOrWhiteSpace(candidate.WhyIThinkThat))
+            return $"This ranked highest because {candidate.WhyIThinkThat.TrimEnd('.')} and the symptom language points most strongly to {candidate.CategoryName.ToLowerInvariant()}.";
+
+        return $"This ranked highest because the symptom language points most strongly to {candidate.CategoryName.ToLowerInvariant()}.";
+    }
+
+    private static string BuildRunnerUpRankingReason(TriageCandidate candidate, TriageCandidate topCandidate)
+    {
+        var runnerReason = string.IsNullOrWhiteSpace(candidate.WhyIThinkThat)
+            ? $"{candidate.CategoryName} still matched part of the symptom description"
+            : candidate.WhyIThinkThat.TrimEnd('.');
+        var topReason = string.IsNullOrWhiteSpace(topCandidate.WhyIThinkThat)
+            ? $"the top result matched the stronger signals for {topCandidate.CategoryName.ToLowerInvariant()}"
+            : topCandidate.WhyIThinkThat.TrimEnd('.');
+
+        return $"{runnerReason}, but it ranked below the top result because {topReason}.";
+    }
+
     private static int ScorePhrase(string source, string query, string[] tokens, HashSet<string> expandedTerms)
     {
         if (string.IsNullOrWhiteSpace(source))
@@ -1254,11 +1299,21 @@ public sealed class RunbookCatalogService : IRunbookCatalogService
             "Clears low-risk clutter fast so the user can recover space without broader system changes.",
             "maintenance",
             "~4 min",
+            240,
             repairCatalog,
             knownIds,
-            RepairStep("quick-clean-runbook", 1, "Clear temp files", "clear-temp-files"),
-            RepairStep("quick-clean-runbook", 2, "Empty the Recycle Bin", "empty-recycle-bin", stopOnFailure: false),
-            VerificationStep("quick-clean-runbook", 3, "Confirm free space improved"));
+            irreversibleActions:
+            [
+                "Temporary files and recycle bin contents that are removed by this workflow cannot be restored from FixFox."
+            ],
+            nextStepIfSucceeded: "Recheck free space and reopen the app or workflow that was failing because of storage pressure.",
+            nextStepIfFailed: "If cleanup did not free enough space, open Storage Review or create a support package before deleting user data manually.",
+            requestedSteps: new RunbookStepDefinition[]
+            {
+                RepairStep("quick-clean-runbook", 1, "Clear temp files", "clear-temp-files"),
+                RepairStep("quick-clean-runbook", 2, "Empty the Recycle Bin", "empty-recycle-bin", stopOnFailure: false),
+                VerificationStep("quick-clean-runbook", 3, "Confirm free space improved")
+            });
 
         yield return BuildRunbook(
             "disk-full-rescue-runbook",
@@ -1266,14 +1321,24 @@ public sealed class RunbookCatalogService : IRunbookCatalogService
             "Starts with safe clutter removal, then escalates to deeper Windows cleanup when the system drive is under real pressure.",
             "storage",
             "~7 min",
+            420,
             repairCatalog,
             knownIds,
-            DiagnosticStep("disk-full-rescue-runbook", 1, "Confirm the system drive is actually the pressure point"),
-            RepairStep("disk-full-rescue-runbook", 2, "Clear temp files", "clear-temp-files"),
-            RepairStep("disk-full-rescue-runbook", 3, "Empty the Recycle Bin", "empty-recycle-bin", stopOnFailure: false),
-            RepairStep("disk-full-rescue-runbook", 4, "Clear browser caches", "clear-browser-cache-all", stopOnFailure: false),
-            VerificationStep("disk-full-rescue-runbook", 5, "Re-check free space after cleanup"),
-            RepairStep("disk-full-rescue-runbook", 6, "Run Disk Cleanup", "run-disk-cleanup", stopOnFailure: false));
+            irreversibleActions:
+            [
+                "Temporary files, recycle bin contents, and browser caches removed during cleanup cannot be restored from FixFox."
+            ],
+            nextStepIfSucceeded: "Confirm the drive has enough free space for the blocked task, then retry the original workflow.",
+            nextStepIfFailed: "If storage is still critically low, move to Storage Review or create a support package before deleting user files.",
+            requestedSteps: new RunbookStepDefinition[]
+            {
+                DiagnosticStep("disk-full-rescue-runbook", 1, "Confirm the system drive is actually the pressure point"),
+                RepairStep("disk-full-rescue-runbook", 2, "Clear temp files", "clear-temp-files"),
+                RepairStep("disk-full-rescue-runbook", 3, "Empty the Recycle Bin", "empty-recycle-bin", stopOnFailure: false),
+                RepairStep("disk-full-rescue-runbook", 4, "Clear browser caches", "clear-browser-cache-all", stopOnFailure: false),
+                VerificationStep("disk-full-rescue-runbook", 5, "Re-check free space after cleanup"),
+                RepairStep("disk-full-rescue-runbook", 6, "Run Disk Cleanup", "run-disk-cleanup", stopOnFailure: false)
+            });
 
         yield return BuildRunbook(
             "printing-rescue-runbook",
@@ -1281,13 +1346,23 @@ public sealed class RunbookCatalogService : IRunbookCatalogService
             "Stabilizes the spooler, clears stuck queues, and resets default printer routing before the user is sent to deeper printer escalation.",
             "devices",
             "~5 min",
+            300,
             repairCatalog,
             knownIds,
-            DiagnosticStep("printing-rescue-runbook", 1, "Confirm the printer is online and reachable"),
-            RepairStep("printing-rescue-runbook", 2, "Restart the print spooler", "restart-spooler", stopOnFailure: false),
-            RepairStep("printing-rescue-runbook", 3, "Clear the print queue", "clear-print-queue"),
-            VerificationStep("printing-rescue-runbook", 4, "Confirm the queue is clear and the spooler is responding"),
-            RepairStep("printing-rescue-runbook", 5, "Review the default printer", "set-default-printer", stopOnFailure: false));
+            irreversibleActions:
+            [
+                "Stuck print jobs that are cleared from the queue cannot be recovered."
+            ],
+            nextStepIfSucceeded: "Print a small test page before returning to the original document or line-of-business app.",
+            nextStepIfFailed: "If the queue or spooler still fails, create a support package and include the printer model and connection type.",
+            requestedSteps: new RunbookStepDefinition[]
+            {
+                DiagnosticStep("printing-rescue-runbook", 1, "Confirm the printer is online and reachable"),
+                RepairStep("printing-rescue-runbook", 2, "Restart the print spooler", "restart-spooler", stopOnFailure: false),
+                RepairStep("printing-rescue-runbook", 3, "Clear the print queue", "clear-print-queue"),
+                VerificationStep("printing-rescue-runbook", 4, "Confirm the queue is clear and the spooler is responding"),
+                RepairStep("printing-rescue-runbook", 5, "Review the default printer", "set-default-printer", stopOnFailure: false)
+            });
 
         yield return BuildRunbook(
             "safe-maintenance-runbook",
@@ -1295,13 +1370,23 @@ public sealed class RunbookCatalogService : IRunbookCatalogService
             "Runs a conservative cleanup and core Windows health check without broad resets or aggressive system changes.",
             "maintenance",
             "~6 min",
+            360,
             repairCatalog,
             knownIds,
-            RepairStep("safe-maintenance-runbook", 1, "Clear temp files", "clear-temp-files"),
-            RepairStep("safe-maintenance-runbook", 2, "Empty the Recycle Bin", "empty-recycle-bin", stopOnFailure: false),
-            RepairStep("safe-maintenance-runbook", 3, "Check Defender status", "check-defender-status", stopOnFailure: false),
-            RepairStep("safe-maintenance-runbook", 4, "Check firewall status", "check-firewall", stopOnFailure: false),
-            VerificationStep("safe-maintenance-runbook", 5, "Confirm free space and core security are in a healthier state"));
+            irreversibleActions:
+            [
+                "Temporary files and recycle bin contents removed by this workflow cannot be restored from FixFox."
+            ],
+            nextStepIfSucceeded: "Let the device settle for a minute, then check whether the original issue still reproduces.",
+            nextStepIfFailed: "If the problem remains, move to Guided Diagnosis so FixFox can narrow the issue before deeper repair.",
+            requestedSteps: new RunbookStepDefinition[]
+            {
+                RepairStep("safe-maintenance-runbook", 1, "Clear temp files", "clear-temp-files"),
+                RepairStep("safe-maintenance-runbook", 2, "Empty the Recycle Bin", "empty-recycle-bin", stopOnFailure: false),
+                RepairStep("safe-maintenance-runbook", 3, "Check Defender status", "check-defender-status", stopOnFailure: false),
+                RepairStep("safe-maintenance-runbook", 4, "Check firewall status", "check-firewall", stopOnFailure: false),
+                VerificationStep("safe-maintenance-runbook", 5, "Confirm free space and core security are in a healthier state")
+            });
 
         yield return BuildRunbook(
             "slow-pc-runbook",
@@ -1309,21 +1394,31 @@ public sealed class RunbookCatalogService : IRunbookCatalogService
             "Checks storage pressure first, removes temp bloat, then escalates to heavier cleanup only if needed.",
             "performance",
             "~8 min",
+            480,
             repairCatalog,
             knownIds,
-            new RunbookStepDefinition
+            irreversibleActions:
+            [
+                "Temporary files removed during cleanup cannot be restored from FixFox."
+            ],
+            nextStepIfSucceeded: "Restart the slow app or reopen the desktop session and confirm startup or responsiveness improved.",
+            nextStepIfFailed: "If the device is still slow, switch to Device Health or create a support package with the recent receipts.",
+            requestedSteps: new RunbookStepDefinition[]
             {
-                Id = "slow-pc-runbook-intro",
-                Title = "Confirm the symptom",
-                Description = "Verify the problem is general system slowness rather than one specific app or network issue.",
-                StepKind = RunbookStepKind.Message,
-                PostStepMessage = "If one app is the only problem, route to the app-specific repair path instead."
-            },
-            RepairStep("slow-pc-runbook", 1, "Check startup pressure", "manage-startup-programs"),
-            RepairStep("slow-pc-runbook", 2, "Clear temp bloat", "clear-temp-files"),
-            VerificationStep("slow-pc-runbook", 3, "Re-check free space and responsiveness"),
-            RepairStep("slow-pc-runbook", 4, "Run Windows cleanup", "run-disk-cleanup"),
-            RepairStep("slow-pc-runbook", 5, "Tune visual overhead", "optimize-visual-effects", stopOnFailure: false));
+                new()
+                {
+                    Id = "slow-pc-runbook-intro",
+                    Title = "Confirm the symptom",
+                    Description = "Verify the problem is general system slowness rather than one specific app or network issue.",
+                    StepKind = RunbookStepKind.Message,
+                    PostStepMessage = "If one app is the only problem, route to the app-specific repair path instead."
+                },
+                RepairStep("slow-pc-runbook", 1, "Check startup pressure", "manage-startup-programs"),
+                RepairStep("slow-pc-runbook", 2, "Clear temp bloat", "clear-temp-files"),
+                VerificationStep("slow-pc-runbook", 3, "Re-check free space and responsiveness"),
+                RepairStep("slow-pc-runbook", 4, "Run Windows cleanup", "run-disk-cleanup"),
+                RepairStep("slow-pc-runbook", 5, "Tune visual overhead", "optimize-visual-effects", stopOnFailure: false)
+            });
 
         yield return BuildRunbook(
             "internet-recovery-runbook",
@@ -1331,14 +1426,24 @@ public sealed class RunbookCatalogService : IRunbookCatalogService
             "Starts with adapter and DNS checks, then moves to broader resets only if basic connectivity still fails.",
             "network",
             "~6 min",
+            360,
             repairCatalog,
             knownIds,
-            DiagnosticStep("internet-recovery-runbook", 1, "Capture current network state"),
-            RepairStep("internet-recovery-runbook", 2, "Check the internet path", "test-connection", stopOnFailure: false),
-            RepairStep("internet-recovery-runbook", 3, "Flush DNS", "flush-dns"),
-            VerificationStep("internet-recovery-runbook", 4, "Validate DNS and reachability"),
-            RepairStep("internet-recovery-runbook", 5, "Renew the IP lease", "renew-ip"),
-            RepairStep("internet-recovery-runbook", 6, "Reset the network stack", "full-network-reset", stopOnFailure: false));
+            irreversibleActions:
+            [
+                "Network reset steps can remove saved adapter state and may briefly disconnect the current session."
+            ],
+            nextStepIfSucceeded: "Retry the site, service, or VPN path that originally failed before changing anything else.",
+            nextStepIfFailed: "If internet access still fails after the reset path, create a support package and include whether other devices are affected.",
+            requestedSteps: new RunbookStepDefinition[]
+            {
+                DiagnosticStep("internet-recovery-runbook", 1, "Capture current network state"),
+                RepairStep("internet-recovery-runbook", 2, "Check the internet path", "test-connection", stopOnFailure: false),
+                RepairStep("internet-recovery-runbook", 3, "Flush DNS", "flush-dns"),
+                VerificationStep("internet-recovery-runbook", 4, "Validate DNS and reachability"),
+                RepairStep("internet-recovery-runbook", 5, "Renew the IP lease", "renew-ip"),
+                RepairStep("internet-recovery-runbook", 6, "Reset the network stack", "full-network-reset", stopOnFailure: false)
+            });
 
         yield return BuildRunbook(
             "browser-problem-runbook",
@@ -1346,13 +1451,23 @@ public sealed class RunbookCatalogService : IRunbookCatalogService
             "Separates browser cache issues from wider internet issues so the user does not jump straight to network resets.",
             "apps",
             "~5 min",
+            300,
             repairCatalog,
             knownIds,
-            DiagnosticStep("browser-problem-runbook", 1, "Check whether only the browser is affected"),
-            RepairStep("browser-problem-runbook", 2, "Validate internet access", "test-connection", stopOnFailure: false),
-            RepairStep("browser-problem-runbook", 3, "Flush DNS", "flush-dns", stopOnFailure: false),
-            RepairStep("browser-problem-runbook", 4, "Clear browser caches", "clear-browser-cache-all"),
-            VerificationStep("browser-problem-runbook", 5, "Confirm browsing works without stale cache or DNS"));
+            irreversibleActions:
+            [
+                "Browser caches cleared by this workflow cannot be restored and some sites may ask you to sign in again."
+            ],
+            nextStepIfSucceeded: "Reopen the browser and retry the affected site before making broader network changes.",
+            nextStepIfFailed: "If browsing still fails but other internet apps work, export a support package and note which browser is affected.",
+            requestedSteps: new RunbookStepDefinition[]
+            {
+                DiagnosticStep("browser-problem-runbook", 1, "Check whether only the browser is affected"),
+                RepairStep("browser-problem-runbook", 2, "Validate internet access", "test-connection", stopOnFailure: false),
+                RepairStep("browser-problem-runbook", 3, "Flush DNS", "flush-dns", stopOnFailure: false),
+                RepairStep("browser-problem-runbook", 4, "Clear browser caches", "clear-browser-cache-all"),
+                VerificationStep("browser-problem-runbook", 5, "Confirm browsing works without stale cache or DNS")
+            });
 
         yield return BuildRunbook(
             "work-from-home-runbook",
@@ -1360,22 +1475,32 @@ public sealed class RunbookCatalogService : IRunbookCatalogService
             "Checks internet basics, then moves through VPN and work-app remediation before escalating auth or policy issues.",
             "remote",
             "~9 min",
+            540,
             repairCatalog,
             knownIds,
-            DiagnosticStep("work-from-home-runbook", 1, "Confirm whether internet works outside the VPN"),
-            RepairStep("work-from-home-runbook", 2, "Validate internet access", "test-connection", stopOnFailure: false),
-            RepairStep("work-from-home-runbook", 3, "Flush DNS", "flush-dns"),
-            RepairStep("work-from-home-runbook", 4, "Stabilize VPN session", "fix-vpn-disconnect", stopOnFailure: false),
-            RepairStep("work-from-home-runbook", 5, "Clear Teams cache", "clear-teams-cache", stopOnFailure: false),
-            VerificationStep("work-from-home-runbook", 6, "Confirm network and remote-work services respond"),
-            new RunbookStepDefinition
+            irreversibleActions:
+            [
+                "Clearing cached app data or re-establishing VPN state may sign you out of work apps."
+            ],
+            nextStepIfSucceeded: "Retry the work resource, mapped drive, or meeting app that originally failed while the session is still fresh.",
+            nextStepIfFailed: "If VPN sign-in, certificates, or internal resources still fail, create a support package and escalate with the receipt.",
+            requestedSteps: new RunbookStepDefinition[]
             {
-                Id = "work-from-home-runbook-escalate",
-                Title = "Escalate account or certificate failures",
-                Description = "If VPN sign-in, cert, MFA, or mapped-drive access still fails, escalate to IT with the support package.",
-                StepKind = RunbookStepKind.KnowledgeBase,
-                StopOnFailure = false,
-                PostStepMessage = "This step exists so FixFox stops acting like cert or policy failures are local PC fixes."
+                DiagnosticStep("work-from-home-runbook", 1, "Confirm whether internet works outside the VPN"),
+                RepairStep("work-from-home-runbook", 2, "Validate internet access", "test-connection", stopOnFailure: false),
+                RepairStep("work-from-home-runbook", 3, "Flush DNS", "flush-dns"),
+                RepairStep("work-from-home-runbook", 4, "Stabilize VPN session", "fix-vpn-disconnect", stopOnFailure: false),
+                RepairStep("work-from-home-runbook", 5, "Clear Teams cache", "clear-teams-cache", stopOnFailure: false),
+                VerificationStep("work-from-home-runbook", 6, "Confirm network and remote-work services respond"),
+                new()
+                {
+                    Id = "work-from-home-runbook-escalate",
+                    Title = "Escalate account or certificate failures",
+                    Description = "If VPN sign-in, cert, MFA, or mapped-drive access still fails, escalate to IT with the support package.",
+                    StepKind = RunbookStepKind.KnowledgeBase,
+                    StopOnFailure = false,
+                    PostStepMessage = "This step exists so FixFox stops acting like cert or policy failures are local PC fixes."
+                }
             });
 
         yield return BuildRunbook(
@@ -1384,13 +1509,23 @@ public sealed class RunbookCatalogService : IRunbookCatalogService
             "A practical weekly support workflow: free space, clear stale caches, and check core security health.",
             "maintenance",
             "~7 min",
+            420,
             repairCatalog,
             knownIds,
-            RepairStep("routine-maintenance-runbook", 1, "Clear temp files", "clear-temp-files"),
-            RepairStep("routine-maintenance-runbook", 2, "Clear browser caches", "clear-browser-cache-all", stopOnFailure: false),
-            RepairStep("routine-maintenance-runbook", 3, "Check Defender status", "check-defender-status", stopOnFailure: false),
-            RepairStep("routine-maintenance-runbook", 4, "Check firewall status", "check-firewall", stopOnFailure: false),
-            VerificationStep("routine-maintenance-runbook", 5, "Confirm the workstation is in a healthier steady state"));
+            irreversibleActions:
+            [
+                "Temporary files and browser caches removed during maintenance cannot be restored from FixFox."
+            ],
+            nextStepIfSucceeded: "Leave automation enabled if the device is healthy now, then review Activity only if issues return.",
+            nextStepIfFailed: "If maintenance surfaces repeated warnings, move to Guided Diagnosis or export a support package for escalation.",
+            requestedSteps: new RunbookStepDefinition[]
+            {
+                RepairStep("routine-maintenance-runbook", 1, "Clear temp files", "clear-temp-files"),
+                RepairStep("routine-maintenance-runbook", 2, "Clear browser caches", "clear-browser-cache-all", stopOnFailure: false),
+                RepairStep("routine-maintenance-runbook", 3, "Check Defender status", "check-defender-status", stopOnFailure: false),
+                RepairStep("routine-maintenance-runbook", 4, "Check firewall status", "check-firewall", stopOnFailure: false),
+                VerificationStep("routine-maintenance-runbook", 5, "Confirm the workstation is in a healthier steady state")
+            });
 
         yield return BuildRunbook(
             "meeting-device-runbook",
@@ -1398,13 +1533,23 @@ public sealed class RunbookCatalogService : IRunbookCatalogService
             "Checks the audio path, microphone, and camera in a sensible order before pushing the user toward app-specific escalation.",
             "devices",
             "~6 min",
+            360,
             repairCatalog,
             knownIds,
-            DiagnosticStep("meeting-device-runbook", 1, "Confirm whether the problem is audio, microphone, camera, or device selection"),
-            RepairStep("meeting-device-runbook", 2, "Restart the audio service", "restart-audio-service", stopOnFailure: false),
-            RepairStep("meeting-device-runbook", 3, "Check microphone access and defaults", "fix-microphone", stopOnFailure: false),
-            RepairStep("meeting-device-runbook", 4, "Check camera access and presence", "fix-webcam", stopOnFailure: false),
-            VerificationStep("meeting-device-runbook", 5, "Confirm meeting devices are visible and available to apps"));
+            irreversibleActions:
+            [
+                "Clearing meeting-app cache may sign you out and remove recent in-app state."
+            ],
+            nextStepIfSucceeded: "Rejoin a quick test meeting and confirm the right mic, speaker, and camera are still selected.",
+            nextStepIfFailed: "If a device is still missing or blocked, create a support package and include the meeting app name.",
+            requestedSteps: new RunbookStepDefinition[]
+            {
+                DiagnosticStep("meeting-device-runbook", 1, "Confirm whether the problem is audio, microphone, camera, or device selection"),
+                RepairStep("meeting-device-runbook", 2, "Restart the audio service", "restart-audio-service", stopOnFailure: false),
+                RepairStep("meeting-device-runbook", 3, "Check microphone access and defaults", "fix-microphone", stopOnFailure: false),
+                RepairStep("meeting-device-runbook", 4, "Check camera access and presence", "fix-webcam", stopOnFailure: false),
+                VerificationStep("meeting-device-runbook", 5, "Confirm meeting devices are visible and available to apps")
+            });
 
         yield return BuildRunbook(
             "windows-repair-runbook",
@@ -1412,22 +1557,29 @@ public sealed class RunbookCatalogService : IRunbookCatalogService
             "Starts with update health, then uses Windows-native integrity repair tools before routing to recovery options.",
             "windows",
             "~12 min",
+            720,
             repairCatalog,
             knownIds,
-            DiagnosticStep("windows-repair-runbook", 1, "Capture update and servicing state"),
-            RepairStep("windows-repair-runbook", 2, "Check or reset Windows Update health", "fix-stuck-windows-update", stopOnFailure: false),
-            VerificationStep("windows-repair-runbook", 3, "Confirm update services respond"),
-            RepairStep("windows-repair-runbook", 4, "Run System File Checker", "run-sfc"),
-            RepairStep("windows-repair-runbook", 5, "Run DISM servicing repair", "run-dism", stopOnFailure: false),
-            new RunbookStepDefinition
+            riskLevel: FixRiskLevel.MayRestart,
+            nextStepIfSucceeded: "Restart the PC if Windows or servicing requested it, then confirm the original system issue no longer reproduces.",
+            nextStepIfFailed: "If integrity repair or update reset still leaves Windows unstable, move to Recovery and create a support package before a reset.",
+            requestedSteps: new RunbookStepDefinition[]
             {
-                Id = "windows-repair-runbook-recovery",
-                Title = "Route to Windows recovery options when local repair is not enough",
-                Description = "Open Recovery options for startup repair, uninstall update, or reset guidance when servicing repair does not restore the system.",
-                StepKind = RunbookStepKind.Repair,
-                LinkedRepairId = "open-recovery-options",
-                StopOnFailure = false,
-                PostStepMessage = "Recovery is the next grounded step when update or integrity repair still leaves Windows unstable."
+                DiagnosticStep("windows-repair-runbook", 1, "Capture update and servicing state"),
+                RepairStep("windows-repair-runbook", 2, "Check or reset Windows Update health", "fix-stuck-windows-update", stopOnFailure: false),
+                VerificationStep("windows-repair-runbook", 3, "Confirm update services respond"),
+                RepairStep("windows-repair-runbook", 4, "Run System File Checker", "run-sfc"),
+                RepairStep("windows-repair-runbook", 5, "Run DISM servicing repair", "run-dism", stopOnFailure: false),
+                new()
+                {
+                    Id = "windows-repair-runbook-recovery",
+                    Title = "Route to Windows recovery options when local repair is not enough",
+                    Description = "Open Recovery options for startup repair, uninstall update, or reset guidance when servicing repair does not restore the system.",
+                    StepKind = RunbookStepKind.Repair,
+                    LinkedRepairId = "open-recovery-options",
+                    StopOnFailure = false,
+                    PostStepMessage = "Recovery is the next grounded step when update or integrity repair still leaves Windows unstable."
+                }
             });
     }
 
@@ -1437,8 +1589,14 @@ public sealed class RunbookCatalogService : IRunbookCatalogService
         string description,
         string categoryId,
         string estTime,
+        int estimatedDurationSeconds,
         IRepairCatalogService repairCatalog,
         ISet<string> knownIds,
+        FixRiskLevel riskLevel = FixRiskLevel.Safe,
+        bool isDestructive = false,
+        IReadOnlyList<string>? irreversibleActions = null,
+        string nextStepIfFailed = "",
+        string nextStepIfSucceeded = "",
         params RunbookStepDefinition[] requestedSteps)
     {
         var steps = requestedSteps
@@ -1459,11 +1617,21 @@ public sealed class RunbookCatalogService : IRunbookCatalogService
             Description = description,
             CategoryId = categoryId,
             EstTime = estTime,
+            EstimatedDurationSeconds = estimatedDurationSeconds,
+            RiskLevel = riskLevel,
+            IsDestructive = isDestructive,
             RequiresAdmin = linkedRepairs.Any(repair => repair.RequiresAdmin),
             SupportsRollback = linkedRepairs.Any(repair => repair.SupportsRollback),
             SupportsRestorePoint = linkedRepairs.Any(repair => repair.SupportsRestorePoint),
             MinimumEdition = AppEdition.Basic,
             TriggerHint = description,
+            IrreversibleActions = irreversibleActions?.Where(text => !string.IsNullOrWhiteSpace(text)).ToList() ?? [],
+            NextStepIfFailed = string.IsNullOrWhiteSpace(nextStepIfFailed)
+                ? "If this workflow does not finish cleanly, review the failed step and create a support package before deeper repair."
+                : nextStepIfFailed,
+            NextStepIfSucceeded = string.IsNullOrWhiteSpace(nextStepIfSucceeded)
+                ? "Confirm the original issue is resolved before you move on."
+                : nextStepIfSucceeded,
             Steps = steps
         };
     }
@@ -1546,6 +1714,18 @@ public sealed class RepairHistoryService : IRepairHistoryService
         while (_entries.Count > 250)
             _entries.RemoveAt(_entries.Count - 1);
 
+        Persist();
+    }
+
+    public void Delete(IEnumerable<string> entryIds)
+    {
+        var idSet = entryIds
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (idSet.Count == 0)
+            return;
+
+        _entries.RemoveAll(entry => idSet.Contains(entry.Id));
         Persist();
     }
 
@@ -2870,7 +3050,7 @@ public sealed class RunbookExecutionService : IRunbookExecutionService
         if (effectiveEdition < runbook.MinimumEdition)
         {
             var summary = $"{runbook.Title} is available in {FormatEdition(runbook.MinimumEdition)}.";
-            _repairHistoryService.Record(new RepairHistoryEntry
+            var blockedReceipt = new RepairHistoryEntry
             {
                 Query = userQuery,
                 CategoryId = runbook.CategoryId,
@@ -2885,9 +3065,10 @@ public sealed class RunbookExecutionService : IRunbookExecutionService
                 PreStateSummary = "Workflow blocked before execution.",
                 PostStateSummary = summary,
                 VerificationSummary = "Workflow did not run.",
-                NextStep = "Choose a workflow available in the current edition or use the standard repair path.",
+                NextStep = runbook.NextStepIfFailed,
                 ChangedSummary = "No workflow steps ran."
-            });
+            };
+            _repairHistoryService.Record(blockedReceipt);
 
             return new RunbookExecutionSummary
             {
@@ -2896,13 +3077,31 @@ public sealed class RunbookExecutionService : IRunbookExecutionService
                 Success = false,
                 CompletedSteps = 0,
                 TotalSteps = runbook.Steps.Count,
+                Outcome = ExecutionOutcome.Blocked,
                 Summary = summary,
-                Timeline = [summary]
+                Timeline = [summary],
+                StepResults =
+                [
+                    new RunbookStepResult
+                    {
+                        StepId = "edition-check",
+                        Title = "Edition check",
+                        StepKind = RunbookStepKind.KnowledgeBase,
+                        Success = false,
+                        Summary = summary,
+                        ChangesMade = ["No workflow changes were made."]
+                    }
+                ],
+                ChangesMade = ["No workflow changes were made."],
+                NextStepText = runbook.NextStepIfFailed,
+                Receipt = blockedReceipt
             };
         }
 
         var results = new List<RepairExecutionResult>();
+        var stepResults = new List<RunbookStepResult>();
         var timeline = new List<string>();
+        var changesMade = new List<string>();
         var completedSteps = 0;
         var blockedStep = "";
 
@@ -2920,7 +3119,19 @@ public sealed class RunbookExecutionService : IRunbookExecutionService
 
             if (step.StepKind != RunbookStepKind.Repair || string.IsNullOrWhiteSpace(step.LinkedRepairId))
             {
-                timeline.Add($"{step.Title}: {BuildNonRepairStepMessage(step)}");
+                var stepSummary = BuildNonRepairStepMessage(step);
+                timeline.Add($"{step.Title}: {stepSummary}");
+                stepResults.Add(new RunbookStepResult
+                {
+                    StepId = step.Id,
+                    Title = step.Title,
+                    StepKind = step.StepKind,
+                    Success = true,
+                    Summary = stepSummary,
+                    ChangesMade = string.IsNullOrWhiteSpace(step.PostStepMessage)
+                        ? []
+                        : [step.PostStepMessage]
+                });
                 completedSteps++;
                 continue;
             }
@@ -2928,7 +3139,17 @@ public sealed class RunbookExecutionService : IRunbookExecutionService
             var fix = _catalog.GetById(step.LinkedRepairId);
             if (fix is null)
             {
-                timeline.Add($"{step.Title}: linked repair '{step.LinkedRepairId}' was not found.");
+                var missingSummary = $"linked repair '{step.LinkedRepairId}' was not found.";
+                timeline.Add($"{step.Title}: {missingSummary}");
+                stepResults.Add(new RunbookStepResult
+                {
+                    StepId = step.Id,
+                    Title = step.Title,
+                    StepKind = step.StepKind,
+                    Success = false,
+                    Summary = missingSummary,
+                    ChangesMade = ["No changes were made because the linked repair was missing."]
+                });
                 if (step.StopOnFailure)
                 {
                     blockedStep = step.Title;
@@ -2941,6 +3162,19 @@ public sealed class RunbookExecutionService : IRunbookExecutionService
             results.Add(result);
             completedSteps++;
             timeline.Add($"{step.Title}: {result.Summary}");
+            var stepChanges = BuildRunbookStepChanges(step, result);
+            changesMade.AddRange(stepChanges);
+            stepResults.Add(new RunbookStepResult
+            {
+                StepId = step.Id,
+                Title = step.Title,
+                StepKind = step.StepKind,
+                Success = result.Success,
+                Summary = result.Success
+                    ? result.Summary
+                    : string.IsNullOrWhiteSpace(result.FailureSummary) ? result.Summary : result.FailureSummary,
+                ChangesMade = stepChanges
+            });
 
             if (!result.Success && step.StopOnFailure)
             {
@@ -2952,7 +3186,8 @@ public sealed class RunbookExecutionService : IRunbookExecutionService
         _statePersistenceService.Clear();
 
         var success = completedSteps == runbook.Steps.Count && results.All(r => r.Success);
-        _repairHistoryService.Record(new RepairHistoryEntry
+        var nextStepText = success ? runbook.NextStepIfSucceeded : runbook.NextStepIfFailed;
+        var receipt = new RepairHistoryEntry
         {
             Query = userQuery,
             CategoryId = runbook.CategoryId,
@@ -2969,12 +3204,13 @@ public sealed class RunbookExecutionService : IRunbookExecutionService
             VerificationSummary = results.All(r => r.Verification.Status != VerificationStatus.Failed)
                 ? "Workflow verification did not detect a hard failure."
                 : "One or more repair steps failed verification.",
-            NextStep = success
-                ? "Review the result and export a support package only if the issue persists."
-                : "Review the blocking step, rerun only what makes sense, or export a support package.",
+            NextStep = nextStepText,
             RollbackSummary = results.FirstOrDefault(r => r.Rollback.IsAvailable)?.Rollback.Summary ?? "No workflow-level rollback was captured.",
-            ChangedSummary = string.Join(" | ", results.Select(r => r.Summary).Where(text => !string.IsNullOrWhiteSpace(text)))
-        });
+            ChangedSummary = changesMade.Count == 0
+                ? "No workflow changes were captured."
+                : string.Join(" | ", changesMade.Distinct(StringComparer.OrdinalIgnoreCase))
+        };
+        _repairHistoryService.Record(receipt);
 
         return new RunbookExecutionSummary
         {
@@ -2983,12 +3219,19 @@ public sealed class RunbookExecutionService : IRunbookExecutionService
             Success = success,
             CompletedSteps = completedSteps,
             TotalSteps = runbook.Steps.Count,
+            Outcome = success ? ExecutionOutcome.Completed : ExecutionOutcome.Failed,
             Summary = success
                 ? $"{runbook.Title} completed successfully."
                 : string.IsNullOrWhiteSpace(blockedStep)
                     ? $"{runbook.Title} stopped after {completedSteps} of {runbook.Steps.Count} steps."
                     : $"{runbook.Title} stopped at '{blockedStep}' after {completedSteps} of {runbook.Steps.Count} steps.",
             Timeline = timeline,
+            StepResults = stepResults,
+            ChangesMade = changesMade.Count == 0
+                ? ["No concrete workflow changes were captured."]
+                : changesMade.Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
+            NextStepText = nextStepText,
+            Receipt = receipt,
             RepairResults = results
         };
     }
@@ -3008,6 +3251,26 @@ public sealed class RunbookExecutionService : IRunbookExecutionService
         AppEdition.Pro => "FixFox Pro",
         _ => "the Basic edition"
     };
+
+    private static List<string> BuildRunbookStepChanges(RunbookStepDefinition step, RepairExecutionResult result)
+    {
+        var changes = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(result.Summary))
+            changes.Add(result.Summary.Trim());
+        if (!string.IsNullOrWhiteSpace(result.Verification.Summary)
+            && !string.Equals(result.Verification.Summary, result.Summary, StringComparison.OrdinalIgnoreCase))
+            changes.Add(result.Verification.Summary.Trim());
+        if (result.RebootRecommended)
+            changes.Add("A restart may still be required before Windows reflects the change.");
+        if (!string.IsNullOrWhiteSpace(step.PostStepMessage))
+            changes.Add(step.PostStepMessage.Trim());
+
+        return changes
+            .Where(text => !string.IsNullOrWhiteSpace(text))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
 }
 
 public sealed class HealthCheckService : IHealthCheckService
@@ -3329,6 +3592,9 @@ public sealed class DeploymentConfigurationService : IDeploymentConfigurationSer
         if (Current.RestrictTechnicianExports)
             settings.SupportBundleExportLevel = EvidenceExportLevel.Basic.ToString();
     }
+
+    public PolicyState GetPolicyState(string settingKey, AppSettings? settings = null)
+        => ProductizationPolicies.GetPolicyState(Current, settings ?? new AppSettings(), settingKey);
 }
 
 public sealed class BrandingConfigurationService : IBrandingConfigurationService
@@ -3803,18 +4069,22 @@ public sealed class EvidenceBundleService : IEvidenceBundleService
         HealthCheckReport? healthReport,
         RunbookExecutionSummary? runbookSummary,
         EvidenceExportOptions? options = null,
+        IProgress<EvidenceBundleProgressUpdate>? progress = null,
         CancellationToken cancellationToken = default)
     {
         var snapshot = await _systemInfoService.GetSnapshotAsync();
         options ??= new EvidenceExportOptions();
         var folder = Path.Combine(ProductizationPaths.EvidenceDir, DateTime.Now.ToString("yyyyMMdd-HHmmss"));
         Directory.CreateDirectory(folder);
+        progress?.Report(new EvidenceBundleProgressUpdate { StatusMessage = $"Building {options.Preset} bundle..." });
 
         var summaryPath = Path.Combine(folder, "summary.txt");
         var technicalPath = Path.Combine(folder, "technical-details.txt");
+        var generatedFiles = new List<string>();
         var preview = await BuildPreviewAsync(userIssue, triageResult, healthReport, runbookSummary, options, cancellationToken);
         var branding = _brandingConfigurationService.Current;
         var deployment = _deploymentConfigurationService.Current;
+        progress?.Report(new EvidenceBundleProgressUpdate { Percent = 20, StatusMessage = "Collecting logs..." });
 
         var summaryBuilder = new StringBuilder(preview);
         var technicalBuilder = new StringBuilder();
@@ -3826,45 +4096,117 @@ public sealed class EvidenceBundleService : IEvidenceBundleService
             technicalBuilder.AppendLine($"Deployment: {deployment.OrganizationName}");
         technicalBuilder.AppendLine();
 
-        technicalBuilder.AppendLine("Recent repair history:");
-        foreach (var entry in _repairHistoryService.Entries.Take(10))
-            technicalBuilder.AppendLine($" - [{entry.Timestamp:yyyy-MM-dd HH:mm}] {entry.FixTitle} | Outcome={entry.Outcome} | Verification={entry.VerificationSummary} | Next={Redact(entry.NextStep)}");
-        technicalBuilder.AppendLine();
-        technicalBuilder.AppendLine("Recent automation history:");
-        foreach (var entry in _automationHistoryService.Entries.Take(10))
-            technicalBuilder.AppendLine($" - [{entry.StartedAt:yyyy-MM-dd HH:mm}] {entry.RuleTitle} | Outcome={entry.Outcome} | Summary={Redact(entry.Summary)} | Next={Redact(entry.NextStep)}");
-        technicalBuilder.AppendLine();
-        technicalBuilder.AppendLine(JsonConvert.SerializeObject(new
+        if (options.IncludeRepairHistory)
         {
-            MachineName = Redact(snapshot.MachineName),
-            IpAddress = options.RedactIpAddress ? "<redacted>" : snapshot.IpAddress,
-            snapshot.OsVersion,
-            snapshot.OsBuild,
-            snapshot.WindowsEdition,
-            snapshot.NetworkType,
-            snapshot.InternetReachable,
-            snapshot.DiskFreeGb,
-            snapshot.DiskUsedPct,
-            snapshot.RamUsedPct,
-            snapshot.PendingUpdateCount,
-            snapshot.DefenderEnabled,
-            Notifications = options.IncludeNotifications ? _notificationService.All.Take(10).Select(n => new { n.Title, n.Level, n.IsRead }) : [],
-            History = options.IncludeTechnicalHistory ? _repairHistoryService.Entries.Take(20) : [],
-            AutomationHistory = options.IncludeTechnicalHistory ? _automationHistoryService.Entries.Take(20) : [],
-            Triage = triageResult,
-            Health = healthReport,
-            Runbook = runbookSummary
-        }, Formatting.Indented));
+            technicalBuilder.AppendLine("Recent repair history:");
+            foreach (var entry in _repairHistoryService.Entries.Take(10))
+                technicalBuilder.AppendLine($" - [{entry.Timestamp:yyyy-MM-dd HH:mm}] {entry.FixTitle} | Outcome={entry.Outcome} | Verification={entry.VerificationSummary} | Next={Redact(entry.NextStep)}");
+            technicalBuilder.AppendLine();
+        }
 
+        if (options.IncludeAutomationHistory)
+        {
+            technicalBuilder.AppendLine("Recent automation history:");
+            foreach (var entry in _automationHistoryService.Entries.Take(10))
+                technicalBuilder.AppendLine($" - [{entry.StartedAt:yyyy-MM-dd HH:mm}] {entry.RuleTitle} | Outcome={entry.Outcome} | Summary={Redact(entry.Summary)} | Next={Redact(entry.NextStep)}");
+            technicalBuilder.AppendLine();
+        }
+
+        if (options.IncludeTechnicalHistory || options.IncludeEnvironmentSnapshot)
+        {
+            technicalBuilder.AppendLine(JsonConvert.SerializeObject(new
+            {
+                MachineName = Redact(snapshot.MachineName),
+                IpAddress = options.RedactIpAddress ? "<redacted>" : snapshot.IpAddress,
+                snapshot.OsVersion,
+                snapshot.OsBuild,
+                snapshot.WindowsEdition,
+                snapshot.NetworkType,
+                snapshot.InternetReachable,
+                snapshot.DiskFreeGb,
+                snapshot.DiskUsedPct,
+                snapshot.RamUsedPct,
+                snapshot.PendingUpdateCount,
+                snapshot.DefenderEnabled,
+                Notifications = options.IncludeNotifications ? _notificationService.All.Take(10).Select(n => new { n.Title, n.Level, n.IsRead }) : [],
+                History = options.IncludeTechnicalHistory && options.IncludeRepairHistory ? _repairHistoryService.Entries.Take(20) : [],
+                AutomationHistory = options.IncludeTechnicalHistory && options.IncludeAutomationHistory ? _automationHistoryService.Entries.Take(20) : [],
+                Triage = triageResult,
+                Health = healthReport,
+                Runbook = runbookSummary
+            }, Formatting.Indented));
+        }
+
+        progress?.Report(new EvidenceBundleProgressUpdate { Percent = 55, StatusMessage = "Writing support summary..." });
         File.WriteAllText(summaryPath, summaryBuilder.ToString());
-        File.WriteAllText(technicalPath, technicalBuilder.ToString());
+        generatedFiles.Add(summaryPath);
 
+        if (options.IncludeTechnicalHistory || options.IncludeEnvironmentSnapshot || options.IncludeRepairHistory || options.IncludeAutomationHistory)
+        {
+            progress?.Report(new EvidenceBundleProgressUpdate { Percent = 75, StatusMessage = "Writing technical details..." });
+            File.WriteAllText(technicalPath, technicalBuilder.ToString());
+            generatedFiles.Add(technicalPath);
+        }
+
+        if (options.IncludeLogs)
+        {
+            progress?.Report(new EvidenceBundleProgressUpdate { Percent = 82, StatusMessage = "Collecting logs..." });
+            var logPath = Path.Combine(folder, "app-log.txt");
+            var logEntries = _logService.Entries.Take(100).Select(entry => $"[{entry.Timestamp:yyyy-MM-dd HH:mm:ss}] {entry.Category} | {entry.FixTitle} | {(entry.Success ? "Success" : "Failed")} | {entry.Output}");
+            File.WriteAllLines(logPath, logEntries);
+            generatedFiles.Add(logPath);
+        }
+
+        if (options.IncludeEnvironmentSnapshot)
+        {
+            progress?.Report(new EvidenceBundleProgressUpdate { Percent = 88, StatusMessage = "Capturing environment snapshot..." });
+            var environmentPath = Path.Combine(folder, "environment-snapshot.json");
+            File.WriteAllText(environmentPath, JsonConvert.SerializeObject(new
+            {
+                MachineName = Redact(snapshot.MachineName),
+                UserName = Redact(Environment.UserName),
+                snapshot.OsVersion,
+                snapshot.OsBuild,
+                snapshot.WindowsEdition,
+                snapshot.NetworkType,
+                snapshot.DiskFreeGb,
+                snapshot.RamUsedPct,
+                snapshot.PendingUpdateCount,
+                snapshot.DefenderEnabled
+            }, Formatting.Indented));
+            generatedFiles.Add(environmentPath);
+        }
+
+        if (options.IncludeRepairHistory)
+        {
+            var receiptPath = Path.Combine(folder, "repair-receipts.json");
+            File.WriteAllText(receiptPath, JsonConvert.SerializeObject(_repairHistoryService.Entries.Take(50), Formatting.Indented));
+            generatedFiles.Add(receiptPath);
+        }
+
+        if (options.IncludeAutomationHistory)
+        {
+            var automationPath = Path.Combine(folder, "automation-receipts.json");
+            File.WriteAllText(automationPath, JsonConvert.SerializeObject(_automationHistoryService.Entries.Take(50), Formatting.Indented));
+            generatedFiles.Add(automationPath);
+        }
+
+        if (options.IncludeNotifications)
+        {
+            var notificationsPath = Path.Combine(folder, "notifications.json");
+            File.WriteAllText(notificationsPath, JsonConvert.SerializeObject(_notificationService.All.Take(50), Formatting.Indented));
+            generatedFiles.Add(notificationsPath);
+        }
+
+        progress?.Report(new EvidenceBundleProgressUpdate { Percent = 100, StatusMessage = "Support package complete." });
         return new EvidenceBundleManifest
         {
             SummaryPath = summaryPath,
             TechnicalPath = technicalPath,
             BundleFolder = folder,
-            Headline = triageResult?.Candidates.FirstOrDefault()?.CategoryName ?? $"{branding.AppName} support bundle"
+            Headline = triageResult?.Candidates.FirstOrDefault()?.CategoryName ?? $"{branding.AppName} support bundle",
+            Preset = options.Preset,
+            GeneratedFiles = generatedFiles
         };
     }
 

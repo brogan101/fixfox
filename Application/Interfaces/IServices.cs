@@ -127,6 +127,7 @@ public interface IRepairHistoryService
 {
     IReadOnlyList<RepairHistoryEntry> Entries { get; }
     void Record(RepairHistoryEntry entry);
+    void Delete(IEnumerable<string> entryIds);
     void Clear();
 }
 
@@ -145,6 +146,7 @@ public interface IEvidenceBundleService
         HealthCheckReport? healthReport,
         RunbookExecutionSummary? runbookSummary,
         EvidenceExportOptions? options = null,
+        IProgress<EvidenceBundleProgressUpdate>? progress = null,
         CancellationToken cancellationToken = default);
 
     Task<string> BuildPreviewAsync(
@@ -171,6 +173,7 @@ public interface IDeploymentConfigurationService
 {
     DeploymentConfiguration Current { get; }
     void ApplyPolicy(AppSettings settings);
+    PolicyState GetPolicyState(string settingKey, AppSettings? settings = null);
 }
 
 public interface IEditionCapabilityService
@@ -195,6 +198,35 @@ public interface IHealthCheckService
     Task<HealthCheckReport> RunFullAsync(CancellationToken cancellationToken = default);
 }
 
+public interface IHealthMonitorService
+{
+    Task StartAsync(CancellationToken ct);
+    void Stop();
+    IReadOnlyList<HealthAlert> GetActiveAlerts();
+    event EventHandler<HealthAlert> AlertRaised;
+}
+
+public interface IHealthAlertHistoryService
+{
+    IReadOnlyList<HealthAlertHistoryEntry> Entries { get; }
+    void Record(HealthAlert alert);
+}
+
+public interface IWeeklySummaryService
+{
+    bool IsSummaryDueToday();
+    WeeklySummary Generate();
+    void Save(WeeklySummary summary);
+}
+
+public interface IShellPresenceService
+{
+    bool IsTrayActive { get; }
+    DateTime LastAppOpenUtc { get; }
+    void SetTrayActive(bool isTrayActive);
+    void MarkAppOpened();
+}
+
 public interface IToolboxService
 {
     IReadOnlyList<ToolboxGroup> Groups { get; }
@@ -216,15 +248,14 @@ public interface IMaintenanceProfileService
 
 public interface ICommandPaletteService
 {
-    IReadOnlyList<CommandPaletteItem> Search(
-        string query,
-        IReadOnlyList<FixItem> pinnedFixes,
-        IReadOnlyList<FixItem> favoriteFixes,
-        IReadOnlyList<FixItem> recentFixes,
-        IReadOnlyList<RunbookDefinition> runbooks,
-        IReadOnlyList<MaintenanceProfileDefinition> maintenanceProfiles,
-        IReadOnlyList<SupportCenterDefinition> supportCenters,
-        IReadOnlyList<ToolboxGroup> toolboxGroups);
+    IReadOnlyList<CommandPaletteItem> Search(string query, CommandPaletteSearchContext context);
+}
+
+public interface ITextSubstitutionService
+{
+    string Get(string key, bool? simplifiedModeOverride = null);
+    bool SimplifiedModeEnabled { get; }
+    void SetSimplifiedMode(bool enabled);
 }
 
 public interface IDashboardWorkspaceService
@@ -241,6 +272,20 @@ public interface IDashboardWorkspaceService
         IReadOnlyList<ScanResult> scanResults,
         IReadOnlyList<RepairHistoryEntry> historyEntries,
         IReadOnlyList<RunbookDefinition> runbooks);
+
+    IReadOnlyList<DashboardSuggestion> BuildSuggestions(
+        DashboardSuggestionSignals signals,
+        IReadOnlyList<AutomationRuleSettings> automationRules,
+        IReadOnlyList<AutomationRunReceipt> automationHistory,
+        DateTime now);
+}
+
+public interface IDashboardSuggestionSignalService
+{
+    Task<DashboardSuggestionSignals> EvaluateAsync(
+        IReadOnlyList<AutomationRuleSettings> automationRules,
+        IReadOnlyList<AutomationRunReceipt> automationHistory,
+        CancellationToken cancellationToken = default);
 }
 
 public interface IAutomationCoordinatorService

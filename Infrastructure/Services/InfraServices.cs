@@ -11,15 +11,16 @@ using SharedConstants = HelpDesk.Shared.Constants;
 
 namespace HelpDesk.Infrastructure.Services;
 
-// ══════════════════════════════════════════════════════════════════════════
-//  SETTINGS SERVICE  — atomic writes, auto-recovery from corruption
-// ══════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//  SETTINGS SERVICE  â€” atomic writes, auto-recovery from corruption
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 public sealed class SettingsService : ISettingsService
 {
     private const int SaveRetryCount = 4;
     private readonly string _dir;
     private readonly string _settingsPath;
     private readonly string _backupPath;
+    private readonly string _tempPath;
     private readonly object _syncRoot = new();
 
     public SettingsLoadStatus LastLoadStatus { get; private set; } = new()
@@ -38,6 +39,7 @@ public sealed class SettingsService : ISettingsService
         _dir = baseDirectory;
         _settingsPath = Path.Combine(_dir, "settings.json");
         _backupPath = Path.Combine(_dir, "settings.bak.json");
+        _tempPath = Path.Combine(_dir, "settings.json.tmp");
     }
 
     public AppSettings Load()
@@ -77,17 +79,18 @@ public sealed class SettingsService : ISettingsService
                         MigrationApplied = migrationApplied,
                         ValidationApplied = validationApplied,
                         PreviousSessionEndedUncleanly = wasDirty,
-                        SchemaVersion = normalized.SettingsSchemaVersion,
+                        SchemaVersion = normalized.SchemaVersion,
                         Notes = notes
                     };
 
-                    if (migrationApplied || validationApplied)
+                    if (!loadedFromPrimary || migrationApplied || validationApplied)
                         SaveCore(normalized);
 
                     return normalized;
                 }
-                catch
+                catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException or InvalidDataException)
                 {
+                    TryLogSettingsRecovery($"FixFox could not read settings from '{file}'. The file will be moved aside and defaults or backup settings will be used instead.", ex);
                     MoveCorruptFileAside(file);
                 }
             }
@@ -96,7 +99,7 @@ public sealed class SettingsService : ISettingsService
             LastLoadStatus = new SettingsLoadStatus
             {
                 RecoveredDefaults = true,
-                SchemaVersion = defaults.SettingsSchemaVersion,
+                SchemaVersion = defaults.SchemaVersion,
                 Notes = ["FixFox restored product defaults because the saved settings could not be read."]
             };
             SaveCore(defaults);
@@ -117,7 +120,7 @@ public sealed class SettingsService : ISettingsService
         LastLoadStatus = new SettingsLoadStatus
         {
             RecoveredDefaults = true,
-            SchemaVersion = defaults.SettingsSchemaVersion,
+            SchemaVersion = defaults.SchemaVersion,
             Notes = ["FixFox restored the default settings for this device."]
         };
     }
@@ -146,11 +149,10 @@ public sealed class SettingsService : ISettingsService
         Exception? lastError = null;
         for (var attempt = 1; attempt <= SaveRetryCount; attempt++)
         {
-            var tmp = _settingsPath + $".tmp-{Environment.ProcessId}-{Environment.CurrentManagedThreadId}-{Guid.NewGuid():N}";
             try
             {
-                File.WriteAllText(tmp, json);
-                CommitSettingsFile(tmp);
+                File.WriteAllText(_tempPath, json);
+                CommitSettingsFile(_tempPath);
                 return;
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -158,8 +160,8 @@ public sealed class SettingsService : ISettingsService
                 lastError = ex;
                 try
                 {
-                    if (File.Exists(tmp))
-                        File.Delete(tmp);
+                    if (File.Exists(_tempPath))
+                        File.Delete(_tempPath);
                 }
                 catch
                 {
@@ -177,18 +179,8 @@ public sealed class SettingsService : ISettingsService
     {
         if (!File.Exists(_settingsPath))
         {
-            File.Move(tempPath, _settingsPath);
+            File.Move(tempPath, _settingsPath, overwrite: true);
             return;
-        }
-
-        try
-        {
-            File.Replace(tempPath, _settingsPath, _backupPath, ignoreMetadataErrors: true);
-            return;
-        }
-        catch (IOException)
-        {
-            // Some fresh-profile launches can briefly reject Replace even though a direct overwrite succeeds.
         }
 
         try
@@ -199,14 +191,38 @@ public sealed class SettingsService : ISettingsService
         {
         }
 
+        try
+        {
+            File.Replace(tempPath, _settingsPath, null, ignoreMetadataErrors: true);
+            return;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            TryLogSettingsRecovery("FixFox fell back to a direct settings overwrite after File.Replace was rejected.", ex);
+        }
+
         File.Copy(tempPath, _settingsPath, overwrite: true);
         File.Delete(tempPath);
     }
+
+    private static void TryLogSettingsRecovery(string message, Exception ex)
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(SharedConstants.AppLogFile)!);
+            File.AppendAllText(
+                SharedConstants.AppLogFile,
+                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [WRN] {message} | {ex.GetType().Name}: {ex.Message}{Environment.NewLine}");
+        }
+        catch
+        {
+        }
+    }
 }
 
-// ══════════════════════════════════════════════════════════════════════════
-//  LOG SERVICE  — 500-entry ring buffer, atomic save
-// ══════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//  LOG SERVICE  â€” 500-entry ring buffer, atomic save
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 public sealed class LogService : ILogService
 {
     private const int MaxEntries = 500;
@@ -265,12 +281,12 @@ public sealed class LogService : ILogService
     }
 
     private static string Truncate(string s, int max) =>
-        s.Length <= max ? s : s[..max] + "…";
+        s.Length <= max ? s : s[..max] + "â€¦";
 }
 
-// ══════════════════════════════════════════════════════════════════════════
-//  NOTIFICATION SERVICE  — 200-item cap, atomic save
-// ══════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//  NOTIFICATION SERVICE  â€” 200-item cap, atomic save
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 public sealed class NotificationService : INotificationService
 {
     private const int MaxItems = 200;
@@ -348,9 +364,9 @@ public sealed class NotificationService : INotificationService
     }
 }
 
-// ══════════════════════════════════════════════════════════════════════════
-//  SYSTEM INFO SERVICE  — every WMI query individually isolated
-// ══════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//  SYSTEM INFO SERVICE  â€” every WMI query individually isolated
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 public sealed class SystemInfoService : ISystemInfoService, IDisposable
 {
     private Computer? _hw;
@@ -427,7 +443,7 @@ public sealed class SystemInfoService : ISystemInfoService, IDisposable
                 BiosVersion        = boardTask.Result.BiosVersion,
             };
 
-        // Temps use LibreHardwareMonitor — must stay on a single thread
+        // Temps use LibreHardwareMonitor â€” must stay on a single thread
         snap = WithTemps(snap);
         return snap;
     }
@@ -717,7 +733,7 @@ public sealed class SystemInfoService : ISystemInfoService, IDisposable
         return s;
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────
+    // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     private static ManagementObjectSearcher Wmi(string query) =>
         new(query);
@@ -754,9 +770,9 @@ public sealed class SystemInfoService : ISystemInfoService, IDisposable
     }
 }
 
-// ══════════════════════════════════════════════════════════════════════════
-//  QUICK SCAN SERVICE  — each check fully isolated, never crashes scan
-// ══════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//  QUICK SCAN SERVICE  â€” each check fully isolated, never crashes scan
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 public sealed class QuickScanService : IQuickScanService
 {
     private readonly AppSettings _settings;
@@ -800,7 +816,7 @@ public sealed class QuickScanService : IQuickScanService
 
             if (pct >= _settings.DiskWarningPct + 5)
                 return Crit("C: drive critically full", $"{freeGb:N1} GB free ({pct:N0}% used)",
-                    "Your drive is nearly full — this causes crashes and slowdowns. Free up space now.", "clear-temp-files");
+                    "Your drive is nearly full â€” this causes crashes and slowdowns. Free up space now.", "clear-temp-files");
             if (pct >= _settings.DiskWarningPct)
                 return Warn("C: drive getting full", $"{freeGb:N1} GB free ({pct:N0}% used)",
                     "Running low on disk space. Clear temp files to recover space.", "clear-temp-files");
@@ -824,7 +840,7 @@ public sealed class QuickScanService : IQuickScanService
 
                 if (pct >= _settings.RamWarningPct + 5)
                     return Crit("RAM critically high", $"{freeMb} MB free ({pct:N0}% used)",
-                        "Very little memory left — apps may crash. Close unused programs.", "top-memory-processes");
+                        "Very little memory left â€” apps may crash. Close unused programs.", "top-memory-processes");
                 if (pct >= _settings.RamWarningPct)
                     return Warn("RAM usage high", $"{freeMb} MB free ({pct:N0}% used)",
                         "Memory is getting tight. Check what's using the most RAM.", "top-memory-processes");
@@ -934,7 +950,7 @@ public sealed class QuickScanService : IQuickScanService
                 var pct    = Convert.ToInt32(o["EstimatedChargeRemaining"] ?? 100);
                 var status = Convert.ToInt32(o["BatteryStatus"] ?? 2);
                 if (status == 1 && pct <= 10)
-                    return Crit("Battery critically low", $"{pct}% remaining — not charging",
+                    return Crit("Battery critically low", $"{pct}% remaining â€” not charging",
                         "Plug in your charger now to avoid losing unsaved work.", null);
                 if (status == 1 && pct <= 20)
                     return Warn("Battery low", $"{pct}% remaining", "Consider plugging in soon.", null);
@@ -953,7 +969,7 @@ public sealed class QuickScanService : IQuickScanService
             var sizeMb = GetDirSizeMb(path);
             if (sizeMb > 1024)
                 return Warn("Large temp folder", $"{sizeMb / 1024.0:N1} GB of temp files",
-                    "Over 1 GB of temporary files found — safe to clear for free space.", "clear-temp-files");
+                    "Over 1 GB of temporary files found â€” safe to clear for free space.", "clear-temp-files");
         }
         catch { }
         return null;
@@ -1103,7 +1119,7 @@ public sealed class QuickScanService : IQuickScanService
         new() { Title = title, Detail = detail, Severity = ScanSeverity.Good };
 }
 
-// ── List extension helper ─────────────────────────────────────────────────
+// â”€â”€ List extension helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 internal static class ListExtensions
 {
     public static void AddIfNotNull<T>(this List<T> list, T? item) where T : class

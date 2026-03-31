@@ -5,16 +5,16 @@ namespace HelpDesk.Infrastructure.Fixes;
 
 public sealed partial class FixCatalogService
 {
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  5. PRINTERS & PERIPHERALS
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     private static FixCategory PrintersAndPeripherals() => new()
     {
         Id="printers", Icon="\uE749", Title="Printers & Peripherals",
         Fixes=
         [
             new() { Id="clear-print-queue", Title="Clear stuck print queue",
-                Description="Stops the spooler, deletes all stuck jobs, and restarts — fixes 99% of printer jams.",
+                Description="Stops the spooler, deletes all stuck jobs, and restarts â€” fixes 99% of printer jams.",
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["printer stuck", "print queue stuck", "printer not printing", "can't print", "printing paused", "documents stuck"],
                 Script="""
@@ -25,7 +25,7 @@ public sealed partial class FixCatalogService
                     Remove-Item 'C:\Windows\System32\spool\PRINTERS\*' -Force -EA SilentlyContinue
                     Start-Service Spooler
                     $status = (Get-Service Spooler).Status
-                    Write-Output "✓ Removed $count stuck print job(s). Spooler: $status"
+                    Write-Output "âœ“ Removed $count stuck print job(s). Spooler: $status"
                     """ },
 
             new() { Id="list-printers", Title="List installed printers & status",
@@ -66,7 +66,7 @@ public sealed partial class FixCatalogService
                             Start-Sleep -Milliseconds 400
                             $_ | Enable-PnpDevice -Confirm:$false -EA SilentlyContinue
                         }
-                        Write-Output "✓ USB controllers reset."
+                        Write-Output "âœ“ USB controllers reset."
                         """ },
                     new() { Title="Plug back in",           Instruction="Plug the USB device into a different port. Windows should now detect it." }
                 ]},
@@ -75,7 +75,7 @@ public sealed partial class FixCatalogService
                 Description="Asks Windows to re-scan for devices it may have missed.",
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["device not detected", "new hardware not found", "hardware not showing up"],
-                Script="pnputil /scan-devices; Write-Output '✓ Hardware scan triggered.'" },
+                Script="pnputil /scan-devices; Write-Output 'âœ“ Hardware scan triggered.'" },
 
             new() { Id="fix-bluetooth", Title="Fix Bluetooth not connecting",
                 Description="Restarts the Bluetooth service and guides you through re-pairing a device.",
@@ -84,32 +84,32 @@ public sealed partial class FixCatalogService
                     new() { Title="Restart Bluetooth",  Instruction="Click 'Done' to restart the Bluetooth service.",
                 Script="""
                         Restart-Service bthserv -EA SilentlyContinue
-                        Write-Output "✓ Bluetooth service restarted."
+                        Write-Output "âœ“ Bluetooth service restarted."
                         """ },
                     new() { Title="Open Bluetooth settings", Instruction="Bluetooth settings will open.", Script="Start-Process ms-settings:bluetooth" },
-                    new() { Title="Remove and re-pair",      Instruction="Find your device → click it → 'Remove device'. Then put your device in pairing mode and click 'Add device'." }
+                    new() { Title="Remove and re-pair",      Instruction="Find your device â†’ click it â†’ 'Remove device'. Then put your device in pairing mode and click 'Add device'." }
                 ]},
 
             new() { Id="restart-spooler", Title="Restart print spooler service",
-                Description="Restarts just the print spooler without clearing jobs — a lighter-touch fix.",
+                Description="Restarts just the print spooler without clearing jobs â€” a lighter-touch fix.",
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["printer not working", "restart print spooler", "print service", "spooler crashed"],
                 Script="""
                     Restart-Service Spooler -Force -EA SilentlyContinue
-                    Write-Output "✓ Print spooler restarted. Status: $((Get-Service Spooler).Status)"
+                    Write-Output "âœ“ Print spooler restarted. Status: $((Get-Service Spooler).Status)"
                     """ },
         ]
     };
 
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  6. GAMING & STREAMING  (Most elaborate section)
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     private static FixCategory GamingAndStreaming() => new()
     {
         Id="gaming", Icon="\uE7FC", Title="Gaming & Streaming",
         Fixes=
         [
-            // ── GENERAL GAMING OPTIMIZATIONS ──────────────────────────────
+            // â”€â”€ GENERAL GAMING OPTIMIZATIONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
             new() { Id="enable-game-mode", Title="Enable Game Mode",
                 Description="Turns on Windows Game Mode to prioritize CPU and GPU resources for games.",
@@ -120,11 +120,11 @@ public sealed partial class FixCatalogService
                     if (!(Test-Path $p)) { New-Item -Path $p -Force | Out-Null }
                     Set-ItemProperty -Path $p -Name AutoGameModeEnabled -Value 1 -Type DWord
                     Set-ItemProperty -Path $p -Name AllowAutoGameMode   -Value 1 -Type DWord
-                    Write-Output "✓ Game Mode enabled."
+                    Write-Output "âœ“ Game Mode enabled."
                     """ },
 
             new() { Id="disable-game-bar", Title="Disable Xbox Game Bar & Game DVR",
-                Description="Disables Xbox Game Bar and Game DVR — known causes of FPS drops and stuttering.",
+                Description="Disables Xbox Game Bar and Game DVR â€” known causes of FPS drops and stuttering.",
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["game bar overlay", "disable overlay", "fps drops", "game bar stutter", "xbox overlay"],
                 Script="""
@@ -148,7 +148,7 @@ public sealed partial class FixCatalogService
                         Stop-Service $svc -Force -EA SilentlyContinue
                         Set-Service  $svc -StartupType Disabled -EA SilentlyContinue
                     }
-                    Write-Output "✓ Xbox Game Bar and Game DVR disabled. Restart to fully apply."
+                    Write-Output "âœ“ Xbox Game Bar and Game DVR disabled. Restart to fully apply."
                     """ },
 
             new() { Id="gaming-registry-tweaks", Title="Apply gaming registry optimizations",
@@ -156,7 +156,7 @@ public sealed partial class FixCatalogService
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["gaming tweaks", "registry performance", "speed up gaming", "optimize for games"],
                 Script="""
-                    # MMCSS — give games priority CPU scheduling
+                    # MMCSS â€” give games priority CPU scheduling
                     $games = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games'
                     if (!(Test-Path $games)) { New-Item -Path $games -Force | Out-Null }
                     Set-ItemProperty -Path $games -Name 'GPU Priority'       -Value 8    -Type DWord
@@ -169,7 +169,7 @@ public sealed partial class FixCatalogService
                     Set-ItemProperty -Path $sp -Name SystemResponsiveness    -Value 0    -Type DWord
                     Set-ItemProperty -Path $sp -Name NetworkThrottlingIndex  -Value 0xffffffff -Type DWord
 
-                    # Hardware-accelerated GPU scheduling (HAGS) — Windows 10 2004+
+                    # Hardware-accelerated GPU scheduling (HAGS) â€” Windows 10 2004+
                     $hags = 'HKLM:\SYSTEM\CurrentControlSet\Control\GraphicsDrivers'
                     Set-ItemProperty -Path $hags -Name HwSchMode -Value 2 -Type DWord -EA SilentlyContinue
 
@@ -178,11 +178,11 @@ public sealed partial class FixCatalogService
                     if (!(Test-Path $pt)) { New-Item -Path $pt -Force | Out-Null }
                     Set-ItemProperty -Path $pt -Name PowerThrottlingOff -Value 1 -Type DWord
 
-                    Write-Output "✓ Gaming registry tweaks applied. Restart to fully activate."
+                    Write-Output "âœ“ Gaming registry tweaks applied. Restart to fully activate."
                     """ },
 
             new() { Id="gaming-network-tweaks", Title="Apply low-latency network tweaks",
-                Description="Sets TcpAckFrequency and TCPNoDelay on all adapters — reduces game ping.",
+                Description="Sets TcpAckFrequency and TCPNoDelay on all adapters â€” reduces game ping.",
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["reduce lag", "lower ping", "gaming network settings", "tcp tweak", "network latency"],
                 Script="""
@@ -209,7 +209,7 @@ public sealed partial class FixCatalogService
                     if (!(Test-Path $msmq)) { New-Item -Path $msmq -Force | Out-Null }
                     Set-ItemProperty -Path $msmq -Name 'TCPNoDelay' -Value 1 -Type DWord -EA SilentlyContinue
 
-                    Write-Output "✓ Low-latency network tweaks applied to $applied interface(s). Restart to activate."
+                    Write-Output "âœ“ Low-latency network tweaks applied to $applied interface(s). Restart to activate."
                     """ },
 
             new() { Id="force-dedicated-gpu", Title="Force game to use dedicated GPU",
@@ -218,11 +218,11 @@ public sealed partial class FixCatalogService
                 Steps=[
                     new() { Title="Open graphics settings", Instruction="Graphics settings will open.", Script="Start-Process ms-settings:display-advancedgraphics" },
                     new() { Title="Add your game",          Instruction="Click 'Browse', navigate to your game's .exe file, and click Add." },
-                    new() { Title="Set High Performance",   Instruction="Click on the game in the list → Options → select 'High Performance' → Save." }
+                    new() { Title="Set High Performance",   Instruction="Click on the game in the list â†’ Options â†’ select 'High Performance' â†’ Save." }
                 ]},
 
             new() { Id="clear-shader-cache", Title="Clear GPU shader cache (NVIDIA/AMD)",
-                Description="Deletes compiled shader caches for both NVIDIA and AMD — fixes stuttering and visual glitches.",
+                Description="Deletes compiled shader caches for both NVIDIA and AMD â€” fixes stuttering and visual glitches.",
                 Type=FixType.Silent, RequiresAdmin=false,
                 Keywords=["game stuttering", "graphical glitches", "gpu cache", "shader stutter", "game loading slow"],
                 Script="""
@@ -243,7 +243,7 @@ public sealed partial class FixCatalogService
                             Remove-Item "$p\*" -Recurse -Force -EA SilentlyContinue
                         }
                     }
-                    Write-Output "✓ GPU shader caches cleared — freed $([math]::Round($freed/1MB,1)) MB."
+                    Write-Output "âœ“ GPU shader caches cleared â€” freed $([math]::Round($freed/1MB,1)) MB."
                     """ },
 
             new() { Id="optimize-mouse-gaming", Title="Optimize mouse for gaming",
@@ -255,12 +255,12 @@ public sealed partial class FixCatalogService
                     Set-ItemProperty -Path $mouse -Name MouseSpeed      -Value 0
                     Set-ItemProperty -Path $mouse -Name MouseThreshold1 -Value 0
                     Set-ItemProperty -Path $mouse -Name MouseThreshold2 -Value 0
-                    Write-Output "✓ Mouse acceleration disabled. Log out and back in to apply."
+                    Write-Output "âœ“ Mouse acceleration disabled. Log out and back in to apply."
                     Write-Output "  Note: You may need to re-adjust in-game sensitivity after this change."
                     """ },
 
             new() { Id="disable-fullscreen-optimizations-global", Title="Disable fullscreen optimizations (global)",
-                Description="Disables Windows fullscreen optimizations globally — reduces input lag in many games.",
+                Description="Disables Windows fullscreen optimizations globally â€” reduces input lag in many games.",
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["fullscreen optimization", "game fps drop", "disable fullscreen opt", "input lag"],
                 Script="""
@@ -269,11 +269,11 @@ public sealed partial class FixCatalogService
                     Set-ItemProperty -Path $path -Name GameDVR_FSEBehaviorMode -Value 2 -Type DWord
                     Set-ItemProperty -Path $path -Name GameDVR_HonorUserFSEBehaviorMode -Value 1 -Type DWord
                     Set-ItemProperty -Path $path -Name GameDVR_DXGIHonorFSEWindowsCompatible -Value 1 -Type DWord
-                    Write-Output "✓ Fullscreen optimizations disabled globally."
+                    Write-Output "âœ“ Fullscreen optimizations disabled globally."
                     """ },
 
             new() { Id="check-temperatures", Title="Check CPU & GPU temperatures",
-                Description="Reads current thermal sensor data — warns if your PC is running too hot for gaming.",
+                Description="Reads current thermal sensor data â€” warns if your PC is running too hot for gaming.",
                 Type=FixType.Silent, RequiresAdmin=false,
                 Keywords=["cpu temperature", "gpu temperature", "computer hot", "overheating", "check temps", "thermal throttling"],
                 Script="""
@@ -282,8 +282,8 @@ public sealed partial class FixCatalogService
                         $temps = Get-WmiObject MSAcpi_ThermalZoneTemperature -Namespace root/wmi -EA Stop
                         foreach ($t in $temps) {
                             $c = [math]::Round(($t.CurrentTemperature - 2732) / 10, 1)
-                            $status = if($c -gt 90){"⚠ CRITICAL"}elseif($c -gt 80){"⚠ Hot"}elseif($c -gt 70){"◉ Warm"}else{"✓ Normal"}
-                            Write-Output "Thermal zone: $c°C  $status"
+                            $status = if($c -gt 90){"âš  CRITICAL"}elseif($c -gt 80){"âš  Hot"}elseif($c -gt 70){"â—‰ Warm"}else{"âœ“ Normal"}
+                            Write-Output "Thermal zone: $cÂ°C  $status"
                         }
                     } catch {
                         Write-Output "WMI thermal sensors not accessible without elevation."
@@ -292,7 +292,7 @@ public sealed partial class FixCatalogService
                     """ },
 
             new() { Id="add-defender-game-exclusions", Title="Add game folders to Defender exclusions",
-                Description="Stops Defender from scanning your Steam/Epic/game folders while you play — reduces stutters.",
+                Description="Stops Defender from scanning your Steam/Epic/game folders while you play â€” reduces stutters.",
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["antivirus slowing game", "defender affecting fps", "whitelist game folder", "exclude game from scan"],
                 Script="""
@@ -306,17 +306,17 @@ public sealed partial class FixCatalogService
                         if (Test-Path $p) { $paths += $p }
                     }
                     if ($paths.Count -eq 0) {
-                        Write-Output "No standard game library folders found. Add paths manually in Windows Security → Exclusions."
+                        Write-Output "No standard game library folders found. Add paths manually in Windows Security â†’ Exclusions."
                     } else {
                         foreach ($p in $paths) {
                             Add-MpPreference -ExclusionPath $p -EA SilentlyContinue
-                            Write-Output "✓ Added exclusion: $p"
+                            Write-Output "âœ“ Added exclusion: $p"
                         }
-                        Write-Output "✓ Game folders added to Windows Defender exclusions."
+                        Write-Output "âœ“ Game folders added to Windows Defender exclusions."
                     }
                     """ },
 
-            // ── GAME STREAMING (OBS / STREAMLABS / etc.) ──────────────────
+            // â”€â”€ GAME STREAMING (OBS / STREAMLABS / etc.) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
             new() { Id="streaming-diagnose-dropped-frames", Title="Diagnose dropped frames (streaming)",
                 Description="Checks CPU, GPU, RAM, and network to identify why your stream is dropping frames.",
@@ -328,43 +328,43 @@ public sealed partial class FixCatalogService
 
                     # CPU
                     $cpu = (Get-WmiObject Win32_Processor | Measure-Object -Property LoadPercentage -Average).Average
-                    $cpuStatus = if($cpu -gt 90){"⚠ CRITICAL — encoder likely overloaded"}elseif($cpu -gt 75){"⚠ High — use hardware encoder (NVENC/AMF)"}else{"✓ OK ($cpu%)"}
+                    $cpuStatus = if($cpu -gt 90){"âš  CRITICAL â€” encoder likely overloaded"}elseif($cpu -gt 75){"âš  High â€” use hardware encoder (NVENC/AMF)"}else{"âœ“ OK ($cpu%)"}
                     Write-Output "CPU Usage       : $cpu%  $cpuStatus"
 
                     # RAM
                     $os = Get-CimInstance Win32_OperatingSystem
                     $ramPct = [math]::Round(100 * ($os.TotalVisibleMemorySize - $os.FreePhysicalMemory) / $os.TotalVisibleMemorySize)
-                    $ramStatus = if($ramPct -gt 90){"⚠ CRITICAL — close background apps"}elseif($ramPct -gt 80){"⚠ High"}else{"✓ OK ($ramPct%)"}
+                    $ramStatus = if($ramPct -gt 90){"âš  CRITICAL â€” close background apps"}elseif($ramPct -gt 80){"âš  High"}else{"âœ“ OK ($ramPct%)"}
                     Write-Output "RAM Usage       : $ramPct%  $ramStatus"
 
                     # GPU (via WMI)
                     $gpuVid = (Get-CimInstance Win32_VideoController | Select-Object -First 1)
                     Write-Output "GPU             : $($gpuVid.Name)"
 
-                    # Network — quick ping jitter test
+                    # Network â€” quick ping jitter test
                     $pings = 1..10 | ForEach-Object { (Test-Connection 8.8.8.8 -Count 1 -EA SilentlyContinue).ResponseTime }
                     $pings = $pings | Where-Object {$_}
                     if ($pings) {
                         $avg    = [math]::Round(($pings | Measure-Object -Average).Average)
                         $max    = ($pings | Measure-Object -Maximum).Maximum
                         $jitter = $max - ($pings | Measure-Object -Minimum).Minimum
-                        $netStatus = if($jitter -gt 50){"⚠ High jitter — likely causing dropped frames"}elseif($jitter -gt 20){"⚠ Moderate jitter"}else{"✓ Stable"}
+                        $netStatus = if($jitter -gt 50){"âš  High jitter â€” likely causing dropped frames"}elseif($jitter -gt 20){"âš  Moderate jitter"}else{"âœ“ Stable"}
                         Write-Output "Network Ping    : avg ${avg}ms  jitter ${jitter}ms  $netStatus"
                     } else {
-                        Write-Output "Network         : ✗ No response from ping servers"
+                        Write-Output "Network         : âœ— No response from ping servers"
                     }
 
                     Write-Output ""
                     Write-Output "=== Recommendations ==="
                     if ($cpu -gt 75) {
-                        Write-Output "• High CPU: Switch OBS encoder from x264 (CPU) to NVENC (NVIDIA GPU) or AMF (AMD GPU)"
-                        Write-Output "• High CPU: Lower in-game resolution or cap FPS to 120/144"
-                        Write-Output "• High CPU: Close Chrome, Discord video, and other background apps while streaming"
+                        Write-Output "â€¢ High CPU: Switch OBS encoder from x264 (CPU) to NVENC (NVIDIA GPU) or AMF (AMD GPU)"
+                        Write-Output "â€¢ High CPU: Lower in-game resolution or cap FPS to 120/144"
+                        Write-Output "â€¢ High CPU: Close Chrome, Discord video, and other background apps while streaming"
                     }
-                    if ($ramPct -gt 80) { Write-Output "• Low RAM: Close browser tabs and non-essential apps" }
+                    if ($ramPct -gt 80) { Write-Output "â€¢ Low RAM: Close browser tabs and non-essential apps" }
                     if ($pings -and $jitter -gt 20) {
-                        Write-Output "• Network jitter: Use a wired Ethernet connection instead of Wi-Fi"
-                        Write-Output "• Network jitter: Try a different ingest server in OBS/Streamlabs settings"
+                        Write-Output "â€¢ Network jitter: Use a wired Ethernet connection instead of Wi-Fi"
+                        Write-Output "â€¢ Network jitter: Try a different ingest server in OBS/Streamlabs settings"
                     }
                     """ },
 
@@ -373,37 +373,37 @@ public sealed partial class FixCatalogService
                 Keywords=["obs settings", "obs setup", "best obs settings", "streaming quality settings"],
                 Type=FixType.Guided, Steps=[
                     new() { Title="Switch to hardware encoder",
-                        Instruction="In OBS: Settings → Output → Encoder. Change from 'Software (x264)' to 'NVENC H.264' (NVIDIA) or 'AMD HW H.264' (AMD). Hardware encoding offloads work from your CPU to your GPU chip." },
+                        Instruction="In OBS: Settings â†’ Output â†’ Encoder. Change from 'Software (x264)' to 'NVENC H.264' (NVIDIA) or 'AMD HW H.264' (AMD). Hardware encoding offloads work from your CPU to your GPU chip." },
                     new() { Title="Lower output resolution",
-                        Instruction="In OBS: Settings → Video → Output (Scaled) Resolution. Change from 1920×1080 to 1280×720. Your viewers won't notice at typical stream bitrates, and this halves the encoding workload." },
+                        Instruction="In OBS: Settings â†’ Video â†’ Output (Scaled) Resolution. Change from 1920Ã—1080 to 1280Ã—720. Your viewers won't notice at typical stream bitrates, and this halves the encoding workload." },
                     new() { Title="Cap your in-game FPS",
-                        Instruction="In your game settings: enable V-sync or set a 120–144 FPS cap. Uncapped FPS makes the GPU work overtime, leaving less headroom for OBS to encode frames." },
+                        Instruction="In your game settings: enable V-sync or set a 120â€“144 FPS cap. Uncapped FPS makes the GPU work overtime, leaving less headroom for OBS to encode frames." },
                     new() { Title="Close background apps",
                         Instruction="Before going live: close Chrome, Discord (leave audio only), Spotify desktop, and any game overlays you don't need. Each one steals resources from OBS." },
                     new() { Title="Enable 'Process Priority'",
-                        Instruction="In OBS: Settings → Advanced → Process Priority → set to 'High'. This tells Windows to give OBS more CPU time relative to background tasks." }
+                        Instruction="In OBS: Settings â†’ Advanced â†’ Process Priority â†’ set to 'High'. This tells Windows to give OBS more CPU time relative to background tasks." }
                 ]},
 
-            new() { Id="streaming-fix-dropped-frames-network", Title="Fix dropped frames — network causes",
+            new() { Id="streaming-fix-dropped-frames-network", Title="Fix dropped frames â€” network causes",
                 Description="Step-by-step guide to fix stream dropped frames caused by network issues.",
                 Keywords=["dropped frames network", "stream disconnecting", "internet causing drops", "streaming connection"],
                 Type=FixType.Guided, Steps=[
                     new() { Title="Check your upload speed",
                         Instruction="Go to speedtest.net and run a test. For 1080p60 streaming, you need at least 8 Mbps upload. For 720p60, at least 4 Mbps. If you're below this, your bitrate is too high for your connection." },
                     new() { Title="Lower your bitrate",
-                        Instruction="In OBS/Streamlabs: Settings → Output → Bitrate. A safe formula: set bitrate to 75% of your stable upload speed. E.g. if your upload is 10 Mbps, use 7500 kbps or lower." },
+                        Instruction="In OBS/Streamlabs: Settings â†’ Output â†’ Bitrate. A safe formula: set bitrate to 75% of your stable upload speed. E.g. if your upload is 10 Mbps, use 7500 kbps or lower." },
                     new() { Title="Switch to Ethernet",
                         Instruction="Plug directly into your router with an Ethernet cable. Wi-Fi adds unpredictable latency spikes that cause dropped frames no matter how good your plan is." },
                     new() { Title="Change ingest server",
-                        Instruction="In OBS/Streamlabs: Settings → Stream → Server. Select 'Auto' or manually pick a server geographically close to you. The auto-selected server is not always the best one." },
+                        Instruction="In OBS/Streamlabs: Settings â†’ Stream â†’ Server. Select 'Auto' or manually pick a server geographically close to you. The auto-selected server is not always the best one." },
                     new() { Title="Run network latency fix",
                         Instruction="Click 'Done' to flush DNS and reset the network stack.", Script="""
                             ipconfig /flushdns | Out-Null
                             netsh int tcp set global autotuninglevel=normal | Out-Null
-                            Write-Output "✓ DNS flushed and TCP auto-tuning restored."
+                            Write-Output "âœ“ DNS flushed and TCP auto-tuning restored."
                             """ },
                     new() { Title="Open port 1935 (RTMP)",
-                        Instruction="If your stream still drops, your firewall may be blocking RTMP. In Windows Security: Firewall → Advanced Settings → Outbound Rules → New Rule → Port → TCP 1935 → Allow." }
+                        Instruction="If your stream still drops, your firewall may be blocking RTMP. In Windows Security: Firewall â†’ Advanced Settings â†’ Outbound Rules â†’ New Rule â†’ Port â†’ TCP 1935 â†’ Allow." }
                 ]},
 
             new() { Id="streaming-clear-obs-cache", Title="Clear OBS / Streamlabs cache",
@@ -429,7 +429,7 @@ public sealed partial class FixCatalogService
                             }
                         }
                     }
-                    Write-Output "✓ OBS/Streamlabs caches cleared — freed $([math]::Round($freed/1KB)) KB."
+                    Write-Output "âœ“ OBS/Streamlabs caches cleared â€” freed $([math]::Round($freed/1KB)) KB."
                     """ },
 
             new() { Id="streaming-optimize-obs-for-gpu", Title="Set OBS to use dedicated GPU",
@@ -438,8 +438,8 @@ public sealed partial class FixCatalogService
                 Type=FixType.Guided, Steps=[
                     new() { Title="Open Graphics settings", Instruction="Graphics settings will open.", Script="Start-Process ms-settings:display-advancedgraphics" },
                     new() { Title="Find OBS Studio",        Instruction="Click 'Browse'. Navigate to C:\\Program Files\\obs-studio\\bin\\64bit\\ and select obs64.exe." },
-                    new() { Title="Set High Performance",   Instruction="Click OBS Studio in the list → Options → select 'High Performance' (your dedicated GPU) → Save." },
-                    new() { Title="For NVIDIA users only",  Instruction="Open NVIDIA Control Panel → Manage 3D Settings → Program Settings → Add obs64.exe → set 'Preferred graphics processor' to your NVIDIA GPU → Apply." }
+                    new() { Title="Set High Performance",   Instruction="Click OBS Studio in the list â†’ Options â†’ select 'High Performance' (your dedicated GPU) â†’ Save." },
+                    new() { Title="For NVIDIA users only",  Instruction="Open NVIDIA Control Panel â†’ Manage 3D Settings â†’ Program Settings â†’ Add obs64.exe â†’ set 'Preferred graphics processor' to your NVIDIA GPU â†’ Apply." }
                 ]},
 
             new() { Id="streaming-network-adapter-tune", Title="Tune network adapter for streaming",
@@ -456,7 +456,7 @@ public sealed partial class FixCatalogService
                         Set-NetAdapterAdvancedProperty -Name $a.Name -DisplayName 'Large Send Offload V2 (IPv6)' -DisplayValue 'Enabled' -EA SilentlyContinue
                         # Enable checksum offload
                         Set-NetAdapterAdvancedProperty -Name $a.Name -DisplayName 'TCP Checksum Offload (IPv4)' -DisplayValue 'TX Enabled' -EA SilentlyContinue
-                        Write-Output "✓ Tuned: $($a.Name)"
+                        Write-Output "âœ“ Tuned: $($a.Name)"
                     }
                     Write-Output "Network adapter stream tuning complete. Restart to activate."
                     """ },
@@ -466,8 +466,8 @@ public sealed partial class FixCatalogService
                 Keywords=["steam game corrupted", "steam game crashing", "verify steam files", "steam game not launching"],
                 Type=FixType.Guided, Steps=[
                     new() { Title="Open Steam Library",      Instruction="Open Steam and click 'Library' in the top navigation." },
-                    new() { Title="Right-click your game",   Instruction="Right-click the game that's crashing or broken → click 'Properties'." },
-                    new() { Title="Verify integrity",        Instruction="Click 'Local Files' on the left → click 'Verify integrity of game files'. Steam checks every file and re-downloads corrupted ones. This can take a few minutes." }
+                    new() { Title="Right-click your game",   Instruction="Right-click the game that's crashing or broken â†’ click 'Properties'." },
+                    new() { Title="Verify integrity",        Instruction="Click 'Local Files' on the left â†’ click 'Verify integrity of game files'. Steam checks every file and re-downloads corrupted ones. This can take a few minutes." }
                 ]},
 
             new() { Id="game-repair-epic", Title="Repair Epic Games files",
@@ -483,8 +483,8 @@ public sealed partial class FixCatalogService
                 Description="Clears corrupted Steam download data that causes stuck or looping updates.",
                 Keywords=["steam update stuck", "steam slow", "clear steam download", "steam cache"],
                 Type=FixType.Guided, Steps=[
-                    new() { Title="Open Steam Settings",    Instruction="In Steam: click Steam (top-left menu) → Settings." },
-                    new() { Title="Clear download cache",   Instruction="Click 'Downloads' in the left panel → click 'Clear Download Cache'. Steam will sign you out and restart." }
+                    new() { Title="Open Steam Settings",    Instruction="In Steam: click Steam (top-left menu) â†’ Settings." },
+                    new() { Title="Clear download cache",   Instruction="Click 'Downloads' in the left panel â†’ click 'Clear Download Cache'. Steam will sign you out and restart." }
                 ]},
 
             new() { Id="game-check-directx", Title="Check DirectX and graphics diagnostics",
@@ -493,19 +493,19 @@ public sealed partial class FixCatalogService
                 Script="Start-Process dxdiag.exe" },
 
             new() { Id="game-disable-hpet", Title="Disable HPET timer (reduce input latency)",
-                Description="Disables the High Precision Event Timer — can reduce input latency on some systems.",
+                Description="Disables the High Precision Event Timer â€” can reduce input latency on some systems.",
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["directx error", "dx11 missing", "directx not installed", "game directx error"],
                 Script="""
                     bcdedit /deletevalue useplatformclock 2>&1 | Out-Null
                     bcdedit /set disabledynamictick yes 2>&1 | Out-Null
-                    Write-Output "✓ HPET adjustments applied. Restart to take effect."
+                    Write-Output "âœ“ HPET adjustments applied. Restart to take effect."
                     Write-Output "  Note: Effects vary by system. If gaming feels worse, reverse with:"
                     Write-Output "  bcdedit /deletevalue disabledynamictick"
                     """ },
 
             new() { Id="game-enable-resizable-bar", Title="Check Resizable BAR / SAM status",
-                Description="Shows whether Resizable BAR (AMD SAM) is enabled — this boosts GPU performance in games.",
+                Description="Shows whether Resizable BAR (AMD SAM) is enabled â€” this boosts GPU performance in games.",
                 Type=FixType.Silent, RequiresAdmin=false,
                 Keywords=["resizable bar", "rebar", "smart access memory", "gpu performance"],
                 Script="""
@@ -520,7 +520,7 @@ public sealed partial class FixCatalogService
                         Write-Output "2. Look for 'Resizable BAR' or 'Smart Access Memory' in GPU info"
                         Write-Output "3. If disabled: enable it in your PC's BIOS/UEFI settings under PCI Express or Advanced"
                         Write-Output ""
-                        Write-Output "Resizable BAR can improve game performance by 5–15% on compatible systems."
+                        Write-Output "Resizable BAR can improve game performance by 5â€“15% on compatible systems."
                     }
                     """ },
 
@@ -535,16 +535,16 @@ public sealed partial class FixCatalogService
                     Write-Output "(For a precise speed test, visit fast.com or speedtest.net)"
                     Write-Output ""
                     Write-Output "=== Bitrate Recommendations by Internet Speed ==="
-                    Write-Output "Upload Speed  │ 1080p60 Bitrate  │ 720p60 Bitrate  │ 720p30 Bitrate"
-                    Write-Output "──────────────┼──────────────────┼─────────────────┼───────────────"
-                    Write-Output "4-6 Mbps      │ Not recommended  │ 2500-3500 kbps  │ 1500-2500 kbps"
-                    Write-Output "6-10 Mbps     │ Not recommended  │ 4000-5000 kbps  │ 2500-3000 kbps"
-                    Write-Output "10-20 Mbps    │ 5000-6000 kbps   │ 4500-5000 kbps  │ 3000-3500 kbps"
-                    Write-Output "20-50 Mbps    │ 6000-8000 kbps   │ 5000-6000 kbps  │ 3500-4000 kbps"
-                    Write-Output "50+ Mbps      │ 8000-12000 kbps  │ 6000+ kbps      │ 4000+ kbps"
+                    Write-Output "Upload Speed  â”‚ 1080p60 Bitrate  â”‚ 720p60 Bitrate  â”‚ 720p30 Bitrate"
+                    Write-Output "â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€"
+                    Write-Output "4-6 Mbps      â”‚ Not recommended  â”‚ 2500-3500 kbps  â”‚ 1500-2500 kbps"
+                    Write-Output "6-10 Mbps     â”‚ Not recommended  â”‚ 4000-5000 kbps  â”‚ 2500-3000 kbps"
+                    Write-Output "10-20 Mbps    â”‚ 5000-6000 kbps   â”‚ 4500-5000 kbps  â”‚ 3000-3500 kbps"
+                    Write-Output "20-50 Mbps    â”‚ 6000-8000 kbps   â”‚ 5000-6000 kbps  â”‚ 3500-4000 kbps"
+                    Write-Output "50+ Mbps      â”‚ 8000-12000 kbps  â”‚ 6000+ kbps      â”‚ 4000+ kbps"
                     Write-Output ""
                     Write-Output "Rule: Set bitrate to no more than 75% of your upload speed."
-                    Write-Output "Rule: Use NVENC/AMD hardware encoder — much lighter on CPU than x264."
+                    Write-Output "Rule: Use NVENC/AMD hardware encoder â€” much lighter on CPU than x264."
                     Write-Output "Rule: If viewers report buffering, lower bitrate by 500 kbps."
                     """ },
 
@@ -555,23 +555,23 @@ public sealed partial class FixCatalogService
                     new() { Title="Identify which is delayed",
                         Instruction="Watch a recording or VOD: if audio is ahead of video, add positive audio delay. If audio is behind video, add negative delay. Note which direction." },
                     new() { Title="Apply audio delay in OBS",
-                        Instruction="In OBS: click the ⚙ gear icon next to your audio source (mic or desktop audio) → Properties → add a delay value in milliseconds. Start with ±200ms and adjust." },
+                        Instruction="In OBS: click the âš™ gear icon next to your audio source (mic or desktop audio) â†’ Properties â†’ add a delay value in milliseconds. Start with Â±200ms and adjust." },
                     new() { Title="Check capture card timing",
                         Instruction="If using a capture card: its hardware introduces latency. Open capture card settings and look for 'Audio offset' or 'Sync correction' and adjust there first." },
                     new() { Title="Set all audio to same sample rate",
-                        Instruction="Mismatched sample rates (44.1kHz vs 48kHz) cause drift over time. In OBS: Settings → Audio → set Sample Rate to 48kHz. In Windows Sound settings, set all devices to 48000 Hz." }
+                        Instruction="Mismatched sample rates (44.1kHz vs 48kHz) cause drift over time. In OBS: Settings â†’ Audio â†’ set Sample Rate to 48kHz. In Windows Sound settings, set all devices to 48000 Hz." }
                 ]},
 
             new() { Id="streaming-record-mode-fix", Title="Fix OBS recordings (not live streaming)",
-                Description="Optimizes OBS recording settings for local gameplay capture — higher quality than streaming.",
+                Description="Optimizes OBS recording settings for local gameplay capture â€” higher quality than streaming.",
                 Keywords=["obs recording", "record gameplay", "obs record settings", "recording quality"],
                 Type=FixType.Guided, Steps=[
                     new() { Title="Switch to CRF recording mode",
-                        Instruction="In OBS: Settings → Output → Recording. Set Output Mode to 'Advanced'. Set Encoder to NVENC or AMD. Enable 'CRF' mode and set CRF to 18–23. Lower = better quality, larger file." },
+                        Instruction="In OBS: Settings â†’ Output â†’ Recording. Set Output Mode to 'Advanced'. Set Encoder to NVENC or AMD. Enable 'CRF' mode and set CRF to 18â€“23. Lower = better quality, larger file." },
                     new() { Title="Set recording format to MKV",
-                        Instruction="In OBS: Settings → Output → Recording → Recording Format → set to MKV. MKV protects recordings if OBS crashes mid-stream. You can remux to MP4 after via File → Remux Recordings." },
+                        Instruction="In OBS: Settings â†’ Output â†’ Recording â†’ Recording Format â†’ set to MKV. MKV protects recordings if OBS crashes mid-stream. You can remux to MP4 after via File â†’ Remux Recordings." },
                     new() { Title="Record to a separate drive",
-                        Instruction="In OBS: Settings → Output → Recording Path → choose a drive different from your OS drive. This prevents the recording write from competing with Windows disk I/O." }
+                        Instruction="In OBS: Settings â†’ Output â†’ Recording Path â†’ choose a drive different from your OS drive. This prevents the recording write from competing with Windows disk I/O." }
                 ]},
 
             new() { Id="game-fps-cap-tool", Title="Show current FPS and resource usage while gaming",
@@ -581,16 +581,16 @@ public sealed partial class FixCatalogService
                     new() { Title="Enable Xbox Game Bar overlay",
                         Instruction="Press Win+G while in-game to open Game Bar. Click 'Performance' to pin a real-time overlay showing FPS, CPU %, GPU %, and RAM." },
                     new() { Title="Or use Steam FPS counter",
-                        Instruction="In Steam: Settings → In-Game → In-game FPS counter → select a screen corner. This shows FPS for any Steam game without using extra resources." },
+                        Instruction="In Steam: Settings â†’ In-Game â†’ In-game FPS counter â†’ select a screen corner. This shows FPS for any Steam game without using extra resources." },
                     new() { Title="Or use NVIDIA/AMD overlays",
-                        Instruction="NVIDIA: Open NVIDIA App → Settings → Overlay. AMD: Open AMD Software → Performance → Metrics. Both show GPU-specific data like VRAM usage and GPU temp in-game." }
+                        Instruction="NVIDIA: Open NVIDIA App â†’ Settings â†’ Overlay. AMD: Open AMD Software â†’ Performance â†’ Metrics. Both show GPU-specific data like VRAM usage and GPU temp in-game." }
                 ]},
         ]
     };
 
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  7. APP ISSUES
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     private static FixCategory AppIssues() => new()
     {
         Id="apps", Icon="\uE7B8", Title="App Issues",
@@ -602,7 +602,7 @@ public sealed partial class FixCatalogService
                 Script="Start-Process taskmgr" },
 
             new() { Id="clear-browser-cache", Title="Clear browser cache (all browsers)",
-                Description="Clears cached data for Chrome, Edge, and Firefox — fixes slow or broken browsing.",
+                Description="Clears cached data for Chrome, Edge, and Firefox â€” fixes slow or broken browsing.",
                 Type=FixType.Silent, RequiresAdmin=false,
                 Keywords=["browser slow", "website not loading", "clear chrome cache", "clear edge cache", "browser error", "cache too big"],
                 Script="""
@@ -622,7 +622,7 @@ public sealed partial class FixCatalogService
                             Remove-Item "$p\*" -Recurse -Force -EA SilentlyContinue
                         }
                     }
-                    Write-Output "✓ Browser caches cleared — freed $([math]::Round($freed/1MB,1)) MB."
+                    Write-Output "âœ“ Browser caches cleared â€” freed $([math]::Round($freed/1MB,1)) MB."
                     """ },
 
             new() { Id="reregister-store", Title="Re-register Microsoft Store",
@@ -634,11 +634,11 @@ public sealed partial class FixCatalogService
                     Get-AppxPackage -AllUsers Microsoft.WindowsStore | ForEach-Object {
                         Add-AppxPackage -DisableDevelopmentMode -Register "$($_.InstallLocation)\AppXManifest.xml" -EA SilentlyContinue
                     }
-                    Write-Output "✓ Done. Try opening the Store again."
+                    Write-Output "âœ“ Done. Try opening the Store again."
                     """ },
 
             new() { Id="reregister-all-appx", Title="Re-register all built-in Windows apps",
-                Description="Re-registers all inbox apps — fixes missing Start Menu tiles and broken apps.",
+                Description="Re-registers all inbox apps â€” fixes missing Start Menu tiles and broken apps.",
                 Type=FixType.Silent, RequiresAdmin=false,
                 Keywords=["missing windows apps", "start menu apps gone", "built in apps broken", "reset inbox apps"],
                 Script="""
@@ -648,7 +648,7 @@ public sealed partial class FixCatalogService
                             Add-AppxPackage -DisableDevelopmentMode -Register "$($_.InstallLocation)\AppXManifest.xml" -EA SilentlyContinue
                         } catch {}
                     }
-                    Write-Output "✓ Done. Restart your PC to apply."
+                    Write-Output "âœ“ Done. Restart your PC to apply."
                     """ },
 
             new() { Id="repair-store-app", Title="Repair or reset a Store app",
@@ -656,15 +656,15 @@ public sealed partial class FixCatalogService
                 Type=FixType.Guided, Keywords=["app not working", "app crashing", "store app broken", "reset app", "repair app"],
                 Steps=[
                     new() { Title="Open Apps settings", Instruction="Apps & Features will open.", Script="Start-Process ms-settings:appsfeatures" },
-                    new() { Title="Find the broken app", Instruction="Scroll to the app → click it → 'Advanced options'." },
-                    new() { Title="Repair or Reset",     Instruction="Click 'Repair' first — this fixes the app without losing settings. If still broken, click 'Reset'." }
+                    new() { Title="Find the broken app", Instruction="Scroll to the app â†’ click it â†’ 'Advanced options'." },
+                    new() { Title="Repair or Reset",     Instruction="Click 'Repair' first â€” this fixes the app without losing settings. If still broken, click 'Reset'." }
                 ]},
 
             new() { Id="fix-dotnet-runtime", Title="Fix missing .NET runtime",
                 Description="Opens the Microsoft .NET download page to install missing runtime components.",
                 Keywords=["dotnet error", "net runtime missing", "application wont start", "runtime not found", "dotnet 6", "dotnet 8"],
                 Type=FixType.Guided, Steps=[
-                    new() { Title="Note the version",    Instruction="Check your error — it says something like '.NET 6', '.NET 7', or '.NET 8'. Note the exact version number." },
+                    new() { Title="Note the version",    Instruction="Check your error â€” it says something like '.NET 6', '.NET 7', or '.NET 8'. Note the exact version number." },
                     new() { Title="Download runtime",    Instruction="The .NET download page will open.", Script="Start-Process 'https://dotnet.microsoft.com/download'" },
                     new() { Title="Install and retry",   Instruction="Install the matching runtime version, restart, then try the app again." }
                 ]},
@@ -686,9 +686,9 @@ public sealed partial class FixCatalogService
                         Stop-Service WSearch -Force -EA SilentlyContinue
                         Start-Sleep 3
                         Start-Service WSearch -EA SilentlyContinue
-                        Write-Output "✓ Windows Search service: $((Get-Service WSearch).Status)"
+                        Write-Output "âœ“ Windows Search service: $((Get-Service WSearch).Status)"
                         """ },
-                    new() { Title="Rebuild search index",   Instruction="Search settings will open — click 'Advanced search indexer settings' → Advanced → Rebuild.", Script="Start-Process ms-settings:search" }
+                    new() { Title="Rebuild search index",   Instruction="Search settings will open â€” click 'Advanced search indexer settings' â†’ Advanced â†’ Rebuild.", Script="Start-Process ms-settings:search" }
                 ]},
 
             new() { Id="reset-file-associations", Title="Reset default file associations",
@@ -697,7 +697,7 @@ public sealed partial class FixCatalogService
                 Script="Start-Process ms-settings:defaultapps" },
 
             new() { Id="list-installed-apps", Title="List all installed programs",
-                Description="Shows every installed program — useful before repairs or uninstalls.",
+                Description="Shows every installed program â€” useful before repairs or uninstalls.",
                 Type=FixType.Silent, RequiresAdmin=false,
                 Keywords=["what programs are installed", "see all software", "installed programs"],
                 Script="""
@@ -731,7 +731,7 @@ public sealed partial class FixCatalogService
                     Stop-Process -Name StartMenuExperienceHost -Force -EA SilentlyContinue
                     Start-Sleep 2
                     Start-Process "$env:WINDIR\SystemApps\Microsoft.Windows.StartMenuExperienceHost_cw5n1h2txyewy\StartMenuExperienceHost.exe" -EA SilentlyContinue
-                    Write-Output "✓ Start Menu components refreshed."
+                    Write-Output "âœ“ Start Menu components refreshed."
                     """ },
 
             new() { Id="fix-context-menu-slow", Title="Fix slow right-click context menu",
@@ -745,7 +745,7 @@ public sealed partial class FixCatalogService
                             # Disable 'Send to' scanning
                             $path = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
                             Set-ItemProperty -Path $path -Name Start_ShowSetProgramAccessAndDefaults -Value 0 -EA SilentlyContinue
-                            Write-Output "✓ Quick context menu optimizations applied."
+                            Write-Output "âœ“ Quick context menu optimizations applied."
                             """ },
                     new() { Title="Test the menu",
                         Instruction="Right-click your desktop. If still slow, use ShellExView to identify and disable slow third-party extensions (highlighted in pink)." }
@@ -753,9 +753,9 @@ public sealed partial class FixCatalogService
         ]
     };
 
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  8. SECURITY & PRIVACY
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     private static FixCategory SecurityAndPrivacy() => new()
     {
         Id="security", Icon="\uE72E", Title="Security & Privacy",
@@ -768,17 +768,17 @@ public sealed partial class FixCatalogService
                 Script="""
                     $s = Get-MpComputerStatus -EA SilentlyContinue
                     if ($s) {
-                        $avStatus  = if($s.AntivirusEnabled){"✓ Enabled"}else{"✗ DISABLED"}
-                        $rtStatus  = if($s.RealTimeProtectionEnabled){"✓ Active"}else{"✗ INACTIVE"}
+                        $avStatus  = if($s.AntivirusEnabled){"âœ“ Enabled"}else{"âœ— DISABLED"}
+                        $rtStatus  = if($s.RealTimeProtectionEnabled){"âœ“ Active"}else{"âœ— INACTIVE"}
                         $defAge    = $s.AntivirusSignatureAge
-                        $defStatus = if($defAge -le 3){"✓ Current ($defAge days old)"}elseif($defAge -le 7){"⚠ Getting old ($defAge days old)"}else{"✗ OUTDATED ($defAge days old)"}
+                        $defStatus = if($defAge -le 3){"âœ“ Current ($defAge days old)"}elseif($defAge -le 7){"âš  Getting old ($defAge days old)"}else{"âœ— OUTDATED ($defAge days old)"}
                         Write-Output "Antivirus        : $avStatus"
                         Write-Output "Real-time prot.  : $rtStatus"
                         Write-Output "Definitions      : $defStatus"
                         Write-Output "Last quick scan  : $($s.QuickScanAge) days ago"
                         Write-Output "Last full scan   : $($s.FullScanAge) days ago"
                     } else {
-                        Write-Output "⚠ Could not read Defender status. It may be managed by a third-party AV."
+                        Write-Output "âš  Could not read Defender status. It may be managed by a third-party AV."
                     }
                     """ },
 
@@ -788,17 +788,17 @@ public sealed partial class FixCatalogService
                 Script="""
                     Write-Output "Starting Windows Defender quick scan..."
                     Start-MpScan -ScanType QuickScan
-                    Write-Output "✓ Scan initiated. Check Windows Security for results."
+                    Write-Output "âœ“ Scan initiated. Check Windows Security for results."
                     """ },
 
             new() { Id="full-virus-scan", Title="Run full virus scan",
-                Description="Triggers a full Windows Defender scan of all drives. Takes 15–60 minutes.",
+                Description="Triggers a full Windows Defender scan of all drives. Takes 15â€“60 minutes.",
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["full scan", "deep virus scan", "thorough malware scan"],
                 Script="""
-                    Write-Output "Starting full scan — this will take 15-60 minutes..."
+                    Write-Output "Starting full scan â€” this will take 15-60 minutes..."
                     Start-MpScan -ScanType FullScan
-                    Write-Output "✓ Full scan initiated. Check Windows Security for progress and results."
+                    Write-Output "âœ“ Full scan initiated. Check Windows Security for progress and results."
                     """ },
 
             new() { Id="update-virus-definitions", Title="Update virus definitions",
@@ -809,7 +809,7 @@ public sealed partial class FixCatalogService
                     Write-Output "Updating Windows Defender definitions..."
                     Update-MpSignature
                     $v = (Get-MpComputerStatus).AntivirusSignatureVersion
-                    Write-Output "✓ Definitions updated. Version: $v"
+                    Write-Output "âœ“ Definitions updated. Version: $v"
                     """ },
 
             new() { Id="check-firewall", Title="Check Windows Firewall status",
@@ -818,7 +818,7 @@ public sealed partial class FixCatalogService
                 Keywords=["firewall on", "is firewall enabled", "check firewall status", "firewall settings"],
                 Script="""
                     Get-NetFirewallProfile | ForEach-Object {
-                        $status = if($_.Enabled){"✓ ENABLED"}else{"✗ DISABLED"}
+                        $status = if($_.Enabled){"âœ“ ENABLED"}else{"âœ— DISABLED"}
                         Write-Output "$($_.Name) profile: $status"
                     }
                     """ },
@@ -838,7 +838,7 @@ public sealed partial class FixCatalogService
                     """ },
 
             new() { Id="list-user-accounts", Title="List all user accounts",
-                Description="Shows all local user accounts — helps spot unauthorized accounts.",
+                Description="Shows all local user accounts â€” helps spot unauthorized accounts.",
                 Type=FixType.Silent, RequiresAdmin=false,
                 Keywords=["see user accounts", "find accounts", "user list", "unknown accounts"],
                 Script="""
@@ -849,7 +849,7 @@ public sealed partial class FixCatalogService
                     """ },
 
             new() { Id="check-shared-folders", Title="List network shared folders",
-                Description="Shows all folders shared on the network — useful for privacy and security audits.",
+                Description="Shows all folders shared on the network â€” useful for privacy and security audits.",
                 Type=FixType.Silent, RequiresAdmin=false,
                 Keywords=["shared folders", "network shares", "what is shared", "file sharing", "shared drives"],
                 Script="""
@@ -876,11 +876,11 @@ public sealed partial class FixCatalogService
                     Stop-Service dmwappushservice -Force -EA SilentlyContinue
                     Set-Service  dmwappushservice -StartupType Disabled -EA SilentlyContinue
 
-                    Write-Output "✓ Telemetry set to minimum. Restart to apply."
+                    Write-Output "âœ“ Telemetry set to minimum. Restart to apply."
                     """ },
 
             new() { Id="disable-remote-access", Title="Disable Remote Desktop & Remote Assistance",
-                Description="Disables RDP and Remote Assistance — reduces attack surface if you don't use them.",
+                Description="Disables RDP and Remote Assistance â€” reduces attack surface if you don't use them.",
                 Type=FixType.Silent, RequiresAdmin=true,
                 Keywords=["disable remote desktop", "turn off remote access", "rdp off", "stop remote access"],
                 Script="""
@@ -890,7 +890,7 @@ public sealed partial class FixCatalogService
                     Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Remote Assistance' -Name fAllowToGetHelp -Value 0 -EA SilentlyContinue
                     # Update firewall
                     netsh advfirewall firewall set rule group='remote desktop' new enable=No 2>&1 | Out-Null
-                    Write-Output "✓ Remote Desktop and Remote Assistance disabled."
+                    Write-Output "âœ“ Remote Desktop and Remote Assistance disabled."
                     """ },
 
             new() { Id="check-bitlocker", Title="Check BitLocker encryption status",

@@ -36,12 +36,12 @@ public sealed class AutomationServicesTests
         var workFromHome = Assert.Single(rules, rule => rule.Id == "work-from-home-readiness");
         var safeMaintenance = Assert.Single(rules, rule => rule.Id == "safe-maintenance");
 
-        Assert.Equal(AutomationScheduleKind.Daily, quickHealth.ScheduleKind);
-        Assert.Equal(AutomationScheduleKind.Startup, startupCheck.ScheduleKind);
+        Assert.Equal(AutomationScheduleKind.EveryXDays, quickHealth.ScheduleKind);
+        Assert.Equal(AutomationScheduleKind.StartupDelay, startupCheck.ScheduleKind);
         Assert.True(workFromHome.Enabled);
         Assert.Equal(AutomationScheduleKind.Weekly, workFromHome.ScheduleKind);
 
-        Assert.Equal(AutomationScheduleKind.Daily, safeMaintenance.ScheduleKind);
+        Assert.Equal(AutomationScheduleKind.EveryXDays, safeMaintenance.ScheduleKind);
         Assert.Equal("07:45", safeMaintenance.ScheduleTime);
         Assert.False(safeMaintenance.RunOnlyWhenIdle);
         Assert.False(safeMaintenance.SkipOnBattery);

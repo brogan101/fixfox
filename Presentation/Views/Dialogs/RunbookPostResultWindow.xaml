@@ -1,0 +1,115 @@
+<Window x:Class="HelpDesk.Presentation.Views.Dialogs.RunbookPostResultWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
+        xmlns:h="clr-namespace:HelpDesk.Presentation.Helpers"
+        Title="Workflow Result"
+        Width="800"
+        MaxWidth="800"
+        Height="680"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        Background="{DynamicResource BgPrimaryBrush}">
+  <Window.Resources>
+    <h:BoolToVisConverter x:Key="BoolVis"/>
+  </Window.Resources>
+  <Border Background="{DynamicResource BgPrimaryBrush}" Padding="24"
+          automation:AutomationProperties.AutomationId="Runbook_PostResult_Panel">
+    <DockPanel LastChildFill="True">
+      <WrapPanel DockPanel.Dock="Bottom" HorizontalAlignment="Right" Margin="0,18,0,0">
+        <Button Content="Close"
+                Click="Close_Click"
+                Style="{DynamicResource SecondaryButton}"
+                Margin="0,0,8,0"
+                IsCancel="True"
+                automation:AutomationProperties.AutomationId="Runbook_PostResult_Close"/>
+        <Button Content="Save receipt"
+                Click="SaveReceipt_Click"
+                Style="{DynamicResource SecondaryButton}"
+                Margin="0,0,8,0"
+                automation:AutomationProperties.AutomationId="Runbook_PostResult_SaveReceipt"/>
+        <Button Content="Create support package"
+                Click="Escalate_Click"
+                Style="{DynamicResource AccentButtonStyle}"
+                Visibility="{Binding ShowEscalateButton, Converter={StaticResource BoolVis}}"
+                automation:AutomationProperties.AutomationId="Runbook_PostResult_Escalate"/>
+      </WrapPanel>
+
+      <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel>
+          <DockPanel Margin="0,0,0,12">
+            <StackPanel DockPanel.Dock="Left">
+              <TextBlock Text="{Binding Runbook.Title}" Style="{DynamicResource PageTitle}" TextWrapping="Wrap"/>
+              <TextBlock Text="{Binding Summary.Summary}" Style="{DynamicResource CardSub}" Margin="0,8,0,0" TextWrapping="Wrap"/>
+            </StackPanel>
+            <Border DockPanel.Dock="Right"
+                    Background="{Binding OutcomeBackground}"
+                    CornerRadius="12"
+                    Padding="10,4"
+                    Margin="12,0,0,0"
+                    VerticalAlignment="Top"
+                    automation:AutomationProperties.AutomationId="Runbook_PostResult_Outcome">
+              <TextBlock Text="{Binding OutcomeLabel}" Foreground="{Binding OutcomeForeground}" FontWeight="SemiBold"/>
+            </Border>
+          </DockPanel>
+
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Background="{DynamicResource BgCard2Brush}" CornerRadius="10" Padding="14,12" Margin="0,0,8,0">
+              <StackPanel>
+                <TextBlock Text="What ran" Style="{DynamicResource CardLabel}"/>
+                <ItemsControl ItemsSource="{Binding StepRows}"
+                              Margin="0,8,0,0"
+                              automation:AutomationProperties.AutomationId="Runbook_PostResult_StepList">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <Border Background="{Binding StatusBackground}" CornerRadius="8" Padding="10,8" Margin="0,0,0,8">
+                        <StackPanel>
+                          <DockPanel>
+                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                            <TextBlock Text="{Binding StatusLabel}" Foreground="{Binding StatusForeground}" Margin="10,0,0,0" DockPanel.Dock="Right"/>
+                          </DockPanel>
+                          <TextBlock Text="{Binding Summary}" Style="{DynamicResource CardSub}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+
+            <Border Grid.Column="1" Background="{DynamicResource BgCard2Brush}" CornerRadius="10" Padding="14,12" Margin="8,0,0,0">
+              <StackPanel>
+                <TextBlock Text="What changed" Style="{DynamicResource CardLabel}"/>
+                <ItemsControl ItemsSource="{Binding ChangeList}"
+                              Margin="0,8,0,0"
+                              automation:AutomationProperties.AutomationId="Runbook_PostResult_ChangeList">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <DockPanel Margin="0,0,0,6">
+                        <TextBlock Text="•" Margin="0,0,8,0" Foreground="{DynamicResource TextSecBrush}"/>
+                        <TextBlock Text="{Binding}" Style="{DynamicResource CardSub}" TextWrapping="Wrap"/>
+                      </DockPanel>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+          </Grid>
+
+          <Border Background="{DynamicResource BgCard2Brush}" CornerRadius="10" Padding="14,12" Margin="0,16,0,0"
+                  automation:AutomationProperties.AutomationId="Runbook_PostResult_NextStep">
+            <StackPanel>
+              <TextBlock Text="{Binding NextStepHeading}" Style="{DynamicResource CardLabel}"/>
+              <TextBlock Text="{Binding Summary.NextStepText}" Style="{DynamicResource CardSub}" Margin="0,8,0,0" TextWrapping="Wrap"/>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </ScrollViewer>
+    </DockPanel>
+  </Border>
+</Window>

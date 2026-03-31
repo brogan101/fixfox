@@ -9,28 +9,35 @@
 
   <Page.Resources>
     <h:NullToCollapsedConverter x:Key="NullCollapsed"/>
-    <h:RelativeDateConverter    x:Key="RelDate"/>
-    <h:BoolToVisConverter       x:Key="BoolVis"/>
+    <h:RelativeDateConverter x:Key="RelDate"/>
+    <h:BoolToVisConverter x:Key="BoolVis"/>
     <h:InverseBoolToVisConverter x:Key="InvBoolVis"/>
+    <Style x:Key="HistoryActionBarButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+      <Setter Property="Margin" Value="0,0,8,0"/>
+      <Setter Property="MinWidth" Value="92"/>
+    </Style>
   </Page.Resources>
 
   <Grid Margin="28,24">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto"/>
       <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
       <RowDefinition Height="*"/>
     </Grid.RowDefinitions>
 
-    <!-- Header -->
     <DockPanel Grid.Row="0" Margin="0,0,0,20">
       <StackPanel DockPanel.Dock="Left">
-        <TextBlock Text="Activity" Style="{DynamicResource PageTitle}"
+        <TextBlock Text="{Binding TextSubstitutions[History_Header_Title]}" Style="{DynamicResource PageTitle}"
                    automation:AutomationProperties.AutomationId="HistoryPageMarker"/>
         <TextBlock Text="{Binding HistorySummaryText}" Style="{DynamicResource PageSubtitle}"/>
       </StackPanel>
-      <Button DockPanel.Dock="Right" Content="Clear Activity" Click="ClearHistory_Click"
+      <Button DockPanel.Dock="Right"
+              Content="Clear Activity"
+              Click="ClearHistory_Click"
               automation:AutomationProperties.AutomationId="HistoryClearButton"
-              Style="{DynamicResource DangerButton}" HorizontalAlignment="Right"/>
+              Style="{DynamicResource DangerButton}"
+              HorizontalAlignment="Right"/>
     </DockPanel>
 
     <Border Grid.Row="1" Style="{DynamicResource SearchBox}" Margin="0,0,0,16">
@@ -40,116 +47,372 @@
           <ColumnDefinition Width="*"/>
           <ColumnDefinition Width="Auto"/>
         </Grid.ColumnDefinitions>
-        <ui:SymbolIcon Grid.Column="0" Symbol="Search20" FontSize="14"
-                       Foreground="{DynamicResource TextSecBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-        <TextBox Grid.Column="1" Text="{Binding HistorySearchText, UpdateSourceTrigger=PropertyChanged}"
+        <ui:SymbolIcon Grid.Column="0"
+                       Symbol="Search20"
+                       FontSize="14"
+                       Foreground="{DynamicResource TextSecBrush}"
+                       Margin="0,0,8,0"
+                       VerticalAlignment="Center"/>
+        <TextBox x:Name="HistorySearchBox"
+                 Grid.Column="1"
+                 Text="{Binding HistorySearchText, UpdateSourceTrigger=PropertyChanged}"
                  automation:AutomationProperties.AutomationId="HistorySearchBox"
-                 BorderThickness="0" Background="Transparent" VerticalContentAlignment="Center"/>
-        <Button Grid.Column="2" Content="Clear" Click="ClearSearch_Click"
-                Style="{DynamicResource SecondaryButton}" MinWidth="72" Margin="8,0,0,0"
-                Visibility="{Binding HistorySearchText, Converter={StaticResource NullCollapsed}}"/>
+                 BorderThickness="0"
+                 Background="Transparent"
+                 VerticalContentAlignment="Center"/>
+        <Button Grid.Column="2"
+                Content="Clear search"
+                Click="ClearSearch_Click"
+                Style="{DynamicResource SecondaryButton}"
+                MinWidth="92"
+                Margin="8,0,0,0"
+                Visibility="{Binding HasHistorySearchText, Converter={StaticResource BoolVis}}"/>
       </Grid>
     </Border>
 
-    <!-- History list -->
-    <Grid Grid.Row="2">
-      <Border Style="{DynamicResource InfoCard}"
+    <Border Grid.Row="2"
+            Style="{DynamicResource InfoCard}"
+            Padding="12,10"
+            Margin="0,0,0,16"
+            Visibility="{Binding HasSelectedHistoryEntries, Converter={StaticResource BoolVis}}"
+            automation:AutomationProperties.AutomationId="History_ActionBar">
+      <DockPanel LastChildFill="False">
+        <TextBlock DockPanel.Dock="Left"
+                   Text="{Binding SelectedHistoryEntryCount, StringFormat='{}{0} selected'}"
+                   VerticalAlignment="Center"
+                   FontWeight="SemiBold"
+                   Margin="0,0,16,0"/>
+        <WrapPanel DockPanel.Dock="Right" HorizontalAlignment="Right">
+          <Button Content="Export"
+                  Click="ExportSelected_Click"
+                  Style="{StaticResource HistoryActionBarButton}"
+                  automation:AutomationProperties.AutomationId="History_Export"/>
+          <Button Content="Compare"
+                  Click="CompareSelected_Click"
+                  Style="{StaticResource HistoryActionBarButton}"
+                  IsEnabled="{Binding CanCompareSelectedHistoryEntries}"
+                  automation:AutomationProperties.AutomationId="History_Compare"/>
+          <Button Content="Deselect all"
+                  Click="DeselectAll_Click"
+                  Style="{DynamicResource SecondaryButton}"/>
+        </WrapPanel>
+      </DockPanel>
+    </Border>
+
+    <Grid Grid.Row="3">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="Auto"/>
+      </Grid.ColumnDefinitions>
+
+      <Border Grid.Column="0"
+              Style="{DynamicResource InfoCard}"
               Visibility="{Binding HasFilteredHistoryEntries, Converter={StaticResource InvBoolVis}}">
         <StackPanel>
           <TextBlock Text="{Binding HistoryEmptyStateTitle}" Style="{DynamicResource PanelTitle}"/>
-          <TextBlock Text="{Binding HistoryEmptyStateText}"
-                     Style="{DynamicResource CardSub}" Margin="0,6,0,12"/>
+          <TextBlock Text="{Binding HistoryEmptyStateText}" Style="{DynamicResource CardSub}" Margin="0,6,0,12" TextWrapping="Wrap"/>
           <WrapPanel>
-            <Button Content="Open Repair Library" Click="OpenRepairLibrary_Click"
-                    Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
-            <Button Content="Open Automation" Click="OpenAutomation_Click"
-                    Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
-            <Button Content="Clear Search" Click="ClearSearch_Click"
-                    Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8"
-                    Visibility="{Binding HistorySearchText, Converter={StaticResource NullCollapsed}}"/>
+            <Button Content="Open Repair Library" Click="OpenRepairLibrary_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
+            <Button Content="Open Automation" Click="OpenAutomation_Click" Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
+            <Button Content="Clear search"
+                    Click="ClearSearch_Click"
+                    Style="{DynamicResource SecondaryButton}"
+                    Visibility="{Binding HasHistorySearchText, Converter={StaticResource BoolVis}}"/>
           </WrapPanel>
         </StackPanel>
       </Border>
 
-      <ScrollViewer Visibility="{Binding HasFilteredHistoryEntries, Converter={StaticResource BoolVis}}">
-      <ItemsControl ItemsSource="{Binding FilteredHistoryEntries}"
-                    VirtualizingStackPanel.IsVirtualizing="True"
-                    VirtualizingStackPanel.VirtualizationMode="Recycling">
-        <ItemsControl.ItemsPanel>
-          <ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate>
-        </ItemsControl.ItemsPanel>
-        <ItemsControl.ItemTemplate>
-          <DataTemplate DataType="{x:Type m:RepairHistoryEntry}">
-            <Border Style="{DynamicResource FixCard}" Padding="14,10"
-                    Tag="{Binding}"
-                    MouseLeftButtonDown="HistoryCard_MouseLeftButtonDown">
-              <Border.ContextMenu>
-                <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
-                  <MenuItem Header="Run Again" Click="RerunFix_Click" CommandParameter="{Binding}"/>
-                  <MenuItem Header="View Receipt Details" Click="ReceiptDetails_Click" CommandParameter="{Binding}"/>
-                  <MenuItem Header="Copy Details" Click="CopyDetails_Click" CommandParameter="{Binding}"/>
-                  <MenuItem Header="Create Support Package" Click="CreateSupportPackage_Click" CommandParameter="{Binding}"/>
-                </ContextMenu>
-              </Border.ContextMenu>
-              <Grid>
+      <Border Grid.Column="0"
+              Style="{DynamicResource InfoCard}"
+              Visibility="{Binding HasFilteredHistoryEntries, Converter={StaticResource BoolVis}}">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+          </Grid.RowDefinitions>
+
+          <DockPanel Grid.Row="0" Margin="0,0,0,12">
+            <StackPanel DockPanel.Dock="Left">
+              <WrapPanel>
+                <TextBlock Text="{Binding TextSubstitutions[History_Header_Receipt]}" Style="{DynamicResource PanelTitle}" VerticalAlignment="Center"/>
+                <Button Content="?"
+                        Click="ReceiptHelp_Click"
+                        Width="28"
+                        Height="28"
+                        Margin="8,0,0,0"
+                        Style="{DynamicResource SecondaryButton}"
+                        Visibility="{Binding ShowSimpleHelp, Converter={StaticResource BoolVis}}"
+                        automation:AutomationProperties.AutomationId="Help_Receipt_Trigger"/>
+              </WrapPanel>
+              <TextBlock Text="{Binding HistoryLoadedSummaryText}"
+                         Style="{DynamicResource CardSub}"
+                         Margin="0,4,0,0"/>
+            </StackPanel>
+            <CheckBox DockPanel.Dock="Right"
+                      VerticalAlignment="Center"
+                      Content="Select all"
+                      IsChecked="{Binding AreAllVisibleHistoryEntriesSelected, Mode=OneWay}"
+                      Click="SelectAll_Click"
+                      automation:AutomationProperties.AutomationId="History_SelectAll"/>
+          </DockPanel>
+
+          <ListView Grid.Row="1"
+                    x:Name="HistoryReceiptListView"
+                    ItemsSource="{Binding FilteredHistoryEntries}"
+                    AlternationCount="2048"
+                    BorderThickness="0"
+                    Background="Transparent"
+                    ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                    ScrollViewer.IsDeferredScrollingEnabled="True"
+                    ScrollViewer.ScrollChanged="HistoryScrollViewer_ScrollChanged"
+                    VirtualizingPanel.IsVirtualizing="True"
+                    VirtualizingPanel.VirtualizationMode="Recycling"
+                    automation:AutomationProperties.AutomationId="HistoryReceiptList">
+            <ListView.ItemsPanel>
+              <ItemsPanelTemplate>
+                <VirtualizingStackPanel/>
+              </ItemsPanelTemplate>
+            </ListView.ItemsPanel>
+            <ListView.ItemContainerStyle>
+              <Style TargetType="ListViewItem">
+                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Padding" Value="0"/>
+                <Setter Property="Margin" Value="0"/>
+                <Setter Property="Focusable" Value="False"/>
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="Template">
+                  <Setter.Value>
+                    <ControlTemplate TargetType="ListViewItem">
+                      <ContentPresenter/>
+                    </ControlTemplate>
+                  </Setter.Value>
+                </Setter>
+              </Style>
+            </ListView.ItemContainerStyle>
+            <ListView.ItemTemplate>
+                <DataTemplate DataType="{x:Type m:RepairHistoryEntry}">
+                  <Border Style="{DynamicResource FixCard}"
+                          Padding="14,10"
+                          Margin="0,0,0,10"
+                          Tag="{Binding}"
+                          automation:AutomationProperties.AutomationId="{Binding HistoryAutomationId}"
+                          MouseLeftButtonDown="HistoryCard_MouseLeftButtonDown">
+                    <Border.ContextMenu>
+                      <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}"
+                                   automation:AutomationProperties.AutomationId="ContextMenu_Receipt">
+                        <MenuItem Header="Run Again"
+                                  Click="RerunFix_Click"
+                                  CommandParameter="{Binding}"
+                                  automation:AutomationProperties.AutomationId="Card_Receipt_RunAgain"/>
+                        <MenuItem Header="View Receipt Details"
+                                  Click="ReceiptDetails_Click"
+                                  CommandParameter="{Binding}"
+                                  automation:AutomationProperties.AutomationId="Card_Receipt_Details"/>
+                        <MenuItem Header="Copy Details"
+                                  Click="CopyDetails_Click"
+                                  CommandParameter="{Binding}"
+                                  automation:AutomationProperties.AutomationId="Card_Receipt_Copy"/>
+                        <MenuItem Header="Create Support Package"
+                                  Click="CreateSupportPackage_Click"
+                                  CommandParameter="{Binding}"
+                                  automation:AutomationProperties.AutomationId="Card_Receipt_CreateSupportPackage"/>
+                      </ContextMenu>
+                    </Border.ContextMenu>
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                      </Grid.ColumnDefinitions>
+
+                      <CheckBox Grid.Column="0"
+                                Margin="0,0,12,0"
+                                VerticalAlignment="Top"
+                                IsChecked="{Binding IsSelectedForComparison, Mode=TwoWay}"
+                                Checked="HistoryItemSelection_Changed"
+                                Unchecked="HistoryItemSelection_Changed"
+                                Tag="{Binding}"
+                                automation:AutomationProperties.AutomationId="{Binding RelativeSource={RelativeSource AncestorType=ContentPresenter}, Path=(ItemsControl.AlternationIndex), StringFormat=History_Item_{0}_Checkbox}"/>
+
+                      <TextBlock Grid.Column="1"
+                                 VerticalAlignment="Top"
+                                 Margin="0,1,12,0"
+                                 FontFamily="{DynamicResource IconFont}"
+                                 FontSize="16">
+                        <TextBlock.Style>
+                          <Style TargetType="TextBlock">
+                            <Setter Property="Text" Value="&#xE711;"/>
+                            <Setter Property="Foreground" Value="{DynamicResource AccentRedBrush}"/>
+                            <Style.Triggers>
+                              <DataTrigger Binding="{Binding Success}" Value="True">
+                                <Setter Property="Text" Value="&#xE73E;"/>
+                                <Setter Property="Foreground" Value="{DynamicResource AccentGreenBrush}"/>
+                              </DataTrigger>
+                              <DataTrigger Binding="{Binding IsWeeklySummary}" Value="True">
+                                <Setter Property="Text" Value="&#xE823;"/>
+                                <Setter Property="Foreground" Value="{DynamicResource AccentBlueBrush}"/>
+                              </DataTrigger>
+                            </Style.Triggers>
+                          </Style>
+                        </TextBlock.Style>
+                      </TextBlock>
+
+                      <StackPanel Grid.Column="2">
+                        <TextBlock Text="{Binding FixTitle}" FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Text="{Binding CategoryName}" Style="{DynamicResource MetaText}" TextTrimming="CharacterEllipsis"/>
+                        <WrapPanel Margin="0,4,0,0"
+                                   Visibility="{Binding DataContext.AdvancedModeEnabled, RelativeSource={RelativeSource AncestorType=Page}, Converter={StaticResource BoolVis}}">
+                          <TextBlock Text="{Binding DurationMs, StringFormat='Duration: {0} ms'}"
+                                     Style="{DynamicResource MetaText}"
+                                     Margin="0,0,10,0"/>
+                          <TextBlock Text="{Binding ExitCode, StringFormat='Exit code: {0}'}"
+                                     Style="{DynamicResource MetaText}"
+                                     Margin="0,0,10,0"
+                                     Visibility="{Binding ExitCode, Converter={StaticResource NullCollapsed}}"/>
+                          <TextBlock Text="{Binding StepCount, StringFormat='Raw steps: {0}'}"
+                                     Style="{DynamicResource MetaText}"/>
+                        </WrapPanel>
+                        <TextBlock Text="{Binding PostStateSummary}"
+                                   Style="{DynamicResource CardSub}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,4,0,0"
+                                   Visibility="{Binding PostStateSummary, Converter={StaticResource NullCollapsed}}"/>
+                        <TextBlock Text="{Binding WeeklySummary.SummaryText}"
+                                   Style="{DynamicResource CardSub}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,4,0,0"
+                                   Visibility="{Binding IsWeeklySummary, Converter={StaticResource BoolVis}}"/>
+                        <TextBlock Text="{Binding VerificationSummary}"
+                                   Style="{DynamicResource MetaText}"
+                                   Margin="0,4,0,0"
+                                   Visibility="{Binding VerificationSummary, Converter={StaticResource NullCollapsed}}"/>
+                        <TextBlock Text="{Binding NextStep}"
+                                   Style="{DynamicResource MetaText}"
+                                   Margin="0,4,0,0"
+                                   TextWrapping="Wrap"
+                                   Visibility="{Binding NextStep, Converter={StaticResource NullCollapsed}}"/>
+                      </StackPanel>
+
+                      <StackPanel Grid.Column="3" HorizontalAlignment="Right" Margin="16,0,0,0">
+                        <TextBlock Text="{Binding Timestamp, Converter={StaticResource RelDate}}"
+                                   Style="{DynamicResource CardSub}"
+                                   FontSize="11"
+                                   HorizontalAlignment="Right"/>
+                        <WrapPanel HorizontalAlignment="Right" Margin="0,8,0,0">
+                          <Button Content="Details"
+                                  Tag="{Binding}"
+                                  Click="ReceiptDetailsButton_Click"
+                                  automation:AutomationProperties.AutomationId="Card_Receipt_Details"
+                                  Style="{DynamicResource SecondaryButton}"
+                                  Margin="0,0,8,8"/>
+                          <Button Content="Copy"
+                                  Tag="{Binding}"
+                                  Click="CopyDetails_Click"
+                                  automation:AutomationProperties.AutomationId="Card_Receipt_Copy"
+                                  Style="{DynamicResource SecondaryButton}"
+                                  Margin="0,0,8,8"/>
+                          <Button Content="View Raw Receipt"
+                                  Tag="{Binding}"
+                                  Click="ViewRawReceipt_Click"
+                                  automation:AutomationProperties.AutomationId="Card_Receipt_ViewRaw"
+                                  Style="{DynamicResource SecondaryButton}"
+                                  Margin="0,0,8,8"
+                                  Visibility="{Binding DataContext.AdvancedModeEnabled, RelativeSource={RelativeSource AncestorType=Page}, Converter={StaticResource BoolVis}}"/>
+                          <Button Content="Run Again"
+                                  Tag="{Binding}"
+                                  Click="RerunFix_Click"
+                                  automation:AutomationProperties.AutomationId="Card_Receipt_RunAgain"
+                                  Style="{DynamicResource SecondaryButton}"
+                                  Margin="0,0,0,8"
+                                  Visibility="{Binding FixId, Converter={StaticResource NullCollapsed}}"/>
+                        </WrapPanel>
+                      </StackPanel>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+          </ListView>
+        </Grid>
+      </Border>
+
+      <Border Grid.Column="1"
+              Width="420"
+              Margin="16,0,0,0"
+              Style="{DynamicResource InfoCard}"
+              Visibility="{Binding IsHistoryComparePanelOpen, Converter={StaticResource BoolVis}}"
+              automation:AutomationProperties.AutomationId="History_ComparePanel">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+          </Grid.RowDefinitions>
+
+          <DockPanel Grid.Row="0" Margin="0,0,0,12">
+            <StackPanel DockPanel.Dock="Left">
+              <TextBlock Text="Compare Receipts" Style="{DynamicResource PanelTitle}"/>
+              <TextBlock Text="Differences are highlighted so you can see what changed between the two runs."
+                         Style="{DynamicResource CardSub}"
+                         Margin="0,4,0,0"
+                         TextWrapping="Wrap"/>
+            </StackPanel>
+            <Button DockPanel.Dock="Right"
+                    Content="Close"
+                    Click="CloseCompare_Click"
+                    Style="{DynamicResource SecondaryButton}"/>
+          </DockPanel>
+
+          <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+              <Grid Margin="0,0,0,12">
                 <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="Auto"/>
                   <ColumnDefinition Width="*"/>
-                  <ColumnDefinition Width="Auto"/>
+                  <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0"
-                           FontFamily="{DynamicResource IconFont}" FontSize="16">
-                  <TextBlock.Style>
-                    <Style TargetType="TextBlock">
-                      <Setter Property="Text"       Value="&#xE711;"/>
-                      <Setter Property="Foreground" Value="{DynamicResource AccentRedBrush}"/>
-                      <Style.Triggers>
-                        <DataTrigger Binding="{Binding Success}" Value="True">
-                          <Setter Property="Text"       Value="&#xE73E;"/>
-                          <Setter Property="Foreground" Value="{DynamicResource AccentGreenBrush}"/>
-                        </DataTrigger>
-                      </Style.Triggers>
-                    </Style>
-                  </TextBlock.Style>
-                </TextBlock>
-                <StackPanel Grid.Column="1">
-                  <TextBlock Text="{Binding FixTitle}" FontWeight="SemiBold" FontSize="13"/>
-                  <TextBlock Text="{Binding CategoryName}" Style="{DynamicResource MetaText}"/>
-                  <TextBlock Text="{Binding PostStateSummary}" Style="{DynamicResource CardSub}"
-                             TextWrapping="Wrap" Margin="0,4,0,0"
-                             Visibility="{Binding PostStateSummary, Converter={StaticResource NullCollapsed}}"/>
-                  <TextBlock Text="{Binding VerificationSummary}" Style="{DynamicResource MetaText}" Margin="0,4,0,0"
-                             Visibility="{Binding VerificationSummary, Converter={StaticResource NullCollapsed}}"/>
-                  <TextBlock Text="{Binding NextStep}" Style="{DynamicResource MetaText}" Margin="0,4,0,0"
-                             Visibility="{Binding NextStep, Converter={StaticResource NullCollapsed}}"/>
-                  <TextBlock Text="{Binding ChangedSummary}" Style="{DynamicResource MetaText}" Margin="0,4,0,0"
-                             TextWrapping="Wrap"
-                             Visibility="{Binding DataContext.AdvancedModeEnabled, RelativeSource={RelativeSource AncestorType=Page}, Converter={StaticResource BoolVis}}"/>
-                  <TextBlock Text="{Binding RollbackSummary}" Style="{DynamicResource MetaText}" Margin="0,4,0,0"
-                             TextWrapping="Wrap"
-                             Visibility="{Binding DataContext.AdvancedModeEnabled, RelativeSource={RelativeSource AncestorType=Page}, Converter={StaticResource BoolVis}}"/>
-                </StackPanel>
-                <StackPanel Grid.Column="2" HorizontalAlignment="Right">
-                  <TextBlock Text="{Binding Timestamp, Converter={StaticResource RelDate}}"
-                             Style="{DynamicResource CardSub}" VerticalAlignment="Center" FontSize="11"
-                             HorizontalAlignment="Right"/>
-                  <WrapPanel HorizontalAlignment="Right" Margin="0,8,0,0">
-                    <Button Content="Details" Tag="{Binding}" Click="ReceiptDetailsButton_Click"
-                            automation:AutomationProperties.AutomationId="HistoryReceiptDetailsButton"
-                            Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
-                    <Button Content="Copy" Tag="{Binding}" Click="CopyDetails_Click"
-                            Style="{DynamicResource SecondaryButton}" Margin="0,0,8,8"/>
-                    <Button Content="Run Again" Tag="{Binding}" Click="RerunFix_Click"
-                            Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8"
-                            Visibility="{Binding FixId, Converter={StaticResource NullCollapsed}}"/>
-                  </WrapPanel>
-                </StackPanel>
+                <Border Grid.Column="0" Background="{DynamicResource BgCard2Brush}" CornerRadius="8" Padding="10" Margin="0,0,6,0">
+                  <TextBlock Text="{Binding HistoryCompareLeftTitle}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                </Border>
+                <Border Grid.Column="1" Background="{DynamicResource BgCard2Brush}" CornerRadius="8" Padding="10" Margin="6,0,0,0">
+                  <TextBlock Text="{Binding HistoryCompareRightTitle}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                </Border>
               </Grid>
-            </Border>
-          </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
-      </ScrollViewer>
+
+              <ItemsControl ItemsSource="{Binding HistoryComparisonRows}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate DataType="{x:Type m:ReceiptComparisonRow}">
+                    <Border CornerRadius="8" Padding="10" Margin="0,0,0,8">
+                      <Border.Style>
+                        <Style TargetType="Border">
+                          <Setter Property="Background" Value="{DynamicResource BgCard2Brush}"/>
+                          <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsDifferent}" Value="True">
+                              <Setter Property="Background" Value="{DynamicResource BgSurfaceBrush}"/>
+                              <Setter Property="BorderBrush" Value="{DynamicResource AccentAmberBrush}"/>
+                              <Setter Property="BorderThickness" Value="1"/>
+                            </DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </Border.Style>
+                      <StackPanel>
+                        <TextBlock Text="{Binding Label}" Style="{DynamicResource CardLabel}"/>
+                        <Grid Margin="0,8,0,0">
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                          </Grid.ColumnDefinitions>
+                          <TextBlock Grid.Column="0" Text="{Binding LeftValue}" Margin="0,0,8,0" TextWrapping="Wrap"/>
+                          <TextBlock Grid.Column="1" Text="{Binding RightValue}" Margin="8,0,0,0" TextWrapping="Wrap"/>
+                        </Grid>
+                      </StackPanel>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </ScrollViewer>
+        </Grid>
+      </Border>
     </Grid>
   </Grid>
 </Page>

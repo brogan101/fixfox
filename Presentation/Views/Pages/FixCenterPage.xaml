@@ -1,30 +1,82 @@
 <Page x:Class="HelpDesk.Presentation.Views.Pages.FixCenterPage"
+      x:Name="RootPage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
       xmlns:h="clr-namespace:HelpDesk.Presentation.Helpers"
       xmlns:m="clr-namespace:HelpDesk.Domain.Models"
+      xmlns:e="clr-namespace:HelpDesk.Domain.Enums"
+      xmlns:local="clr-namespace:HelpDesk.Presentation.Views.Pages"
       xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
       Background="{DynamicResource BgPrimaryBrush}">
 
   <Page.Resources>
-    <h:BoolToVisConverter       x:Key="BoolVis"/>
+    <h:BoolToVisConverter x:Key="BoolVis"/>
     <h:InverseBoolToVisConverter x:Key="InvBoolVis"/>
-    <h:NullToCollapsedConverter  x:Key="NullCollapsed"/>
-    <h:StatusIconConverter       x:Key="StatusIcon"/>
-    <h:StatusBgConverter         x:Key="StatusBg"/>
-    <h:StatusFgConverter         x:Key="StatusFg"/>
-    <h:RunningVisConverter       x:Key="RunningVis"/>
-    <h:AdminShieldVisConverter   x:Key="AdminVis"/>
+    <h:NullToCollapsedConverter x:Key="NullCollapsed"/>
+    <h:NullOrWhiteSpaceToVisibleConverter x:Key="EmptyStringVisible"/>
+    <h:AdminShieldVisConverter x:Key="AdminVis"/>
+    <h:FixRiskLevelBackgroundConverter x:Key="RiskBg"/>
+    <h:FixRiskLevelForegroundConverter x:Key="RiskFg"/>
+    <h:FixRiskLevelTextConverter x:Key="RiskText"/>
+    <h:FixRiskLevelVariantTextConverter x:Key="RiskVariantText"/>
+    <h:FixCategorySymbolConverter x:Key="CategorySymbol"/>
+    <h:WidthLessThanThresholdConverter x:Key="CompactRail"/>
+    <h:PageWidthToRailWidthConverter x:Key="RailWidth"/>
 
-    <Style x:Key="PinToggleIconStyle" TargetType="ui:SymbolIcon">
-      <Setter Property="Symbol" Value="Pin20"/>
-      <Setter Property="FontSize" Value="15"/>
-      <Setter Property="Foreground" Value="{DynamicResource TextSecBrush}"/>
+    <Style x:Key="CategoryRailListBoxItemStyle" TargetType="ListBoxItem">
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="Margin" Value="0,0,0,8"/>
+      <Setter Property="Focusable" Value="False"/>
+      <Setter Property="automation:AutomationProperties.AutomationId" Value="{Binding AutomationId}"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ListBoxItem">
+            <ContentPresenter/>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style x:Key="FixListBoxItemStyle" TargetType="ListBoxItem">
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="Margin" Value="0"/>
+      <Setter Property="Focusable" Value="True"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ListBoxItem">
+            <ContentPresenter/>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style x:Key="FixCardExpandedStyle" TargetType="Border">
+      <Setter Property="MaxHeight" Value="0"/>
+      <Setter Property="Opacity" Value="0"/>
+      <Setter Property="ClipToBounds" Value="True"/>
       <Style.Triggers>
-        <DataTrigger Binding="{Binding IsPinned}" Value="True">
-          <Setter Property="Symbol" Value="PinOff20"/>
-          <Setter Property="Foreground" Value="{DynamicResource FoxOrangeBrush}"/>
+        <DataTrigger Binding="{Binding IsExpanded}" Value="True">
+          <DataTrigger.EnterActions>
+            <BeginStoryboard>
+              <Storyboard>
+                <DoubleAnimation Storyboard.TargetProperty="MaxHeight" To="240" Duration="0:0:0.2"/>
+                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.2"/>
+              </Storyboard>
+            </BeginStoryboard>
+          </DataTrigger.EnterActions>
+          <DataTrigger.ExitActions>
+            <BeginStoryboard>
+              <Storyboard>
+                <DoubleAnimation Storyboard.TargetProperty="MaxHeight" To="0" Duration="0:0:0.2"/>
+                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.2"/>
+              </Storyboard>
+            </BeginStoryboard>
+          </DataTrigger.ExitActions>
         </DataTrigger>
       </Style.Triggers>
     </Style>
@@ -33,225 +85,421 @@
   <Grid Margin="28,24">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto"/>
-      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="20"/>
       <RowDefinition Height="*"/>
     </Grid.RowDefinitions>
 
-    <!-- Header + search bar -->
-    <DockPanel Grid.Row="0" Margin="0,0,0,16">
-      <StackPanel DockPanel.Dock="Left">
-        <TextBlock Text="Repair Library" Style="{DynamicResource PageTitle}"
-                   automation:AutomationProperties.AutomationId="FixCenterPageMarker"/>
-        <TextBlock Text="{Binding FixLibrarySummaryText}"
-                   Style="{DynamicResource PageSubtitle}"/>
-      </StackPanel>
-      <Border DockPanel.Dock="Right" Style="{DynamicResource SearchBox}" MinWidth="220" MaxWidth="280" HorizontalAlignment="Right">
+    <StackPanel Grid.Row="0">
+      <TextBlock Text="{Binding TextSubstitutions[FixCenter_Title]}"
+                 Style="{DynamicResource PageTitle}"
+                 automation:AutomationProperties.AutomationId="FixCenterPageMarker"/>
+      <TextBlock Text="{Binding FixLibrarySummaryText}"
+                 Style="{DynamicResource PageSubtitle}"/>
+    </StackPanel>
+
+    <Grid Grid.Row="2">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="{Binding ElementName=RootPage, Path=ActualWidth, Converter={StaticResource RailWidth}}"/>
+        <ColumnDefinition Width="24"/>
+        <ColumnDefinition Width="*"/>
+      </Grid.ColumnDefinitions>
+
+      <Border Grid.Column="0"
+              Style="{DynamicResource InfoCard}"
+              Padding="12">
         <Grid>
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="Auto"/>
-            <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="Auto"/>
-          </Grid.ColumnDefinitions>
-          <ui:SymbolIcon Grid.Column="0" Symbol="Search20" FontSize="14"
-                         Foreground="{DynamicResource TextSecBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-          <TextBox Grid.Column="1" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                   automation:AutomationProperties.AutomationId="FixCenterSearchBox"
-                   BorderThickness="0" Background="Transparent" VerticalContentAlignment="Center"/>
-          <Button Grid.Column="2" Content="&#xE711;" Click="ClearSearch_Click"
-                  FontFamily="{DynamicResource IconFont}" FontSize="10"
-                  Background="Transparent" BorderThickness="0" Cursor="Hand"
-                  Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"
-                  Visibility="{Binding SearchText, Converter={StaticResource NullCollapsed}}"/>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+          </Grid.RowDefinitions>
+
+          <ListBox x:Name="CategoryRailListBox"
+                   Grid.Row="0"
+                   BorderThickness="0"
+                   Background="Transparent"
+                   ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                   ScrollViewer.VerticalScrollBarVisibility="Auto"
+                   ItemContainerStyle="{StaticResource CategoryRailListBoxItemStyle}"
+                   SelectionChanged="CategoryRailListBox_SelectionChanged"
+                   automation:AutomationProperties.AutomationId="FixCenter_CategoryRail">
+            <ListBox.ItemTemplate>
+              <DataTemplate DataType="{x:Type local:FixCenterCategoryRailItem}">
+                <Border x:Name="RailItemBorder"
+                        CornerRadius="10"
+                        Padding="12,10"
+                        Background="Transparent">
+                  <Border.ToolTip>
+                    <ToolTip Content="{Binding Title}"/>
+                  </Border.ToolTip>
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="Auto"/>
+                      <ColumnDefinition Width="10"/>
+                      <ColumnDefinition Width="*"/>
+                      <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <ui:SymbolIcon Grid.Column="0"
+                                   x:Name="RailItemIcon"
+                                   Symbol="{Binding Title, Converter={StaticResource CategorySymbol}}"
+                                   FontSize="16"
+                                   Foreground="{DynamicResource TextPriBrush}"
+                                   VerticalAlignment="Center"/>
+
+                    <TextBlock x:Name="RailTitleText"
+                               Grid.Column="2"
+                               Text="{Binding Title}"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource TextPriBrush}"
+                               TextTrimming="CharacterEllipsis">
+                      <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                          <Setter Property="Visibility" Value="Visible"/>
+                          <Style.Triggers>
+                            <DataTrigger Binding="{Binding ElementName=RootPage, Path=ActualWidth, Converter={StaticResource CompactRail}, ConverterParameter=900}" Value="True">
+                              <Setter Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </TextBlock.Style>
+                    </TextBlock>
+
+                    <Border x:Name="CountPill"
+                            Grid.Column="3"
+                            CornerRadius="999"
+                            Padding="8,2"
+                            Margin="10,0,0,0"
+                            Background="{DynamicResource BgCard2Brush}"
+                            VerticalAlignment="Center">
+                      <TextBlock Text="{Binding Count}"
+                                 x:Name="CountPillText"
+                                 FontSize="11"
+                                 Foreground="{DynamicResource TextSecBrush}"
+                                 VerticalAlignment="Center"/>
+                    </Border>
+                  </Grid>
+                </Border>
+                <DataTemplate.Triggers>
+                  <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsMouseOver}" Value="True">
+                    <Setter TargetName="RailItemBorder" Property="Background" Value="#12FFFFFF"/>
+                  </DataTrigger>
+                  <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsSelected}" Value="True">
+                    <Setter TargetName="RailItemBorder" Property="Background" Value="{DynamicResource FoxOrangeBrush}"/>
+                    <Setter TargetName="RailItemIcon" Property="Foreground" Value="White"/>
+                    <Setter TargetName="RailTitleText" Property="Foreground" Value="White"/>
+                    <Setter TargetName="CountPill" Property="Background" Value="#30FFFFFF"/>
+                    <Setter TargetName="CountPillText" Property="Foreground" Value="White"/>
+                  </DataTrigger>
+                </DataTemplate.Triggers>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
         </Grid>
       </Border>
-    </DockPanel>
 
-    <!-- Fix count label -->
-    <TextBlock Grid.Row="1" Margin="0,0,0,10"
-               Foreground="{DynamicResource TextSecBrush}" FontSize="12"
-               Text="{Binding ActiveFixCountText}"/>
+      <Grid Grid.Column="2">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="16"/>
+          <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
 
-    <!-- Pinned fixes (if any) -->
-    <DockPanel Grid.Row="2">
-      <ScrollViewer DockPanel.Dock="Top" VerticalScrollBarVisibility="Auto"
-                    Visibility="{Binding PinnedFixes.Count, Converter={StaticResource NullCollapsed}}">
-        <StackPanel Margin="0,0,0,12">
-          <TextBlock Text="Quick access" Style="{DynamicResource CardLabel}" Margin="0,0,0,6"/>
-          <ItemsControl ItemsSource="{Binding PinnedFixes}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate DataType="{x:Type m:FixItem}">
-                <Border Style="{DynamicResource FixCard}"
-                        Background="{Binding Status, Converter={StaticResource StatusBg}}"
-                        Tag="{Binding}"
-                        MouseLeftButtonDown="FixCard_MouseLeftButtonDown">
-                  <Border.ContextMenu>
-                    <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
-                      <MenuItem Header="Run Best Action" Click="RunBestAction_Click" CommandParameter="{Binding}"/>
-                      <MenuItem Header="Start Guided Repair" Click="GuidedMenu_Click" CommandParameter="{Binding}"/>
-                      <MenuItem Header="Run Repair" Click="RunMenu_Click" CommandParameter="{Binding}"/>
-                      <Separator/>
-                      <MenuItem Header="View Details" Click="FixDetails_Click" CommandParameter="{Binding}"/>
-                      <MenuItem Header="Copy Technical Detail" Click="CopyFixDetails_Click" CommandParameter="{Binding}"/>
-                      <MenuItem Header="Open Related Workflow" Click="OpenRelatedWorkflow_Click" CommandParameter="{Binding}"/>
-                      <Separator/>
-                      <MenuItem Header="Remove From Quick Access" Click="TogglePinMenu_Click" CommandParameter="{Binding}"/>
-                      <MenuItem Header="Copy Repair Name" Click="CopyFixTitle_Click" CommandParameter="{Binding}"/>
-                    </ContextMenu>
-                  </Border.ContextMenu>
-                  <DockPanel LastChildFill="True">
-                    <WrapPanel DockPanel.Dock="Right" VerticalAlignment="Top" ItemHeight="36">
-                      <Button Content="Details" Tag="{Binding}"
-                              automation:AutomationProperties.AutomationId="FixCenterPinnedDetailsButton"
-                              Click="FixDetailsButton_Click" Style="{DynamicResource SecondaryButton}"
-                              Margin="0,0,8,0" VerticalAlignment="Center"/>
-                      <Button Tag="{Binding}" Click="TogglePin_Click"
-                            Background="Transparent" BorderThickness="0" Cursor="Hand"
-                            Foreground="{DynamicResource TextSecBrush}" VerticalAlignment="Top">
-                        <ui:SymbolIcon Style="{StaticResource PinToggleIconStyle}"/>
-                      </Button>
-                      <Button Content="Run" Tag="{Binding}"
-                              Click="FixButton_Click" Style="{DynamicResource PrimaryButton}"
-                              Margin="0,0,8,0" VerticalAlignment="Center"/>
-                    </WrapPanel>
-                    <StackPanel>
-                      <WrapPanel Margin="0,0,0,2">
-                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13"/>
-                        <Border Style="{DynamicResource CompactStatusBadge}"
-                                Margin="8,0,0,0"
-                                VerticalAlignment="Center"
-                                Visibility="{Binding HasStatusIndicator, Converter={StaticResource BoolVis}}">
-                          <StackPanel Orientation="Horizontal">
-                            <Ellipse Style="{DynamicResource CompactStatusDot}" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding StatusSummary}" Style="{DynamicResource CompactStatusText}" Margin="6,0,0,0"/>
-                          </StackPanel>
-                        </Border>
-                      </WrapPanel>
-                      <TextBlock Text="{Binding Description}" Style="{DynamicResource CardSub}"
-                                 TextWrapping="Wrap" MaxHeight="40"/>
-                      <ProgressBar IsIndeterminate="True" Height="2" Margin="0,6,0,0"
-                                   Foreground="{DynamicResource FoxOrangeBrush}"
-                                   Background="Transparent" BorderThickness="0"
-                                   Visibility="{Binding Status, Converter={StaticResource RunningVis}}"/>
-                    </StackPanel>
-                  </DockPanel>
-                </Border>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </StackPanel>
-      </ScrollViewer>
+        <Border Grid.Row="0"
+                Style="{DynamicResource SearchBox}"
+                Height="40"
+                Padding="12,0">
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto"/>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
 
-      <!-- Main fix list -->
-      <Grid>
-        <Border Style="{DynamicResource InfoCard}"
+            <ui:SymbolIcon Grid.Column="0"
+                           Symbol="Search20"
+                           FontSize="15"
+                           Foreground="{DynamicResource TextSecBrush}"
+                           VerticalAlignment="Center"
+                           Margin="0,0,8,0"/>
+
+            <Grid Grid.Column="1">
+              <TextBox x:Name="FixSearchBox"
+                       Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                       BorderThickness="0"
+                       Background="Transparent"
+                       VerticalContentAlignment="Center"
+                       automation:AutomationProperties.AutomationId="FixCenter_Search"/>
+              <TextBlock Text="{Binding TextSubstitutions[FixCenter_SearchPlaceholder]}"
+                         Foreground="{DynamicResource TextMutedBrush}"
+                         VerticalAlignment="Center"
+                         IsHitTestVisible="False"
+                         Visibility="{Binding SearchText, Converter={StaticResource EmptyStringVisible}}"/>
+            </Grid>
+
+            <Button Grid.Column="2"
+                    Content="Clear"
+                    Click="ClearSearch_Click"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    Foreground="{DynamicResource TextSecBrush}"
+                    Padding="6,0"
+                    Cursor="Hand"
+                    Visibility="{Binding SearchText, Converter={StaticResource NullCollapsed}}"/>
+          </Grid>
+        </Border>
+
+        <TextBlock Grid.Row="1"
+                   Margin="2,12,0,0"
+                   Text="{Binding FixListHeaderText}"
+                   FontSize="13"
+                   FontWeight="SemiBold"
+                   Foreground="{DynamicResource TextSecBrush}"
+                   automation:AutomationProperties.AutomationId="FixCenter_ListHeader"/>
+
+        <Border Grid.Row="3"
+                Style="{DynamicResource InfoCard}"
                 Visibility="{Binding HasActiveFixes, Converter={StaticResource InvBoolVis}}">
-          <StackPanel>
-            <TextBlock Text="{Binding FixLibraryEmptyStateTitle}" Style="{DynamicResource PanelTitle}"/>
-            <TextBlock Text="{Binding FixLibraryEmptyStateText}" Style="{DynamicResource CardSub}" Margin="0,6,0,12"/>
-            <WrapPanel>
-              <Button Content="Clear Search"
-                      Click="ClearSearch_Click"
-                      Style="{DynamicResource SecondaryButton}"
-                      Margin="0,0,8,8"
-                      Visibility="{Binding SearchText, Converter={StaticResource NullCollapsed}}"/>
-              <Button Content="Open Guided Diagnosis"
-                      Click="OpenGuidedDiagnosis_Click"
-                      Style="{DynamicResource SecondaryButton}"
-                      Margin="0,0,0,8"/>
-            </WrapPanel>
+          <StackPanel HorizontalAlignment="Center"
+                      VerticalAlignment="Center">
+            <TextBlock Text="{Binding FixLibraryEmptyStateTitle}"
+                       Style="{DynamicResource PanelTitle}"
+                       HorizontalAlignment="Center"
+                       Margin="0,0,0,6"/>
+            <TextBlock Text="{Binding FixLibraryEmptyStateText}"
+                       Style="{DynamicResource CardSub}"
+                       TextAlignment="Center"
+                       HorizontalAlignment="Center"
+                       Margin="0,0,0,12"
+                       MaxWidth="420"/>
+            <Button Content="Clear search"
+                    Click="ClearSearch_Click"
+                    Style="{DynamicResource SecondaryButton}"
+                    HorizontalAlignment="Center"
+                    Visibility="{Binding SearchText, Converter={StaticResource NullCollapsed}}"/>
           </StackPanel>
         </Border>
 
-        <ScrollViewer Visibility="{Binding HasActiveFixes, Converter={StaticResource BoolVis}}">
-          <ItemsControl ItemsSource="{Binding ActiveFixes}"
-                        VirtualizingStackPanel.IsVirtualizing="True"
-                        VirtualizingStackPanel.VirtualizationMode="Recycling">
-            <ItemsControl.ItemsPanel>
-              <ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
+        <ListBox Grid.Row="3"
+                 ItemsSource="{Binding ActiveFixes}"
+                 BorderThickness="0"
+                 Background="Transparent"
+                 ItemContainerStyle="{StaticResource FixListBoxItemStyle}"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                 ScrollViewer.CanContentScroll="True"
+                 VirtualizingPanel.IsVirtualizing="True"
+                 VirtualizingPanel.VirtualizationMode="Recycling"
+                 Visibility="{Binding HasActiveFixes, Converter={StaticResource BoolVis}}"
+                 automation:AutomationProperties.AutomationId="FixCenter_FixList">
+          <ListBox.ItemsPanel>
+            <ItemsPanelTemplate>
+              <VirtualizingStackPanel/>
+            </ItemsPanelTemplate>
+          </ListBox.ItemsPanel>
+          <ListBox.ItemTemplate>
               <DataTemplate DataType="{x:Type m:FixItem}">
-                <Border Style="{DynamicResource FixCard}"
-                        Background="{Binding Status, Converter={StaticResource StatusBg}}"
+                <Border Margin="0,0,0,12"
+                        Padding="16"
+                        CornerRadius="12"
+                        Background="{DynamicResource BgCardBrush}"
+                        BorderBrush="{DynamicResource StrokeBrush}"
+                        BorderThickness="1"
+                        MinHeight="92"
+                        Focusable="True"
                         Tag="{Binding}"
-                        MouseLeftButtonDown="FixCard_MouseLeftButtonDown">
+                        automation:AutomationProperties.AutomationId="{Binding Id, StringFormat=FixCenter_Fix_{0}_Card}"
+                        MouseLeftButtonDown="FixCard_MouseLeftButtonDown"
+                        MouseRightButtonUp="FixCard_MouseRightButtonUp">
                   <Border.ContextMenu>
-                    <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
-                      <MenuItem Header="Run Best Action" Click="RunBestAction_Click" CommandParameter="{Binding}"/>
-                      <MenuItem Header="Start Guided Repair" Click="GuidedMenu_Click" CommandParameter="{Binding}"/>
-                      <MenuItem Header="Run Repair" Click="RunMenu_Click" CommandParameter="{Binding}"/>
-                      <Separator/>
-                      <MenuItem Header="View Details" Click="FixDetails_Click" CommandParameter="{Binding}"/>
-                      <MenuItem Header="Copy Technical Detail" Click="CopyFixDetails_Click" CommandParameter="{Binding}"/>
-                      <MenuItem Header="Open Related Workflow" Click="OpenRelatedWorkflow_Click" CommandParameter="{Binding}"/>
-                      <Separator/>
-                      <MenuItem Header="Pin To Quick Access" Click="TogglePinMenu_Click" CommandParameter="{Binding}"/>
-                      <MenuItem Header="Copy Repair Name" Click="CopyFixTitle_Click" CommandParameter="{Binding}"/>
+                    <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}"
+                                 automation:AutomationProperties.AutomationId="ContextMenu_Fix">
+                      <MenuItem Header="Run Fix"
+                                Click="FixMenuRun_Click"
+                                CommandParameter="{Binding}"
+                                automation:AutomationProperties.AutomationId="Card_Fix_Run"/>
+                      <MenuItem Header="Toggle Details"
+                                Click="FixMenuToggleDetails_Click"
+                                CommandParameter="{Binding}"
+                                automation:AutomationProperties.AutomationId="Card_Fix_Details"/>
+                      <MenuItem Header="Copy Title"
+                                Click="FixMenuCopyTitle_Click"
+                                CommandParameter="{Binding}"
+                                automation:AutomationProperties.AutomationId="Card_Fix_CopyTitle"/>
                     </ContextMenu>
                   </Border.ContextMenu>
-                  <DockPanel LastChildFill="True">
-                    <WrapPanel DockPanel.Dock="Right" VerticalAlignment="Top" Margin="8,0,0,0" ItemHeight="36">
-                      <TextBlock Text="&#xE7EF;" FontFamily="{DynamicResource IconFont}" FontSize="12"
-                                 Foreground="{DynamicResource AccentAmberBrush}" VerticalAlignment="Center" Margin="0,0,6,0"
-                                 ToolTip="Requires admin"
-                                 Visibility="{Binding RequiresAdmin, Converter={StaticResource AdminVis}}"/>
-                      <Button Tag="{Binding}" Click="TogglePin_Click"
-                              Background="Transparent" BorderThickness="0" Cursor="Hand"
-                              Foreground="{DynamicResource TextSecBrush}" Margin="0,0,6,0">
-                        <ui:SymbolIcon Style="{StaticResource PinToggleIconStyle}"/>
-                      </Button>
-                      <Button Content="Guide" Tag="{Binding}" Click="GuidedButton_Click"
-                              Style="{DynamicResource SecondaryButton}"
-                              Visibility="{Binding HasSteps, Converter={StaticResource BoolVis}}"
-                              Margin="0,0,6,0"/>
-                      <Button Content="Details" Tag="{Binding}" Click="FixDetailsButton_Click"
-                              automation:AutomationProperties.AutomationId="FixCenterDetailsButton"
-                              Style="{DynamicResource SecondaryButton}"
-                              Margin="0,0,6,0"/>
-                      <Button Content="Run" Tag="{Binding}" Click="FixButton_Click"
-                              Style="{DynamicResource PrimaryButton}"
-                              Visibility="{Binding HasScript, Converter={StaticResource BoolVis}}"/>
-                    </WrapPanel>
+                  <StackPanel>
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                      </Grid.ColumnDefinitions>
 
-                    <StackPanel>
-                      <WrapPanel Margin="0,0,0,3">
-                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13"/>
-                        <Border Background="{DynamicResource BgCard2Brush}" CornerRadius="4"
-                                Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
-                          <TextBlock Text="{Binding Type}" FontSize="10"
+                      <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                        <TextBlock Text="{Binding Title}"
+                                   FontSize="14"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextPriBrush}"
+                                   TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Text="{Binding Id}"
+                                   Margin="0,4,0,0"
+                                   FontSize="11"
+                                   Foreground="{DynamicResource TextMutedBrush}"
+                                   TextTrimming="CharacterEllipsis"
+                                   Visibility="{Binding DataContext.AdvancedModeEnabled, RelativeSource={RelativeSource AncestorType=Page}, Converter={StaticResource BoolVis}}"/>
+                        <TextBlock Text="{Binding Description}"
+                                   Margin="0,6,0,0"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource TextSecBrush}"
+                                   TextTrimming="CharacterEllipsis"/>
+                      </StackPanel>
+
+                      <StackPanel Grid.Column="1"
+                                  Orientation="Horizontal"
+                                  VerticalAlignment="Center">
+                        <Border Background="{Binding RiskLevel, Converter={StaticResource RiskBg}}"
+                                CornerRadius="999"
+                                Padding="8,3"
+                                Margin="0,0,8,0"
+                                VerticalAlignment="Center">
+                          <TextBlock Foreground="{Binding RiskLevel, Converter={StaticResource RiskFg}}"
+                                     FontSize="11"
+                                     FontWeight="SemiBold">
+                            <TextBlock.Text>
+                              <MultiBinding Converter="{StaticResource RiskVariantText}">
+                                <Binding Path="RiskLevel"/>
+                                <Binding Path="DataContext.SimplifiedModeEnabled" RelativeSource="{RelativeSource AncestorType=Page}"/>
+                              </MultiBinding>
+                            </TextBlock.Text>
+                          </TextBlock>
+                        </Border>
+
+                        <ui:SymbolIcon Symbol="Shield20"
+                                       FontSize="15"
+                                       Margin="0,0,8,0"
+                                       Foreground="{DynamicResource AccentAmberBrush}"
+                                       VerticalAlignment="Center"
+                                       Visibility="{Binding RequiresAdmin, Converter={StaticResource AdminVis}}"/>
+                        <Button Content="?"
+                                Click="RequiresAdminHelp_Click"
+                                Width="28"
+                                Height="28"
+                                Margin="0,0,8,0">
+                          <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                              <Setter Property="Visibility" Value="Collapsed"/>
+                              <Style.Triggers>
+                                <MultiDataTrigger>
+                                  <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding DataContext.SimplifiedModeEnabled, RelativeSource={RelativeSource AncestorType=Page}}" Value="True"/>
+                                    <Condition Binding="{Binding RequiresAdmin}" Value="True"/>
+                                  </MultiDataTrigger.Conditions>
+                                  <Setter Property="Visibility" Value="Visible"/>
+                                </MultiDataTrigger>
+                              </Style.Triggers>
+                            </Style>
+                          </Button.Style>
+                          <automation:AutomationProperties.AutomationId>Help_RequiresAdmin_Trigger</automation:AutomationProperties.AutomationId>
+                        </Button>
+                        <Button Content="?"
+                                Click="AdvancedRiskHelp_Click"
+                                Width="28"
+                                Height="28"
+                                Margin="0,0,8,0">
+                          <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                              <Setter Property="Visibility" Value="Collapsed"/>
+                              <Style.Triggers>
+                                <MultiDataTrigger>
+                                  <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding DataContext.SimplifiedModeEnabled, RelativeSource={RelativeSource AncestorType=Page}}" Value="True"/>
+                                    <Condition Binding="{Binding RiskLevel}" Value="{x:Static e:FixRiskLevel.Advanced}"/>
+                                  </MultiDataTrigger.Conditions>
+                                  <Setter Property="Visibility" Value="Visible"/>
+                                </MultiDataTrigger>
+                              </Style.Triggers>
+                            </Style>
+                          </Button.Style>
+                          <automation:AutomationProperties.AutomationId>Help_AdvancedRisk_Trigger</automation:AutomationProperties.AutomationId>
+                        </Button>
+
+                        <Button Content="Run"
+                                Tag="{Binding}"
+                                Click="FixButton_Click"
+                                Style="{DynamicResource PrimaryButton}"
+                                automation:AutomationProperties.AutomationId="Card_Fix_Run">
+                          <Button.ContextMenu>
+                            <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}"
+                                         automation:AutomationProperties.AutomationId="ContextMenu_Fix">
+                              <MenuItem Header="Run Fix"
+                                        Click="FixMenuRun_Click"
+                                        CommandParameter="{Binding}"
+                                        automation:AutomationProperties.AutomationId="Card_Fix_Run"/>
+                              <MenuItem Header="Toggle Details"
+                                        Click="FixMenuToggleDetails_Click"
+                                        CommandParameter="{Binding}"
+                                        automation:AutomationProperties.AutomationId="Card_Fix_Details"/>
+                              <MenuItem Header="Copy Title"
+                                        Click="FixMenuCopyTitle_Click"
+                                        CommandParameter="{Binding}"
+                                        automation:AutomationProperties.AutomationId="Card_Fix_CopyTitle"/>
+                            </ContextMenu>
+                          </Button.ContextMenu>
+                        </Button>
+                      </StackPanel>
+                    </Grid>
+
+                    <Border x:Name="ExpandedDetailPanel"
+                            Margin="0,12,0,0"
+                            Padding="12"
+                            CornerRadius="10"
+                            Background="{DynamicResource BgCard2Brush}"
+                            Style="{StaticResource FixCardExpandedStyle}"
+                            automation:AutomationProperties.AutomationId="{Binding Id, StringFormat=FixCenter_Fix_{0}_Expand}">
+                      <StackPanel>
+                        <TextBlock Text="{Binding Description}"
+                                   TextWrapping="Wrap"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource TextPriBrush}"/>
+
+                        <Grid Margin="0,10,0,0">
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="150"/>
+                            <ColumnDefinition Width="*"/>
+                          </Grid.ColumnDefinitions>
+                          <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                          </Grid.RowDefinitions>
+
+                          <TextBlock Grid.Row="0" Grid.Column="0" Text="Estimated duration"
+                                     FontWeight="SemiBold"
                                      Foreground="{DynamicResource TextSecBrush}"/>
-                        </Border>
-                        <Border Style="{DynamicResource CompactStatusBadge}"
-                                Margin="8,0,0,0"
-                                VerticalAlignment="Center"
-                                Visibility="{Binding HasStatusIndicator, Converter={StaticResource BoolVis}}">
-                          <StackPanel Orientation="Horizontal">
-                            <Ellipse Style="{DynamicResource CompactStatusDot}" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding StatusSummary}" Style="{DynamicResource CompactStatusText}" Margin="6,0,0,0"/>
-                          </StackPanel>
-                        </Border>
-                      </WrapPanel>
-                      <TextBlock Text="{Binding Description}" Style="{DynamicResource CardSub}"
-                                 TextWrapping="Wrap" MaxHeight="48"/>
-                      <Border Background="{DynamicResource BgCardBrush}" CornerRadius="5" Padding="10,6"
-                              Margin="0,8,0,0"
-                              Visibility="{Binding LastOutput, Converter={StaticResource NullCollapsed}}">
-                        <TextBlock Text="{Binding LastOutput}" FontFamily="Consolas" FontSize="11"
-                                   Foreground="{Binding Status, Converter={StaticResource StatusFg}}"
-                                   TextWrapping="Wrap" MaxHeight="72"/>
-                      </Border>
-                      <ProgressBar IsIndeterminate="True" Height="2" Margin="0,6,0,0"
-                                   Foreground="{DynamicResource FoxOrangeBrush}"
-                                   Background="Transparent" BorderThickness="0"
-                                   Visibility="{Binding Status, Converter={StaticResource RunningVis}}"/>
-                    </StackPanel>
-                  </DockPanel>
+                          <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding ExpandedDurationText}"
+                                     Foreground="{DynamicResource TextPriBrush}" TextWrapping="Wrap"/>
+
+                          <TextBlock Grid.Row="1" Grid.Column="0" Margin="0,8,0,0" Text="What this changes"
+                                     FontWeight="SemiBold"
+                                     Foreground="{DynamicResource TextSecBrush}"/>
+                          <TextBlock Grid.Row="1" Grid.Column="1" Margin="0,8,0,0" Text="{Binding ExpandedWhatChanges}"
+                                     Foreground="{DynamicResource TextPriBrush}" TextWrapping="Wrap"/>
+
+                          <TextBlock Grid.Row="2" Grid.Column="0" Margin="0,8,0,0" Text="If it fails"
+                                     FontWeight="SemiBold"
+                                     Foreground="{DynamicResource TextSecBrush}"/>
+                          <TextBlock Grid.Row="2" Grid.Column="1" Margin="0,8,0,0" Text="{Binding ExpandedFailureGuidance}"
+                                     Foreground="{DynamicResource TextPriBrush}" TextWrapping="Wrap"/>
+                        </Grid>
+                      </StackPanel>
+                    </Border>
+                  </StackPanel>
                 </Border>
               </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </ScrollViewer>
+          </ListBox.ItemTemplate>
+        </ListBox>
       </Grid>
-    </DockPanel>
+    </Grid>
   </Grid>
 </Page>

@@ -14,10 +14,10 @@
     <Company>FixFox Software</Company>
     <Description>Windows-native diagnostics, repair workflows, and support package export.</Description>
     <Copyright>Copyright (c) 2025 FixFox Software</Copyright>
-    <Version>1.0.0</Version>
-    <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.0.0.0</FileVersion>
-    <InformationalVersion>1.0.0</InformationalVersion>
+    <Version>1.1.0</Version>
+    <AssemblyVersion>1.1.0.0</AssemblyVersion>
+    <FileVersion>1.1.0.0</FileVersion>
+    <InformationalVersion>1.1.0</InformationalVersion>
     <ApplicationIcon>FixFoxLogo.ico</ApplicationIcon>
     <RepositoryUrl>https://github.com/brogan101/fixfox</RepositoryUrl>
     <StartupObject>HelpDesk.Program</StartupObject>
@@ -69,6 +69,14 @@
     <Page Remove="HelpDesk.UiTests\**\*" />
   </ItemGroup>
 </Project>
+
+
+
+
+
+
+
+
 
 
 
